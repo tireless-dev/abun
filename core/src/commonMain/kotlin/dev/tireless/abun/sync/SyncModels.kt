@@ -1,0 +1,114 @@
+package dev.tireless.abun.sync
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class PullResponse<T>(
+    val items: List<T>,
+    @SerialName("next_cursor") val nextCursor: Long,
+    @SerialName("has_more") val hasMore: Boolean,
+)
+
+@Serializable
+data class BatchRequest<T>(
+    val items: List<T>,
+)
+
+@Serializable
+data class SyncTask(
+    val id: String,
+    @SerialName("parent_id") val parentId: String? = null,
+    @SerialName("routine_id") val routineId: String? = null,
+    val title: String,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),
+    @SerialName("dirty_fields") val dirtyFields: List<String> = emptyList(),
+    @SerialName("accepted_fields") val acceptedFields: List<String>? = null,
+    @SerialName("rejected_fields") val rejectedFields: List<String>? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class SyncRoutine(
+    val id: String,
+    @SerialName("template_title") val templateTitle: String,
+    @SerialName("cron_schedule") val cronSchedule: String,
+    val timezone: String,
+    @SerialName("is_active") val isActive: Boolean = true,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),
+    @SerialName("dirty_fields") val dirtyFields: List<String> = emptyList(),
+    @SerialName("accepted_fields") val acceptedFields: List<String>? = null,
+    @SerialName("rejected_fields") val rejectedFields: List<String>? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class SyncAlarm(
+    val id: String,
+    @SerialName("task_id") val taskId: String,
+    @SerialName("trigger_time") val triggerTime: String,
+    @SerialName("is_active") val isActive: Boolean = true,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),
+    @SerialName("dirty_fields") val dirtyFields: List<String> = emptyList(),
+    @SerialName("accepted_fields") val acceptedFields: List<String>? = null,
+    @SerialName("rejected_fields") val rejectedFields: List<String>? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class SyncTaskEvent(
+    val id: String,
+    @SerialName("task_id") val taskId: String,
+    @SerialName("journal_date") val journalDate: String,
+    @SerialName("event_type") val eventType: TaskEventType,
+    val content: String? = null,
+    @SerialName("event_time") val eventTime: String,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("accepted") val accepted: Boolean? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+enum class TaskEventType {
+    CREATED,
+    MIGRATED,
+    PROGRESSED,
+    ALARM_FIRED,
+    COMPLETED,
+    CANCELLED,
+}
+
+@Serializable
+enum class TaskStatus {
+    UNKNOWN,
+    PENDING,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED,
+}
+
+object TaskStatusDeriver {
+    fun fromEvents(events: List<SyncTaskEvent>): TaskStatus {
+        val latest = events
+            .filterNot(SyncTaskEvent::isDeleted)
+            .maxWithOrNull(compareBy<SyncTaskEvent>({ it.eventTime }, { it.createdAt ?: "" }))
+            ?: return TaskStatus.UNKNOWN
+        return when (latest.eventType) {
+            TaskEventType.CREATED, TaskEventType.MIGRATED, TaskEventType.ALARM_FIRED -> TaskStatus.PENDING
+            TaskEventType.PROGRESSED -> TaskStatus.IN_PROGRESS
+            TaskEventType.COMPLETED -> TaskStatus.COMPLETED
+            TaskEventType.CANCELLED -> TaskStatus.CANCELLED
+        }
+    }
+}

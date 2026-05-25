@@ -1,0 +1,152 @@
+CREATE TABLE routine (
+    id TEXT NOT NULL PRIMARY KEY,
+    template_title TEXT NOT NULL,
+    cron_schedule TEXT NOT NULL,
+    timezone TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE task (
+    id TEXT NOT NULL PRIMARY KEY,
+    parent_id TEXT,
+    routine_id TEXT,
+    title TEXT NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE task_event (
+    id TEXT NOT NULL PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    journal_date TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    content TEXT,
+    event_time INTEGER NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE alarm (
+    id TEXT NOT NULL PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    trigger_time INTEGER NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE sync_state (
+    scope TEXT NOT NULL PRIMARY KEY,
+    last_server_version INTEGER NOT NULL DEFAULT 0
+);
+
+selectTaskById:
+SELECT * FROM task WHERE id = ?;
+
+selectTasks:
+SELECT * FROM task WHERE is_deleted = 0 ORDER BY updated_at DESC, created_at DESC;
+
+selectAllTasks:
+SELECT * FROM task ORDER BY updated_at DESC, created_at DESC;
+
+selectDirtyTasks:
+SELECT * FROM task WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
+
+upsertTask:
+INSERT OR REPLACE INTO task(
+    id, parent_id, routine_id, title, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectRoutineById:
+SELECT * FROM routine WHERE id = ?;
+
+selectAllRoutines:
+SELECT * FROM routine ORDER BY updated_at DESC, created_at DESC;
+
+selectDirtyRoutines:
+SELECT * FROM routine WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
+
+upsertRoutine:
+INSERT OR REPLACE INTO routine(
+    id, template_title, cron_schedule, timezone, is_active, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAlarmById:
+SELECT * FROM alarm WHERE id = ?;
+
+selectAllAlarms:
+SELECT * FROM alarm ORDER BY updated_at DESC, created_at DESC;
+
+selectDirtyAlarms:
+SELECT * FROM alarm WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
+
+upsertAlarm:
+INSERT OR REPLACE INTO alarm(
+    id, task_id, trigger_time, is_active, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectTaskEventById:
+SELECT * FROM task_event WHERE id = ?;
+
+selectTaskEventsForTask:
+SELECT * FROM task_event WHERE task_id = ? ORDER BY event_time DESC, created_at DESC;
+
+selectDirtyTaskEvents:
+SELECT * FROM task_event WHERE is_dirty = 1 ORDER BY event_time ASC, created_at ASC;
+
+selectAllTaskEvents:
+SELECT * FROM task_event ORDER BY event_time ASC, created_at ASC;
+
+upsertTaskEvent:
+INSERT OR REPLACE INTO task_event(
+    id, task_id, journal_date, event_type, content, event_time, is_deleted, server_version, is_dirty, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectJournalEntries:
+SELECT
+    t.id AS task_id,
+    t.title AS title,
+    e.id AS event_id,
+    e.event_type AS event_type,
+    e.content AS content,
+    e.event_time AS event_time,
+    e.created_at AS created_at
+FROM task_event e
+JOIN task t ON e.task_id = t.id
+WHERE e.journal_date = ?
+  AND e.is_deleted = 0
+  AND t.is_deleted = 0
+ORDER BY e.event_time ASC, e.created_at ASC;
+
+selectTaskLatestEvent:
+SELECT * FROM task_event
+WHERE task_id = ?
+  AND is_deleted = 0
+ORDER BY event_time DESC, created_at DESC
+LIMIT 1;
+
+upsertSyncState:
+INSERT OR REPLACE INTO sync_state(scope, last_server_version)
+VALUES (?, ?);
+
+selectSyncState:
+SELECT * FROM sync_state WHERE scope = ?;
