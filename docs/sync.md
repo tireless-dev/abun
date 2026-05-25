@@ -140,6 +140,38 @@ They must not be used as the source-of-truth data stream.
 
 The local database should only be updated through the normal pull/merge process.
 
+Current implementation status:
+
+```text
+- Automatic sync on app startup: implemented
+- Automatic sync after local writes: implemented
+- Remote-change notification trigger: not yet implemented
+```
+
+---
+
+## 1.5 Client sync trigger policy
+
+The client should not require a manual "Sync Now" action for normal operation.
+
+Normal trigger rules:
+
+```text
+1. On app startup, schedule an immediate sync cycle.
+2. After each local-first write to SQLite, schedule a sync cycle.
+3. Multiple rapid local writes may be coalesced with a short debounce.
+4. If a sync is already running and another trigger arrives, queue one follow-up sync cycle.
+5. A manual sync action may still exist as a fallback or debugging affordance.
+```
+
+Notes:
+
+```text
+- Debounce length is an implementation detail, not a protocol-level invariant.
+- Trigger timing may vary by platform lifecycle constraints.
+- These trigger rules do not change the required sync protocol order.
+```
+
 ---
 
 # 2. API Families
@@ -180,6 +212,7 @@ The mobile app normally uses this flow:
 UI action
   -> write to SQLite
   -> mark dirty field groups
+  -> schedule sync
   -> SyncEngine later calls /sync APIs
 ```
 
