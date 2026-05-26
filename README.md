@@ -16,8 +16,8 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
     Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./app/sharedUI/src/jvmMain/kotlin)
     folder is the appropriate location.
 
-* [/app/webApp](./app/webApp) contains a React web application. It uses the Kotlin/JS library produced
-  by the [sharedLogic](./app/sharedLogic) module.
+* [/app/webApp](./app/webApp) contains a React web application. It talks to the server through the direct
+  `/api/*` business API family and does not use the local-first sync layer as its primary data path.
 
 * [/core](./core/src) is for the code that will be shared between all targets in the project.
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
@@ -38,7 +38,6 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
   2. Build and run the web application:
      ```shell
-     npm run build:shared
      npm install
      npm run start
      ```

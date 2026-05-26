@@ -1155,20 +1155,39 @@ They are used by non-local-first clients, web dashboard, backend jobs, admin too
 Example APIs:
 
 ```http
+GET    /api/preferences
+GET    /api/preferences/{key}
+PUT    /api/preferences/{key}
+DELETE /api/preferences/{key}
+
+GET    /api/tasks
+GET    /api/tasks/{id}
 POST   /api/tasks
 PATCH  /api/tasks/{id}
 DELETE /api/tasks/{id}
 
+GET    /api/tasks/{id}/events
 POST   /api/tasks/{id}/events
+GET    /api/tasks/{id}/status
 GET    /api/journals/{date}
 
+GET    /api/routines
+GET    /api/routines/{id}
 POST   /api/routines
 PATCH  /api/routines/{id}
 DELETE /api/routines/{id}
 
+GET    /api/alarms
+GET    /api/alarms/{id}
 POST   /api/alarms
 PATCH  /api/alarms/{id}
 DELETE /api/alarms/{id}
+
+GET    /api/pomodoro-sessions
+GET    /api/pomodoro-sessions/{id}
+POST   /api/pomodoro-sessions
+PATCH  /api/pomodoro-sessions/{id}
+DELETE /api/pomodoro-sessions/{id}
 ```
 
 Rules:
@@ -1178,6 +1197,7 @@ Business APIs must also update sync metadata.
 Business APIs must generate server-side HLC for mutable resources.
 Business APIs must use soft deletes.
 Business APIs must never write task.status.
+Preferences exposed through business APIs must be scoped per user.
 ```
 
 For the KMP local-first app:
@@ -1186,6 +1206,13 @@ For the KMP local-first app:
 UI writes SQLite first.
 SyncEngine uses /sync APIs.
 UI does not call business mutation APIs for ordinary local-first writes.
+```
+
+For the web app:
+
+```text
+React uses the direct /api/* business API family as its primary backend contract.
+The web app is online-first and does not use SyncEngine as its normal write path.
 ```
 
 ---

@@ -1,6 +1,5 @@
 package dev.tireless.abun.app
 
-import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -10,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import dev.tireless.abun.sync.TaskStatus
 
 class AbunAppController(
     dependencies: AppDependencies,
@@ -31,7 +31,9 @@ class AbunAppController(
         ),
     )
 
-    private val _state = MutableStateFlow(AppUiState(selectedDate = dependencies.timeProvider.today().toString()))
+    private val _state = MutableStateFlow(
+        AppUiState(selectedDate = dependencies.timeProvider.today().toString()),
+    )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     private var scheduledSyncJob: Job? = null
     private var isSyncing = false
@@ -42,9 +44,34 @@ class AbunAppController(
         requestSync(immediate = true)
     }
 
+    fun selectTab(tab: AppTab) {
+        _state.value = _state.value.copy(selectedTab = tab)
+    }
+
+    fun selectTaskSubTab(tab: TaskSubTab) {
+        _state.value = _state.value.copy(selectedTaskSubTab = tab, selectedTab = AppTab.TASKS)
+    }
+
+    fun openPreferences() {
+        _state.value = _state.value.copy(isPreferencesOpen = true)
+    }
+
+    fun closePreferences() {
+        _state.value = _state.value.copy(isPreferencesOpen = false)
+    }
+
+    fun openPomodoroDialog() {
+        _state.value = _state.value.copy(isPomodoroDialogOpen = true)
+    }
+
+    fun closePomodoroDialog() {
+        _state.value = _state.value.copy(isPomodoroDialogOpen = false)
+    }
+
     fun createTask(title: String) {
-        if (title.isBlank()) return
-        store.createTask(title.trim(), state.value.selectedDate)
+        val preparedTitle = applyTaskDefaults(title)
+        if (preparedTitle == null) return
+        store.createTask(preparedTitle, state.value.selectedDate)
         refresh()
         requestSync()
     }
@@ -67,8 +94,120 @@ class AbunAppController(
         requestSync()
     }
 
+    fun createRoutine(templateTitle: String, cronSchedule: String, timezone: String) {
+        if (templateTitle.isBlank() || cronSchedule.isBlank()) return
+        store.createRoutine(templateTitle, cronSchedule, timezone)
+        refresh()
+        requestSync()
+    }
+
+    fun updateRoutine(routineId: String, templateTitle: String, cronSchedule: String, timezone: String) {
+        if (templateTitle.isBlank() || cronSchedule.isBlank()) return
+        store.updateRoutine(routineId, templateTitle, cronSchedule, timezone)
+        refresh()
+        requestSync()
+    }
+
+    fun toggleRoutineActive(routineId: String) {
+        store.toggleRoutineActive(routineId)
+        refresh()
+        requestSync()
+    }
+
+    fun deleteRoutine(routineId: String) {
+        store.deleteRoutine(routineId)
+        refresh()
+        requestSync()
+    }
+
+    fun createAlarm(taskId: String, triggerTimeIso: String) {
+        if (taskId.isBlank() || triggerTimeIso.isBlank()) return
+        runCatching { store.createAlarm(taskId, triggerTimeIso) }
+            .onSuccess {
+                refresh()
+                requestSync()
+            }
+    }
+
+    fun updateAlarm(alarmId: String, triggerTimeIso: String) {
+        if (triggerTimeIso.isBlank()) return
+        runCatching { store.updateAlarm(alarmId, triggerTimeIso) }
+            .onSuccess {
+                refresh()
+                requestSync()
+            }
+    }
+
+    fun toggleAlarmActive(alarmId: String) {
+        store.toggleAlarmActive(alarmId)
+        refresh()
+        requestSync()
+    }
+
+    fun deleteAlarm(alarmId: String) {
+        store.deleteAlarm(alarmId)
+        refresh()
+        requestSync()
+    }
+
+    fun startPomodoro(taskId: String? = null, phase: PomodoroPhase = PomodoroPhase.FOCUS) {
+        store.startPomodoroSession(taskId, phase, state.value.preferences)
+        _state.value = _state.value.copy(isPomodoroDialogOpen = true)
+        refresh()
+        requestSync()
+    }
+
+    fun completePomodoro(sessionId: String, note: String?, taskUpdate: PomodoroTaskUpdate) {
+        store.completePomodoroSession(sessionId, note, taskUpdate, state.value.selectedDate)
+        _state.value = _state.value.copy(isPomodoroDialogOpen = false)
+        refresh()
+        requestSync()
+    }
+
+    fun cancelPomodoro(sessionId: String, note: String?) {
+        store.cancelPomodoroSession(sessionId, note)
+        _state.value = _state.value.copy(isPomodoroDialogOpen = false)
+        refresh()
+        requestSync()
+    }
+
+    fun updatePreferences(
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+    ) {
+        store.updatePreferences(
+            titlePrefix = titlePrefix,
+            defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
+            focusMinutes = focusMinutes,
+            shortBreakMinutes = shortBreakMinutes,
+            longBreakMinutes = longBreakMinutes,
+            timezoneOverride = timezoneOverride,
+            dateFormat = dateFormat,
+        )
+        refresh()
+        requestSync()
+    }
+
     fun syncNow() {
         requestSync(immediate = true)
+    }
+
+    fun suggestedAlarmTriggerTimeIso(): String {
+        val leadMinutes = state.value.preferences.defaultAlarmLeadMinutes
+        val now = timeProvider.nowEpochMillis() + leadMinutes * 60_000L
+        return epochMillisToIsoString(now)
+    }
+
+    private fun applyTaskDefaults(title: String): String? {
+        val trimmed = title.trim()
+        if (trimmed.isBlank() && state.value.preferences.blankTitlePolicy == BlankTitlePolicy.REJECT_BLANK) return null
+        val prefix = state.value.preferences.titlePrefix.trim()
+        return if (prefix.isBlank()) trimmed else "$prefix $trimmed".trim()
     }
 
     private fun requestSync(immediate: Boolean = false) {
@@ -112,9 +251,24 @@ class AbunAppController(
     }
 
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
+        val preferences = store.preferences()
+        val tasks = store.allTasks()
+        val alarms = store.alarms(preferences)
         _state.value = _state.value.copy(
-            tasks = store.allTasks(),
-            journalEntries = store.journal(_state.value.selectedDate),
+            today = deriveTodayViewState(
+                tasks = tasks,
+                alarms = alarms,
+                journalEntries = store.journal(_state.value.selectedDate, preferences),
+                nowEpochMillis = timeProvider.nowEpochMillis(),
+            ),
+            taskView = TaskViewState(
+                tasks = tasks,
+                routines = store.routines(),
+                alarms = alarms,
+            ),
+            activePomodoroSession = store.activePomodoroSession(preferences, timeProvider.nowEpochMillis()),
+            recentPomodoroSessions = store.recentPomodoroSessions(preferences = preferences, nowEpochMillis = timeProvider.nowEpochMillis()),
+            preferences = preferences,
             syncState = _state.value.syncState.copy(isSyncing = false, lastSyncedAt = lastSyncedAt),
         )
     }
@@ -124,4 +278,56 @@ class AbunAppController(
 
         fun create(dependencies: AppDependencies): AbunAppController = AbunAppController(dependencies)
     }
+}
+
+private fun AlarmListItemView.toAgendaItem(task: TaskListItemView): AgendaTaskItemView = AgendaTaskItemView(
+    taskId = task.id,
+    title = task.title,
+    status = task.status,
+    triggerTimeLabel = triggerTimeLabel,
+    triggerTimeEpochMillis = isoStringToEpochMillis(triggerTimeIso),
+)
+
+internal fun deriveTodayViewState(
+    tasks: List<TaskListItemView>,
+    alarms: List<AlarmListItemView>,
+    journalEntries: List<JournalEntryView>,
+    nowEpochMillis: Long,
+): TodayViewState {
+    val currentAlarmTasks = alarms.asSequence()
+        .filter { it.isActive }
+        .map { alarm ->
+            val task = tasks.find { it.id == alarm.taskId } ?: return@map null
+            alarm to task
+        }
+        .filterNotNull()
+        .filter { (_, task) -> task.status == TaskStatus.PENDING || task.status == TaskStatus.IN_PROGRESS }
+        .toList()
+    val currentAgenda = currentAlarmTasks
+        .filter { it.first.triggerTimeIso.let(::isoStringToEpochMillis) <= nowEpochMillis }
+        .sortedBy { it.first.triggerTimeIso.let(::isoStringToEpochMillis) }
+        .map { (alarm, task) -> alarm.toAgendaItem(task) }
+    val upcomingAgenda = currentAlarmTasks
+        .filter { it.first.triggerTimeIso.let(::isoStringToEpochMillis) > nowEpochMillis }
+        .sortedBy { it.first.triggerTimeIso.let(::isoStringToEpochMillis) }
+        .map { (alarm, task) -> alarm.toAgendaItem(task) }
+    val taskIdsWithActiveAlarms = alarms.filter { it.isActive }.mapTo(mutableSetOf()) { it.taskId }
+    val fallbackCurrent = if (currentAgenda.isEmpty()) {
+        tasks.filter {
+            it.status == TaskStatus.IN_PROGRESS && it.id !in taskIdsWithActiveAlarms
+        }.map {
+            AgendaTaskItemView(
+                taskId = it.id,
+                title = it.title,
+                status = it.status,
+            )
+        }
+    } else {
+        emptyList()
+    }
+    return TodayViewState(
+        currentTasks = currentAgenda + fallbackCurrent,
+        upcomingTasks = upcomingAgenda,
+        journalEntries = journalEntries,
+    )
 }

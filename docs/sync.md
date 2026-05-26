@@ -145,6 +145,10 @@ Current implementation status:
 ```text
 - Automatic sync on app startup: implemented
 - Automatic sync after local writes: implemented
+- Dedicated /sync/* API family for app clients: implemented
+- Dedicated /api/* API family for direct-access web/online clients: implemented
+- Business API coverage for preferences, routines, tasks, alarms, pomodoro sessions, task events, journals, and task status: implemented
+- Preferences are scoped per user on the server: implemented
 - Remote-change notification trigger: not yet implemented
 ```
 
@@ -236,22 +240,29 @@ Used by:
 Example:
 
 ```http
-GET    /api/transactions
-GET    /api/transactions/{id}
-POST   /api/transactions
-PATCH  /api/transactions/{id}
-DELETE /api/transactions/{id}
+GET    /api/preferences
+PUT    /api/preferences/{key}
+GET    /api/tasks
+GET    /api/tasks/{id}
+POST   /api/tasks
+PATCH  /api/tasks/{id}
+DELETE /api/tasks/{id}
+GET    /api/tasks/{id}/events
+POST   /api/tasks/{id}/events
+GET    /api/journals/{date}
 ```
 
 Business APIs are:
 
 ```text
 - single-resource or paginated APIs
+- do not expose sync-only write metadata such as hlc_map or dirty_fields
 - not used by the local-first mobile UI for ordinary writes
 - responsible for normal online CRUD
 - required to generate server-side HLC tokens
 - required to update server_version
 - required to use soft deletes
+- should enforce per-user ownership and validation on the server
 ```
 
 ---

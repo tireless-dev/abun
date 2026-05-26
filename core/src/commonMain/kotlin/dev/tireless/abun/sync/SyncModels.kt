@@ -80,6 +80,43 @@ data class SyncTaskEvent(
 )
 
 @Serializable
+data class SyncPomodoroSession(
+    val id: String,
+    @SerialName("task_id") val taskId: String? = null,
+    val phase: PomodoroPhaseWire,
+    val state: PomodoroSessionStateWire,
+    @SerialName("started_at") val startedAt: String,
+    @SerialName("ends_at") val endsAt: String,
+    @SerialName("completed_at") val completedAt: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int,
+    val note: String? = null,
+    @SerialName("task_update") val taskUpdate: PomodoroTaskUpdateWire = PomodoroTaskUpdateWire.NONE,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),
+    @SerialName("dirty_fields") val dirtyFields: List<String> = emptyList(),
+    @SerialName("accepted_fields") val acceptedFields: List<String>? = null,
+    @SerialName("rejected_fields") val rejectedFields: List<String>? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class SyncPreference(
+    val key: String,
+    val value: String? = null,
+    @SerialName("value_type") val valueType: PreferenceValueType,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),
+    @SerialName("dirty_fields") val dirtyFields: List<String> = emptyList(),
+    @SerialName("accepted_fields") val acceptedFields: List<String>? = null,
+    @SerialName("rejected_fields") val rejectedFields: List<String>? = null,
+    @SerialName("server_version") val serverVersion: Long = 0,
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
 enum class TaskEventType {
     CREATED,
     MIGRATED,
@@ -96,6 +133,35 @@ enum class TaskStatus {
     IN_PROGRESS,
     COMPLETED,
     CANCELLED,
+}
+
+@Serializable
+enum class PomodoroPhaseWire {
+    FOCUS,
+    SHORT_BREAK,
+    LONG_BREAK,
+}
+
+@Serializable
+enum class PomodoroSessionStateWire {
+    ACTIVE,
+    COMPLETED,
+    CANCELLED,
+}
+
+@Serializable
+enum class PomodoroTaskUpdateWire {
+    NONE,
+    PROGRESS,
+    COMPLETE,
+    CANCEL,
+}
+
+@Serializable
+enum class PreferenceValueType {
+    STRING,
+    INT,
+    ENUM,
 }
 
 object TaskStatusDeriver {

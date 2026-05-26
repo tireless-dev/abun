@@ -1,19 +1,34 @@
 package dev.tireless.abun.app
 
 import dev.tireless.abun.db.AbunDatabase
+import dev.tireless.abun.sync.PomodoroPhaseWire
+import dev.tireless.abun.sync.PomodoroSessionStateWire
+import dev.tireless.abun.sync.PomodoroTaskUpdateWire
 import dev.tireless.abun.sync.SyncAlarm
 import dev.tireless.abun.sync.SyncConflictResolver
+import dev.tireless.abun.sync.SyncPreference
+import dev.tireless.abun.sync.SyncPomodoroSession
 import dev.tireless.abun.sync.SyncRoutine
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
+import dev.tireless.abun.sync.PreferenceValueType
 
 internal data class MutableSyncRow<T>(
     val entity: T,
     val hlcMap: Map<String, String>,
     val dirtyFields: List<String>,
 )
+
+private const val PREF_TASK_TITLE_PREFIX = "task.title_prefix"
+private const val PREF_TASK_DEFAULT_ALARM_LEAD_MINUTES = "task.default_alarm_lead_minutes"
+private const val PREF_TASK_BLANK_TITLE_POLICY = "task.blank_title_policy"
+private const val PREF_POMODORO_FOCUS_MINUTES = "pomodoro.focus_minutes"
+private const val PREF_POMODORO_SHORT_BREAK_MINUTES = "pomodoro.short_break_minutes"
+private const val PREF_POMODORO_LONG_BREAK_MINUTES = "pomodoro.long_break_minutes"
+private const val PREF_APP_TIMEZONE_OVERRIDE = "app.timezone_override"
+private const val PREF_APP_DATE_FORMAT = "app.date_format"
 
 class LocalStore(
     private val database: AbunDatabase,
@@ -25,26 +40,39 @@ class LocalStore(
 
     init {
         SyncScope.entries.forEach { queries.upsertSyncState(it.wireName, 0) }
+        if (queries.selectAllPreferences(::mapPreferenceRow).executeAsList().isEmpty()) {
+            migrateLegacyPreferences()
+        }
     }
 
-    fun allTasks(): List<TaskListItemView> = queries.selectTasks(::mapTaskRow).executeAsList().map { row ->
-        val latestEvent = queries.selectTaskLatestEvent(row.entity.id, ::mapTaskEventRow).executeAsOneOrNull()?.entity?.eventType
-        TaskListItemView(
-            id = row.entity.id,
-            title = row.entity.title,
-            status = when (latestEvent) {
-                null -> TaskStatus.UNKNOWN
-                TaskEventType.CREATED, TaskEventType.MIGRATED, TaskEventType.ALARM_FIRED -> TaskStatus.PENDING
-                TaskEventType.PROGRESSED -> TaskStatus.IN_PROGRESS
-                TaskEventType.COMPLETED -> TaskStatus.COMPLETED
-                TaskEventType.CANCELLED -> TaskStatus.CANCELLED
-            },
-            parentId = row.entity.parentId,
-            routineId = row.entity.routineId,
+    fun allTasks(): List<TaskListItemView> = queries.selectTasks(::mapTaskRow).executeAsList().map(::toTaskListItemView)
+
+    fun routines(): List<RoutineListItemView> = queries.selectActiveRoutines(::mapRoutineRow).executeAsList().map {
+        RoutineListItemView(
+            id = it.entity.id,
+            templateTitle = it.entity.templateTitle,
+            cronSchedule = it.entity.cronSchedule,
+            timezone = it.entity.timezone,
+            isActive = it.entity.isActive,
         )
     }
 
-    fun journal(date: String): List<JournalEntryView> = queries.selectJournalEntries(
+    fun alarms(preferences: PreferencesViewState = preferences()): List<AlarmListItemView> {
+        val taskTitles = allTasks().associateBy(TaskListItemView::id)
+        return queries.selectActiveAlarms(::mapAlarmRow).executeAsList().mapNotNull { row ->
+            val task = taskTitles[row.entity.taskId] ?: return@mapNotNull null
+            AlarmListItemView(
+                id = row.entity.id,
+                taskId = row.entity.taskId,
+                taskTitle = task.title,
+                triggerTimeLabel = formatDateTimeLabel(row.entity.triggerTime, preferences.timezoneOverride, preferences.dateFormat),
+                triggerTimeIso = epochMillisToIsoString(row.entity.triggerTime),
+                isActive = row.entity.isActive,
+            )
+        }
+    }
+
+    fun journal(date: String, preferences: PreferencesViewState = preferences()): List<JournalEntryView> = queries.selectJournalEntries(
         date,
         ::mapJournalRow,
     ).executeAsList().map {
@@ -54,8 +82,142 @@ class LocalStore(
             eventId = it.eventId,
             eventType = enumValueOf(it.eventType),
             content = it.content,
-            eventTimeLabel = epochMillisToIsoString(it.eventTime),
+            eventTimeLabel = formatDateTimeLabel(it.eventTime, preferences.timezoneOverride, preferences.dateFormat),
         )
+    }
+
+    fun preferences(): PreferencesViewState =
+        queries.selectAllPreferences(::mapPreferenceRow).executeAsList().toPreferencesViewState()
+
+    fun updatePreferences(
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+    ) {
+        persistPreferences(
+            PreferencesViewState(
+                titlePrefix = titlePrefix.trim(),
+                defaultAlarmLeadMinutes = defaultAlarmLeadMinutes.coerceIn(0, 24 * 60),
+                focusMinutes = focusMinutes.coerceIn(1, 180),
+                shortBreakMinutes = shortBreakMinutes.coerceIn(1, 60),
+                longBreakMinutes = longBreakMinutes.coerceIn(1, 120),
+                timezoneOverride = timezoneOverride.ifBlank { "SYSTEM" },
+                dateFormat = dateFormat,
+                blankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
+            ),
+        )
+    }
+
+    fun activePomodoroSession(
+        preferences: PreferencesViewState = preferences(),
+        nowEpochMillis: Long = timeProvider.nowEpochMillis(),
+    ): PomodoroSessionView? {
+        val tasksById = allTasks().associateBy(TaskListItemView::id)
+        return queries.selectActivePomodoroSession(::mapPomodoroSessionRow).executeAsOneOrNull()?.let {
+            toPomodoroSessionView(it, tasksById, nowEpochMillis)
+        }
+    }
+
+    fun recentPomodoroSessions(
+        limit: Int = 8,
+        preferences: PreferencesViewState = preferences(),
+        nowEpochMillis: Long = timeProvider.nowEpochMillis(),
+    ): List<PomodoroSessionView> {
+        val tasksById = allTasks().associateBy(TaskListItemView::id)
+        return queries.selectRecentPomodoroSessions(limit.toLong(), ::mapPomodoroSessionRow).executeAsList().map {
+            toPomodoroSessionView(it, tasksById, nowEpochMillis)
+        }
+    }
+
+    fun startPomodoroSession(
+        taskId: String?,
+        phase: PomodoroPhase,
+        preferences: PreferencesViewState = preferences(),
+    ): PomodoroSessionView {
+        val existing = activePomodoroSession(preferences, timeProvider.nowEpochMillis())
+        if (existing != null) return existing
+        val now = timeProvider.nowEpochMillis()
+        val durationMinutes = durationForPhase(phase, preferences)
+        val row = MutableSyncRow(
+            entity = LocalPomodoroSession(
+                id = idGenerator.randomId(),
+                taskId = taskId,
+                phase = phase,
+                state = PomodoroSessionState.ACTIVE,
+                startedAt = now,
+                endsAt = now + durationMinutes * MILLIS_PER_MINUTE,
+                completedAt = null,
+                durationMinutes = durationMinutes,
+                note = null,
+                taskUpdate = PomodoroTaskUpdate.NONE,
+                isDeleted = false,
+                serverVersion = 0,
+                createdAt = now,
+                updatedAt = now,
+            ),
+            hlcMap = mapOf(
+                "task" to clock.next(),
+                "timing" to clock.next(),
+                "state" to clock.next(),
+            ),
+            dirtyFields = listOf("task", "timing", "state"),
+        )
+        persistPomodoroSession(row.entity, row.hlcMap, row.dirtyFields, isDirty = true)
+        val tasksById = allTasks().associateBy(TaskListItemView::id)
+        return toPomodoroSessionView(row, tasksById, now)
+    }
+
+    fun completePomodoroSession(
+        sessionId: String,
+        note: String?,
+        taskUpdate: PomodoroTaskUpdate,
+        journalDate: String,
+    ) = database.transaction {
+        val existing = queries.selectPomodoroSessionById(sessionId, ::mapPomodoroSessionRow).executeAsOneOrNull() ?: return@transaction
+        val now = timeProvider.nowEpochMillis()
+        val updated = existing.entity.copy(
+            state = PomodoroSessionState.COMPLETED,
+            completedAt = now,
+            note = note?.trim()?.ifBlank { null },
+            taskUpdate = taskUpdate,
+            updatedAt = now,
+        )
+        val updatedHlc = existing.hlcMap + mapOf(
+            "state" to clock.next(existing.hlcMap["state"]),
+            "note" to clock.next(existing.hlcMap["note"]),
+            "outcome" to clock.next(existing.hlcMap["outcome"]),
+        )
+        val dirty = (existing.dirtyFields + listOf("state", "note", "outcome")).distinct()
+        persistPomodoroSession(updated, updatedHlc, dirty, isDirty = true)
+        existing.entity.taskId?.let { taskId ->
+            when (taskUpdate) {
+                PomodoroTaskUpdate.NONE -> Unit
+                PomodoroTaskUpdate.PROGRESS -> appendTaskEvent(taskId, journalDate, TaskEventType.PROGRESSED, note)
+                PomodoroTaskUpdate.COMPLETE -> appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
+                PomodoroTaskUpdate.CANCEL -> appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
+            }
+        }
+    }
+
+    fun cancelPomodoroSession(sessionId: String, note: String?) = database.transaction {
+        val existing = queries.selectPomodoroSessionById(sessionId, ::mapPomodoroSessionRow).executeAsOneOrNull() ?: return@transaction
+        val now = timeProvider.nowEpochMillis()
+        val updated = existing.entity.copy(
+            state = PomodoroSessionState.CANCELLED,
+            completedAt = now,
+            note = note?.trim()?.ifBlank { null },
+            updatedAt = now,
+        )
+        val updatedHlc = existing.hlcMap + mapOf(
+            "state" to clock.next(existing.hlcMap["state"]),
+            "note" to clock.next(existing.hlcMap["note"]),
+        )
+        val dirty = (existing.dirtyFields + listOf("state", "note")).distinct()
+        persistPomodoroSession(updated, updatedHlc, dirty, isDirty = true)
     }
 
     fun createTask(title: String, journalDate: String, parentId: String? = null, routineId: String? = null): String =
@@ -126,6 +288,139 @@ class LocalStore(
             isDirty = true,
             createdAt = existing.entity.createdAt,
             updatedAt = timeProvider.nowEpochMillis(),
+        )
+    }
+
+    fun createRoutine(templateTitle: String, cronSchedule: String, timezone: String): String = database.transactionWithResult {
+        val now = timeProvider.nowEpochMillis()
+        val routineId = idGenerator.randomId()
+        persistRoutine(
+            routine = LocalRoutine(
+                id = routineId,
+                templateTitle = templateTitle.trim(),
+                cronSchedule = cronSchedule.trim(),
+                timezone = timezone.ifBlank { "SYSTEM" },
+                isActive = true,
+                isDeleted = false,
+                serverVersion = 0,
+                createdAt = now,
+                updatedAt = now,
+            ),
+            hlcMap = mapOf(
+                "template" to clock.next(),
+                "schedule" to clock.next(),
+                "active" to clock.next(),
+            ),
+            dirtyFields = listOf("template", "schedule", "active"),
+            isDirty = true,
+        )
+        routineId
+    }
+
+    fun updateRoutine(routineId: String, templateTitle: String, cronSchedule: String, timezone: String) = database.transaction {
+        val existing = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull() ?: return@transaction
+        persistRoutine(
+            routine = existing.entity.copy(
+                templateTitle = templateTitle.trim(),
+                cronSchedule = cronSchedule.trim(),
+                timezone = timezone.ifBlank { "SYSTEM" },
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + mapOf(
+                "template" to clock.next(existing.hlcMap["template"]),
+                "schedule" to clock.next(existing.hlcMap["schedule"]),
+            ),
+            dirtyFields = (existing.dirtyFields + listOf("template", "schedule")).distinct(),
+            isDirty = true,
+        )
+    }
+
+    fun toggleRoutineActive(routineId: String) = database.transaction {
+        val existing = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull() ?: return@transaction
+        persistRoutine(
+            routine = existing.entity.copy(
+                isActive = !existing.entity.isActive,
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + ("active" to clock.next(existing.hlcMap["active"])),
+            dirtyFields = (existing.dirtyFields + "active").distinct(),
+            isDirty = true,
+        )
+    }
+
+    fun deleteRoutine(routineId: String) = database.transaction {
+        val existing = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull() ?: return@transaction
+        persistRoutine(
+            routine = existing.entity.copy(
+                isDeleted = true,
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + ("delete" to clock.next(existing.hlcMap["delete"])),
+            dirtyFields = (existing.dirtyFields + "delete").distinct(),
+            isDirty = true,
+        )
+    }
+
+    fun createAlarm(taskId: String, triggerTimeIso: String): String = database.transactionWithResult {
+        val now = timeProvider.nowEpochMillis()
+        val alarmId = idGenerator.randomId()
+        persistAlarm(
+            alarm = LocalAlarm(
+                id = alarmId,
+                taskId = taskId,
+                triggerTime = isoStringToEpochMillis(triggerTimeIso),
+                isActive = true,
+                isDeleted = false,
+                serverVersion = 0,
+                createdAt = now,
+                updatedAt = now,
+            ),
+            hlcMap = mapOf(
+                "trigger" to clock.next(),
+                "active" to clock.next(),
+            ),
+            dirtyFields = listOf("trigger", "active"),
+            isDirty = true,
+        )
+        alarmId
+    }
+
+    fun updateAlarm(alarmId: String, triggerTimeIso: String) = database.transaction {
+        val existing = queries.selectAlarmById(alarmId, ::mapAlarmRow).executeAsOneOrNull() ?: return@transaction
+        persistAlarm(
+            alarm = existing.entity.copy(
+                triggerTime = isoStringToEpochMillis(triggerTimeIso),
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + ("trigger" to clock.next(existing.hlcMap["trigger"])),
+            dirtyFields = (existing.dirtyFields + "trigger").distinct(),
+            isDirty = true,
+        )
+    }
+
+    fun toggleAlarmActive(alarmId: String) = database.transaction {
+        val existing = queries.selectAlarmById(alarmId, ::mapAlarmRow).executeAsOneOrNull() ?: return@transaction
+        persistAlarm(
+            alarm = existing.entity.copy(
+                isActive = !existing.entity.isActive,
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + ("active" to clock.next(existing.hlcMap["active"])),
+            dirtyFields = (existing.dirtyFields + "active").distinct(),
+            isDirty = true,
+        )
+    }
+
+    fun deleteAlarm(alarmId: String) = database.transaction {
+        val existing = queries.selectAlarmById(alarmId, ::mapAlarmRow).executeAsOneOrNull() ?: return@transaction
+        persistAlarm(
+            alarm = existing.entity.copy(
+                isDeleted = true,
+                updatedAt = timeProvider.nowEpochMillis(),
+            ),
+            hlcMap = existing.hlcMap + ("delete" to clock.next(existing.hlcMap["delete"])),
+            dirtyFields = (existing.dirtyFields + "delete").distinct(),
+            isDirty = true,
         )
     }
 
@@ -202,9 +497,15 @@ class LocalStore(
     }
 
     fun dirtyRoutines(): List<SyncRoutine> = queries.selectDirtyRoutines(::mapRoutineRow).executeAsList().map { it.toSyncRoutine() }
+    fun dirtyPreferences(): List<SyncPreference> = queries.selectDirtyPreferences(::mapPreferenceRow).executeAsList().map { it.toSyncPreference() }
     fun dirtyTasks(): List<SyncTask> = queries.selectDirtyTasks(::mapTaskRow).executeAsList().map { it.toSyncTask() }
     fun dirtyAlarms(): List<SyncAlarm> = queries.selectDirtyAlarms(::mapAlarmRow).executeAsList().map { it.toSyncAlarm() }
     fun dirtyTaskEvents(): List<SyncTaskEvent> = queries.selectDirtyTaskEvents(::mapTaskEventRow).executeAsList().map { it.entity.toSyncTaskEvent() }
+    fun dirtyPomodoroSessions(): List<SyncPomodoroSession> = queries.selectDirtyPomodoroSessions(::mapPomodoroSessionRow).executeAsList().map { it.toSyncPomodoroSession() }
+
+    fun mergeRemotePreferences(items: List<SyncPreference>, clearAccepted: Boolean = false) = database.transaction {
+        items.forEach { mergeRemotePreference(it, clearAccepted) }
+    }
 
     fun mergeRemoteRoutines(items: List<SyncRoutine>, clearAccepted: Boolean = false) = database.transaction {
         items.forEach { mergeRemoteRoutine(it, clearAccepted) }
@@ -237,6 +538,10 @@ class LocalStore(
         }
     }
 
+    fun mergeRemotePomodoroSessions(items: List<SyncPomodoroSession>, clearAccepted: Boolean = false) = database.transaction {
+        items.forEach { remote -> mergeRemotePomodoroSession(remote, clearAccepted) }
+    }
+
     fun syncCursor(scope: SyncScope): Long = queries.selectSyncState(scope.wireName).executeAsOne().last_server_version
 
     fun updateSyncCursor(scope: SyncScope, version: Long) {
@@ -262,18 +567,11 @@ class LocalStore(
     private fun mergeRemoteTask(remote: SyncTask, clearAccepted: Boolean) {
         val existing = queries.selectTaskById(remote.id, ::mapTaskRow).executeAsOneOrNull()
         if (existing == null) {
-            persistTask(
-                task = remote.toLocalTask(false),
-                hlcMap = remote.hlcMap,
-                dirtyFields = emptyList(),
-                isDirty = false,
-                createdAt = remote.createdAt?.let(::isoStringToEpochMillis) ?: timeProvider.nowEpochMillis(),
-                updatedAt = remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: timeProvider.nowEpochMillis(),
-            )
+            persistTask(remote.toLocalTask(), remote.hlcMap, emptyList(), false, remote.createdAt?.let(::isoStringToEpochMillis) ?: timeProvider.nowEpochMillis(), remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: timeProvider.nowEpochMillis())
             return
         }
         var mergedTask = existing.entity
-        var mergedHlc = existing.hlcMap.toMutableMap()
+        val mergedHlc = existing.hlcMap.toMutableMap()
         val stillDirty = existing.dirtyFields.toMutableSet()
         for ((field, incomingHlc) in remote.hlcMap) {
             val existingHlc = existing.hlcMap[field]
@@ -286,23 +584,50 @@ class LocalStore(
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) {
-            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        persistTask(mergedTask.copy(serverVersion = remote.serverVersion), mergedHlc, stillDirty.toList(), stillDirty.isNotEmpty(), existing.entity.createdAt, remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: existing.entity.updatedAt)
+    }
+
+    private fun mergeRemotePreference(remote: SyncPreference, clearAccepted: Boolean) {
+        val existing = queries.selectPreferenceByKey(remote.key, ::mapPreferenceRow).executeAsOneOrNull()
+        if (existing == null) {
+            persistPreference(
+                preference = remote.toLocalPreference(),
+                hlcMap = remote.hlcMap,
+                dirtyFields = emptyList(),
+                isDirty = false,
+            )
+            return
         }
-        persistTask(
-            task = mergedTask.copy(serverVersion = remote.serverVersion),
+        var merged = existing.entity
+        val mergedHlc = existing.hlcMap.toMutableMap()
+        val stillDirty = existing.dirtyFields.toMutableSet()
+        for ((field, incomingHlc) in remote.hlcMap) {
+            val existingHlc = existing.hlcMap[field]
+            if (!SyncConflictResolver.shouldAcceptIncoming(incomingHlc, existingHlc)) continue
+            when (field) {
+                "value" -> merged = merged.copy(value = remote.value, valueType = remote.valueType)
+                "delete" -> merged = merged.copy(isDeleted = remote.isDeleted)
+            }
+            mergedHlc[field] = incomingHlc
+        }
+        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        persistPreference(
+            preference = merged.copy(
+                serverVersion = remote.serverVersion,
+                createdAt = existing.entity.createdAt,
+                updatedAt = remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: existing.entity.updatedAt,
+            ),
             hlcMap = mergedHlc,
             dirtyFields = stillDirty.toList(),
             isDirty = stillDirty.isNotEmpty(),
-            createdAt = existing.entity.createdAt,
-            updatedAt = remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: existing.entity.updatedAt,
         )
     }
 
     private fun mergeRemoteRoutine(remote: SyncRoutine, clearAccepted: Boolean) {
         val existing = queries.selectRoutineById(remote.id, ::mapRoutineRow).executeAsOneOrNull()
         if (existing == null) {
-            persistRoutine(remote.toLocalRoutine(false), remote.hlcMap, emptyList(), false)
+            persistRoutine(remote.toLocalRoutine(), remote.hlcMap, emptyList(), false)
             return
         }
         var merged = existing.entity
@@ -326,7 +651,7 @@ class LocalStore(
     private fun mergeRemoteAlarm(remote: SyncAlarm, clearAccepted: Boolean) {
         val existing = queries.selectAlarmById(remote.id, ::mapAlarmRow).executeAsOneOrNull()
         if (existing == null) {
-            persistAlarm(remote.toLocalAlarm(false), remote.hlcMap, emptyList(), false)
+            persistAlarm(remote.toLocalAlarm(), remote.hlcMap, emptyList(), false)
             return
         }
         var merged = existing.entity
@@ -346,53 +671,180 @@ class LocalStore(
         persistAlarm(merged.copy(serverVersion = remote.serverVersion), mergedHlc, stillDirty.toList(), stillDirty.isNotEmpty())
     }
 
-    private fun persistTask(task: LocalTask, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean, createdAt: Long, updatedAt: Long) {
-        queries.upsertTask(
-            id = task.id,
-            parent_id = task.parentId,
-            routine_id = task.routineId,
-            title = task.title,
-            is_deleted = task.isDeleted.toLong(),
-            hlc_map = JsonCodecs.encodeMap(hlcMap),
-            dirty_fields = JsonCodecs.encodeList(dirtyFields),
-            is_dirty = isDirty.toLong(),
-            server_version = task.serverVersion,
-            created_at = createdAt,
-            updated_at = updatedAt,
+    private fun mergeRemotePomodoroSession(remote: SyncPomodoroSession, clearAccepted: Boolean) {
+        val existing = queries.selectPomodoroSessionById(remote.id, ::mapPomodoroSessionRow).executeAsOneOrNull()
+        if (existing == null) {
+            persistPomodoroSession(remote.toLocalPomodoroSession(), remote.hlcMap, emptyList(), false)
+            return
+        }
+        var merged = existing.entity
+        val mergedHlc = existing.hlcMap.toMutableMap()
+        val stillDirty = existing.dirtyFields.toMutableSet()
+        for ((field, incomingHlc) in remote.hlcMap) {
+            val existingHlc = existing.hlcMap[field]
+            if (!SyncConflictResolver.shouldAcceptIncoming(incomingHlc, existingHlc)) continue
+            when (field) {
+                "task" -> merged = merged.copy(taskId = remote.taskId)
+                "timing" -> merged = merged.copy(
+                    startedAt = isoStringToEpochMillis(remote.startedAt),
+                    endsAt = isoStringToEpochMillis(remote.endsAt),
+                    durationMinutes = remote.durationMinutes,
+                )
+                "state" -> merged = merged.copy(
+                    state = remote.state.toApp(),
+                    completedAt = remote.completedAt?.let(::isoStringToEpochMillis),
+                )
+                "note" -> merged = merged.copy(note = remote.note)
+                "outcome" -> merged = merged.copy(taskUpdate = remote.taskUpdate.toApp())
+                "delete" -> merged = merged.copy(isDeleted = remote.isDeleted)
+            }
+            mergedHlc[field] = incomingHlc
+        }
+        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        persistPomodoroSession(
+            merged.copy(
+                serverVersion = remote.serverVersion,
+                createdAt = existing.entity.createdAt,
+                updatedAt = remote.serverUpdatedAt?.let(::isoStringToEpochMillis) ?: existing.entity.updatedAt,
+            ),
+            mergedHlc,
+            stillDirty.toList(),
+            stillDirty.isNotEmpty(),
         )
+    }
+
+    private fun persistTask(task: LocalTask, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean, createdAt: Long, updatedAt: Long) {
+        queries.upsertTask(task.id, task.parentId, task.routineId, task.title, task.isDeleted.toLong(), JsonCodecs.encodeMap(hlcMap), JsonCodecs.encodeList(dirtyFields), isDirty.toLong(), task.serverVersion, createdAt, updatedAt)
     }
 
     private fun persistRoutine(routine: LocalRoutine, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean) {
-        queries.upsertRoutine(
-            id = routine.id,
-            template_title = routine.templateTitle,
-            cron_schedule = routine.cronSchedule,
-            timezone = routine.timezone,
-            is_active = routine.isActive.toLong(),
-            is_deleted = routine.isDeleted.toLong(),
-            hlc_map = JsonCodecs.encodeMap(hlcMap),
-            dirty_fields = JsonCodecs.encodeList(dirtyFields),
-            is_dirty = isDirty.toLong(),
-            server_version = routine.serverVersion,
-            created_at = routine.createdAt,
-            updated_at = routine.updatedAt,
-        )
+        queries.upsertRoutine(routine.id, routine.templateTitle, routine.cronSchedule, routine.timezone, routine.isActive.toLong(), routine.isDeleted.toLong(), JsonCodecs.encodeMap(hlcMap), JsonCodecs.encodeList(dirtyFields), isDirty.toLong(), routine.serverVersion, routine.createdAt, routine.updatedAt)
     }
 
     private fun persistAlarm(alarm: LocalAlarm, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean, createdAt: Long = alarm.createdAt, updatedAt: Long = alarm.updatedAt) {
-        queries.upsertAlarm(
-            id = alarm.id,
-            task_id = alarm.taskId,
-            trigger_time = alarm.triggerTime,
-            is_active = alarm.isActive.toLong(),
-            is_deleted = alarm.isDeleted.toLong(),
+        queries.upsertAlarm(alarm.id, alarm.taskId, alarm.triggerTime, alarm.isActive.toLong(), alarm.isDeleted.toLong(), JsonCodecs.encodeMap(hlcMap), JsonCodecs.encodeList(dirtyFields), isDirty.toLong(), alarm.serverVersion, createdAt, updatedAt)
+    }
+
+    private fun persistPomodoroSession(session: LocalPomodoroSession, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean) {
+        queries.upsertPomodoroSession(
+            session.id,
+            session.taskId,
+            session.phase.name,
+            session.state.name,
+            session.startedAt,
+            session.endsAt,
+            session.completedAt,
+            session.durationMinutes.toLong(),
+            session.note,
+            session.taskUpdate.name,
+            session.isDeleted.toLong(),
+            JsonCodecs.encodeMap(hlcMap),
+            JsonCodecs.encodeList(dirtyFields),
+            isDirty.toLong(),
+            session.serverVersion,
+            session.createdAt,
+            session.updatedAt,
+        )
+    }
+
+    private fun persistPreferences(preferences: PreferencesViewState) {
+        persistPreferenceEntry(PREF_TASK_TITLE_PREFIX, preferences.titlePrefix.ifBlank { null }, PreferenceValueType.STRING)
+        persistPreferenceEntry(PREF_TASK_DEFAULT_ALARM_LEAD_MINUTES, preferences.defaultAlarmLeadMinutes.toString(), PreferenceValueType.INT)
+        persistPreferenceEntry(PREF_POMODORO_FOCUS_MINUTES, preferences.focusMinutes.toString(), PreferenceValueType.INT)
+        persistPreferenceEntry(PREF_POMODORO_SHORT_BREAK_MINUTES, preferences.shortBreakMinutes.toString(), PreferenceValueType.INT)
+        persistPreferenceEntry(PREF_POMODORO_LONG_BREAK_MINUTES, preferences.longBreakMinutes.toString(), PreferenceValueType.INT)
+        persistPreferenceEntry(PREF_APP_TIMEZONE_OVERRIDE, preferences.timezoneOverride, PreferenceValueType.STRING)
+        persistPreferenceEntry(PREF_APP_DATE_FORMAT, preferences.dateFormat.name, PreferenceValueType.ENUM)
+        persistPreferenceEntry(PREF_TASK_BLANK_TITLE_POLICY, preferences.blankTitlePolicy.name, PreferenceValueType.ENUM)
+    }
+
+    private fun persistPreferenceEntry(key: String, value: String?, valueType: PreferenceValueType) {
+        val existing = queries.selectPreferenceByKey(key, ::mapPreferenceRow).executeAsOneOrNull()
+        val now = timeProvider.nowEpochMillis()
+        val valueChanged = existing?.entity?.value != value || existing?.entity?.valueType != valueType || existing?.entity?.isDeleted != false
+        val currentHlc = existing?.hlcMap?.get("value")
+        val dirtyFields = if (valueChanged) (existing?.dirtyFields.orEmpty() + "value").distinct() else existing?.dirtyFields.orEmpty()
+        persistPreference(
+            preference = LocalPreference(
+                key = key,
+                value = value,
+                valueType = valueType,
+                isDeleted = false,
+                serverVersion = existing?.entity?.serverVersion ?: 0L,
+                createdAt = existing?.entity?.createdAt ?: now,
+                updatedAt = now,
+            ),
+            hlcMap = if (valueChanged) (existing?.hlcMap.orEmpty() + ("value" to clock.next(currentHlc))) else existing?.hlcMap.orEmpty(),
+            dirtyFields = dirtyFields,
+            isDirty = valueChanged || (existing?.dirtyFields?.isNotEmpty() == true),
+        )
+    }
+
+    private fun persistPreference(preference: LocalPreference, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean) {
+        queries.upsertPreference(
+            pref_key = preference.key,
+            pref_value = preference.value,
+            value_type = preference.valueType.name,
+            is_deleted = preference.isDeleted.toLong(),
             hlc_map = JsonCodecs.encodeMap(hlcMap),
             dirty_fields = JsonCodecs.encodeList(dirtyFields),
             is_dirty = isDirty.toLong(),
-            server_version = alarm.serverVersion,
-            created_at = createdAt,
-            updated_at = updatedAt,
+            server_version = preference.serverVersion,
+            created_at = preference.createdAt,
+            updated_at = preference.updatedAt,
         )
+    }
+
+    private fun migrateLegacyPreferences() {
+        val legacy = queries.selectAppPreferences(::mapAppPreferencesRow).executeAsOneOrNull()?.toViewState() ?: return
+        persistPreferences(legacy)
+    }
+
+    private fun toTaskListItemView(row: MutableSyncRow<LocalTask>): TaskListItemView {
+        val latestEvent = queries.selectTaskLatestEvent(row.entity.id, ::mapTaskEventRow).executeAsOneOrNull()?.entity?.eventType
+        return TaskListItemView(
+            id = row.entity.id,
+            title = row.entity.title,
+            status = when (latestEvent) {
+                null -> TaskStatus.UNKNOWN
+                TaskEventType.CREATED, TaskEventType.MIGRATED, TaskEventType.ALARM_FIRED -> TaskStatus.PENDING
+                TaskEventType.PROGRESSED -> TaskStatus.IN_PROGRESS
+                TaskEventType.COMPLETED -> TaskStatus.COMPLETED
+                TaskEventType.CANCELLED -> TaskStatus.CANCELLED
+            },
+            parentId = row.entity.parentId,
+            routineId = row.entity.routineId,
+        )
+    }
+
+    private fun toPomodoroSessionView(
+        row: MutableSyncRow<LocalPomodoroSession>,
+        tasksById: Map<String, TaskListItemView>,
+        nowEpochMillis: Long,
+    ): PomodoroSessionView = PomodoroSessionView(
+        id = row.entity.id,
+        taskId = row.entity.taskId,
+        taskTitle = row.entity.taskId?.let(tasksById::get)?.title,
+        phase = row.entity.phase,
+        state = row.entity.state,
+        startedAtEpochMillis = row.entity.startedAt,
+        endsAtEpochMillis = row.entity.endsAt,
+        completedAtEpochMillis = row.entity.completedAt,
+        durationMinutes = row.entity.durationMinutes,
+        note = row.entity.note,
+        taskUpdate = row.entity.taskUpdate,
+        isOverdue = row.entity.state == PomodoroSessionState.ACTIVE && row.entity.endsAt <= nowEpochMillis,
+    )
+
+    private fun durationForPhase(phase: PomodoroPhase, preferences: PreferencesViewState): Int = when (phase) {
+        PomodoroPhase.FOCUS -> preferences.focusMinutes
+        PomodoroPhase.SHORT_BREAK -> preferences.shortBreakMinutes
+        PomodoroPhase.LONG_BREAK -> preferences.longBreakMinutes
+    }
+
+    companion object {
+        private const val SINGLETON_ROW_ID = 1L
+        private const val MILLIS_PER_MINUTE = 60_000L
     }
 }
 
@@ -443,6 +895,44 @@ internal data class LocalTaskEvent(
     val createdAt: Long,
 )
 
+internal data class LocalAppPreferences(
+    val titlePrefix: String?,
+    val defaultAlarmLeadMinutes: Int,
+    val defaultFocusMinutes: Int,
+    val defaultShortBreakMinutes: Int,
+    val defaultLongBreakMinutes: Int,
+    val timezoneOverride: String,
+    val dateFormat: DateFormatPreference,
+    val blankTitlePolicy: BlankTitlePolicy,
+)
+
+internal data class LocalPreference(
+    val key: String,
+    val value: String?,
+    val valueType: PreferenceValueType,
+    val isDeleted: Boolean,
+    val serverVersion: Long,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+internal data class LocalPomodoroSession(
+    val id: String,
+    val taskId: String?,
+    val phase: PomodoroPhase,
+    val state: PomodoroSessionState,
+    val startedAt: Long,
+    val endsAt: Long,
+    val completedAt: Long?,
+    val durationMinutes: Int,
+    val note: String?,
+    val taskUpdate: PomodoroTaskUpdate,
+    val isDeleted: Boolean,
+    val serverVersion: Long,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
 internal data class JournalRow(
     val taskId: String,
     val title: String,
@@ -465,11 +955,7 @@ private fun mapTaskRow(
     server_version: Long,
     created_at: Long,
     updated_at: Long,
-): MutableSyncRow<LocalTask> = MutableSyncRow(
-    entity = LocalTask(id, parent_id, routine_id, title, is_deleted != 0L, server_version, created_at, updated_at),
-    hlcMap = JsonCodecs.decodeMap(hlc_map),
-    dirtyFields = if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
-)
+): MutableSyncRow<LocalTask> = MutableSyncRow(LocalTask(id, parent_id, routine_id, title, is_deleted != 0L, server_version, created_at, updated_at), JsonCodecs.decodeMap(hlc_map), if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList())
 
 private fun mapRoutineRow(
     id: String,
@@ -484,11 +970,7 @@ private fun mapRoutineRow(
     server_version: Long,
     created_at: Long,
     updated_at: Long,
-): MutableSyncRow<LocalRoutine> = MutableSyncRow(
-    entity = LocalRoutine(id, template_title, cron_schedule, timezone, is_active != 0L, is_deleted != 0L, server_version, created_at, updated_at),
-    hlcMap = JsonCodecs.decodeMap(hlc_map),
-    dirtyFields = if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
-)
+): MutableSyncRow<LocalRoutine> = MutableSyncRow(LocalRoutine(id, template_title, cron_schedule, timezone, is_active != 0L, is_deleted != 0L, server_version, created_at, updated_at), JsonCodecs.decodeMap(hlc_map), if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList())
 
 private fun mapAlarmRow(
     id: String,
@@ -502,11 +984,7 @@ private fun mapAlarmRow(
     server_version: Long,
     created_at: Long,
     updated_at: Long,
-): MutableSyncRow<LocalAlarm> = MutableSyncRow(
-    entity = LocalAlarm(id, task_id, trigger_time, is_active != 0L, is_deleted != 0L, server_version, created_at, updated_at),
-    hlcMap = JsonCodecs.decodeMap(hlc_map),
-    dirtyFields = if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
-)
+): MutableSyncRow<LocalAlarm> = MutableSyncRow(LocalAlarm(id, task_id, trigger_time, is_active != 0L, is_deleted != 0L, server_version, created_at, updated_at), JsonCodecs.decodeMap(hlc_map), if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList())
 
 private fun mapTaskEventRow(
     id: String,
@@ -519,40 +997,95 @@ private fun mapTaskEventRow(
     server_version: Long,
     is_dirty: Long,
     created_at: Long,
-): MutableSyncRow<LocalTaskEvent> = MutableSyncRow(
-    entity = LocalTaskEvent(
-        id = id,
-        taskId = task_id,
-        journalDate = journal_date,
-        eventType = enumValueOf(event_type),
-        content = content,
-        eventTime = event_time,
-        isDeleted = is_deleted != 0L,
-        serverVersion = server_version,
-        isDirty = is_dirty != 0L,
-        createdAt = created_at,
-    ),
-    hlcMap = emptyMap(),
-    dirtyFields = emptyList(),
+): MutableSyncRow<LocalTaskEvent> = MutableSyncRow(LocalTaskEvent(id, task_id, journal_date, enumValueOf(event_type), content, event_time, is_deleted != 0L, server_version, is_dirty != 0L, created_at), emptyMap(), emptyList())
+
+private fun mapPomodoroSessionRow(
+    id: String,
+    task_id: String?,
+    phase: String,
+    state: String,
+    started_at: Long,
+    ends_at: Long,
+    completed_at: Long?,
+    duration_minutes: Long,
+    note: String?,
+    task_update: String,
+    is_deleted: Long,
+    hlc_map: String,
+    dirty_fields: String,
+    is_dirty: Long,
+    server_version: Long,
+    created_at: Long,
+    updated_at: Long,
+): MutableSyncRow<LocalPomodoroSession> = MutableSyncRow(
+    LocalPomodoroSession(id, task_id, enumValueOf(phase), enumValueOf(state), started_at, ends_at, completed_at, duration_minutes.toInt(), note, enumValueOf(task_update), is_deleted != 0L, server_version, created_at, updated_at),
+    JsonCodecs.decodeMap(hlc_map),
+    if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
 )
 
-private fun mapJournalRow(
-    task_id: String,
-    title: String,
-    event_id: String,
-    event_type: String,
-    content: String?,
-    event_time: Long,
+private fun mapJournalRow(task_id: String, title: String, event_id: String, event_type: String, content: String?, event_time: Long, created_at: Long): JournalRow =
+    JournalRow(task_id, title, event_id, event_type, content, event_time, created_at)
+
+private fun mapAppPreferencesRow(
+    id: Long,
+    title_prefix: String?,
+    default_alarm_lead_minutes: Long,
+    default_focus_minutes: Long,
+    default_short_break_minutes: Long,
+    default_long_break_minutes: Long,
+    timezone_override: String,
+    date_format: String,
+    blank_title_policy: String,
+): LocalAppPreferences = LocalAppPreferences(title_prefix, default_alarm_lead_minutes.toInt(), default_focus_minutes.toInt(), default_short_break_minutes.toInt(), default_long_break_minutes.toInt(), timezone_override, enumValueOf(date_format), enumValueOf(blank_title_policy))
+
+private fun mapPreferenceRow(
+    pref_key: String,
+    pref_value: String?,
+    value_type: String,
+    is_deleted: Long,
+    hlc_map: String,
+    dirty_fields: String,
+    is_dirty: Long,
+    server_version: Long,
     created_at: Long,
-): JournalRow = JournalRow(task_id, title, event_id, event_type, content, event_time, created_at)
+    updated_at: Long,
+): MutableSyncRow<LocalPreference> = MutableSyncRow(
+    entity = LocalPreference(pref_key, pref_value, enumValueOf(value_type), is_deleted != 0L, server_version, created_at, updated_at),
+    hlcMap = JsonCodecs.decodeMap(hlc_map),
+    dirtyFields = if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
+)
+
+private fun LocalAppPreferences.toViewState(): PreferencesViewState = PreferencesViewState(
+    titlePrefix = titlePrefix.orEmpty(),
+    defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
+    focusMinutes = defaultFocusMinutes,
+    shortBreakMinutes = defaultShortBreakMinutes,
+    longBreakMinutes = defaultLongBreakMinutes,
+    timezoneOverride = timezoneOverride,
+    dateFormat = dateFormat,
+    blankTitlePolicy = blankTitlePolicy,
+)
+
+private fun List<MutableSyncRow<LocalPreference>>.toPreferencesViewState(): PreferencesViewState {
+    val byKey = associateBy { it.entity.key }
+    return PreferencesViewState(
+        titlePrefix = byKey[PREF_TASK_TITLE_PREFIX]?.entity?.value.orEmpty(),
+        defaultAlarmLeadMinutes = byKey[PREF_TASK_DEFAULT_ALARM_LEAD_MINUTES]?.entity?.value?.toIntOrNull() ?: 15,
+        focusMinutes = byKey[PREF_POMODORO_FOCUS_MINUTES]?.entity?.value?.toIntOrNull() ?: 25,
+        shortBreakMinutes = byKey[PREF_POMODORO_SHORT_BREAK_MINUTES]?.entity?.value?.toIntOrNull() ?: 5,
+        longBreakMinutes = byKey[PREF_POMODORO_LONG_BREAK_MINUTES]?.entity?.value?.toIntOrNull() ?: 15,
+        timezoneOverride = byKey[PREF_APP_TIMEZONE_OVERRIDE]?.entity?.value ?: "SYSTEM",
+        dateFormat = byKey[PREF_APP_DATE_FORMAT]?.entity?.value?.let(DateFormatPreference::valueOf) ?: DateFormatPreference.ISO,
+        blankTitlePolicy = byKey[PREF_TASK_BLANK_TITLE_POLICY]?.entity?.value?.let(BlankTitlePolicy::valueOf) ?: BlankTitlePolicy.REJECT_BLANK,
+    )
+}
 
 private fun Boolean.toLong(): Long = if (this) 1 else 0
 
-private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(
-    id = entity.id,
-    parentId = entity.parentId,
-    routineId = entity.routineId,
-    title = entity.title,
+private fun MutableSyncRow<LocalPreference>.toSyncPreference(): SyncPreference = SyncPreference(
+    key = entity.key,
+    value = entity.value,
+    valueType = entity.valueType,
     isDeleted = entity.isDeleted,
     hlcMap = hlcMap,
     dirtyFields = dirtyFields,
@@ -560,24 +1093,23 @@ private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(
     createdAt = epochMillisToIsoString(entity.createdAt),
 )
 
-private fun MutableSyncRow<LocalRoutine>.toSyncRoutine(): SyncRoutine = SyncRoutine(
-    id = entity.id,
-    templateTitle = entity.templateTitle,
-    cronSchedule = entity.cronSchedule,
-    timezone = entity.timezone,
-    isActive = entity.isActive,
-    isDeleted = entity.isDeleted,
-    hlcMap = hlcMap,
-    dirtyFields = dirtyFields,
-    serverVersion = entity.serverVersion,
-    createdAt = epochMillisToIsoString(entity.createdAt),
-)
+private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(entity.id, entity.parentId, entity.routineId, entity.title, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
 
-private fun MutableSyncRow<LocalAlarm>.toSyncAlarm(): SyncAlarm = SyncAlarm(
+private fun MutableSyncRow<LocalRoutine>.toSyncRoutine(): SyncRoutine = SyncRoutine(entity.id, entity.templateTitle, entity.cronSchedule, entity.timezone, entity.isActive, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
+
+private fun MutableSyncRow<LocalAlarm>.toSyncAlarm(): SyncAlarm = SyncAlarm(entity.id, entity.taskId, epochMillisToIsoString(entity.triggerTime), entity.isActive, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
+
+private fun MutableSyncRow<LocalPomodoroSession>.toSyncPomodoroSession(): SyncPomodoroSession = SyncPomodoroSession(
     id = entity.id,
     taskId = entity.taskId,
-    triggerTime = epochMillisToIsoString(entity.triggerTime),
-    isActive = entity.isActive,
+    phase = entity.phase.toWire(),
+    state = entity.state.toWire(),
+    startedAt = epochMillisToIsoString(entity.startedAt),
+    endsAt = epochMillisToIsoString(entity.endsAt),
+    completedAt = entity.completedAt?.let(::epochMillisToIsoString),
+    durationMinutes = entity.durationMinutes,
+    note = entity.note,
+    taskUpdate = entity.taskUpdate.toWire(),
     isDeleted = entity.isDeleted,
     hlcMap = hlcMap,
     dirtyFields = dirtyFields,
@@ -585,48 +1117,44 @@ private fun MutableSyncRow<LocalAlarm>.toSyncAlarm(): SyncAlarm = SyncAlarm(
     createdAt = epochMillisToIsoString(entity.createdAt),
 )
 
-private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
+private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(id, taskId, journalDate, eventType, content, epochMillisToIsoString(eventTime), isDeleted, serverVersion = serverVersion, createdAt = epochMillisToIsoString(createdAt))
+
+private fun SyncTask.toLocalTask(): LocalTask = LocalTask(id, parentId, routineId, title, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
+
+private fun SyncRoutine.toLocalRoutine(): LocalRoutine = LocalRoutine(id, templateTitle, cronSchedule, timezone, isActive, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
+
+private fun SyncAlarm.toLocalAlarm(): LocalAlarm = LocalAlarm(id, taskId, isoStringToEpochMillis(triggerTime), isActive, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
+
+private fun SyncPomodoroSession.toLocalPomodoroSession(): LocalPomodoroSession = LocalPomodoroSession(
     id = id,
     taskId = taskId,
-    journalDate = journalDate,
-    eventType = eventType,
-    content = content,
-    eventTime = epochMillisToIsoString(eventTime),
-    isDeleted = isDeleted,
-    serverVersion = serverVersion,
-    createdAt = epochMillisToIsoString(createdAt),
-)
-
-private fun SyncTask.toLocalTask(isDirty: Boolean): LocalTask = LocalTask(
-    id = id,
-    parentId = parentId,
-    routineId = routineId,
-    title = title,
+    phase = phase.toApp(),
+    state = state.toApp(),
+    startedAt = isoStringToEpochMillis(startedAt),
+    endsAt = isoStringToEpochMillis(endsAt),
+    completedAt = completedAt?.let(::isoStringToEpochMillis),
+    durationMinutes = durationMinutes,
+    note = note,
+    taskUpdate = taskUpdate.toApp(),
     isDeleted = isDeleted,
     serverVersion = serverVersion,
     createdAt = createdAt?.let(::isoStringToEpochMillis) ?: 0L,
     updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
 )
 
-private fun SyncRoutine.toLocalRoutine(isDirty: Boolean): LocalRoutine = LocalRoutine(
-    id = id,
-    templateTitle = templateTitle,
-    cronSchedule = cronSchedule,
-    timezone = timezone,
-    isActive = isActive,
+private fun SyncPreference.toLocalPreference(): LocalPreference = LocalPreference(
+    key = key,
+    value = value,
+    valueType = valueType,
     isDeleted = isDeleted,
     serverVersion = serverVersion,
     createdAt = createdAt?.let(::isoStringToEpochMillis) ?: 0L,
     updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
 )
 
-private fun SyncAlarm.toLocalAlarm(isDirty: Boolean): LocalAlarm = LocalAlarm(
-    id = id,
-    taskId = taskId,
-    triggerTime = isoStringToEpochMillis(triggerTime),
-    isActive = isActive,
-    isDeleted = isDeleted,
-    serverVersion = serverVersion,
-    createdAt = createdAt?.let(::isoStringToEpochMillis) ?: 0L,
-    updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
-)
+private fun PomodoroPhase.toWire(): PomodoroPhaseWire = PomodoroPhaseWire.valueOf(name)
+private fun PomodoroPhaseWire.toApp(): PomodoroPhase = PomodoroPhase.valueOf(name)
+private fun PomodoroSessionState.toWire(): PomodoroSessionStateWire = PomodoroSessionStateWire.valueOf(name)
+private fun PomodoroSessionStateWire.toApp(): PomodoroSessionState = PomodoroSessionState.valueOf(name)
+private fun PomodoroTaskUpdate.toWire(): PomodoroTaskUpdateWire = PomodoroTaskUpdateWire.valueOf(name)
+private fun PomodoroTaskUpdateWire.toApp(): PomodoroTaskUpdate = PomodoroTaskUpdate.valueOf(name)

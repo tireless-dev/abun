@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.ktor.serverContentNegotiation)
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)
+    implementation(libs.ktor.serverStatusPages)
     testImplementation(libs.h2)
     testImplementation(libs.ktor.clientContentNegotiation)
     testImplementation(libs.ktor.clientJson)

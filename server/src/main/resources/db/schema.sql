@@ -7,6 +7,21 @@ INSERT INTO sync_server_version (id, next_value)
 VALUES (1, 0)
 ON CONFLICT (id) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS preference (
+    user_id VARCHAR(255) NOT NULL,
+    pref_key TEXT NOT NULL,
+    pref_value TEXT,
+    value_type TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    hlc_map TEXT NOT NULL,
+    server_version BIGINT NOT NULL,
+    server_updated_at VARCHAR(255) NOT NULL,
+    created_at VARCHAR(255) NOT NULL,
+    PRIMARY KEY (user_id, pref_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_preference_user_server_version ON preference(user_id, server_version);
+
 CREATE TABLE IF NOT EXISTS routine (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
@@ -72,3 +87,25 @@ CREATE TABLE IF NOT EXISTS task_event (
 CREATE INDEX IF NOT EXISTS idx_task_event_user_server_version ON task_event(user_id, server_version);
 CREATE INDEX IF NOT EXISTS idx_task_event_user_journal_date ON task_event(user_id, journal_date);
 CREATE INDEX IF NOT EXISTS idx_task_event_task_id ON task_event(task_id);
+
+CREATE TABLE IF NOT EXISTS pomodoro_session (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    task_id VARCHAR(255),
+    phase VARCHAR(64) NOT NULL,
+    state VARCHAR(64) NOT NULL,
+    started_at VARCHAR(255) NOT NULL,
+    ends_at VARCHAR(255) NOT NULL,
+    completed_at VARCHAR(255),
+    duration_minutes INTEGER NOT NULL,
+    note TEXT,
+    task_update VARCHAR(64) NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    hlc_map TEXT NOT NULL,
+    server_version BIGINT NOT NULL,
+    server_updated_at VARCHAR(255) NOT NULL,
+    created_at VARCHAR(255) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pomodoro_session_user_server_version ON pomodoro_session(user_id, server_version);
+CREATE INDEX IF NOT EXISTS idx_pomodoro_session_task_id ON pomodoro_session(task_id);

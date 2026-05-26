@@ -3,9 +3,15 @@ package dev.tireless.abun
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import dev.tireless.abun.sync.HybridLogicalClock
+import dev.tireless.abun.sync.PomodoroPhaseWire
+import dev.tireless.abun.sync.PomodoroSessionStateWire
+import dev.tireless.abun.sync.PomodoroTaskUpdateWire
+import dev.tireless.abun.sync.PreferenceValueType
 import dev.tireless.abun.sync.PullResponse
 import dev.tireless.abun.sync.SyncAlarm
 import dev.tireless.abun.sync.SyncConflictResolver
+import dev.tireless.abun.sync.SyncPomodoroSession
+import dev.tireless.abun.sync.SyncPreference
 import dev.tireless.abun.sync.SyncRoutine
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
@@ -38,10 +44,12 @@ class AppServices private constructor(
 ) : AutoCloseable {
     private val serverClock = HybridLogicalClock(nodeId = "server") { clock().toEpochMilli() }
 
-    internal val routines = RoutineSyncService(database)
+    internal val preferences = PreferenceSyncService(database, serverClock)
+    internal val routines = RoutineSyncService(database, serverClock)
     internal val tasks = TaskSyncService(database, serverClock)
-    internal val alarms = AlarmSyncService(database)
+    internal val alarms = AlarmSyncService(database, serverClock)
     internal val taskEvents = TaskEventSyncService(database)
+    internal val pomodoroSessions = PomodoroSessionSyncService(database, serverClock)
 
     override fun close() {
         database.close()
@@ -163,7 +171,7 @@ internal class ServerDatabase(
 }
 
 internal abstract class BaseMutableSyncService<T>(
-    private val database: ServerDatabase,
+    protected val database: ServerDatabase,
 ) {
     fun list(userId: String, cursor: Long, limit: Int): PullResponse<T> = database.read { connection ->
         val items = selectAfterCursor(connection, userId, cursor, limit)
@@ -201,8 +209,169 @@ internal abstract class BaseMutableSyncService<T>(
     protected abstract fun mergeExisting(connection: Connection, userId: String, existing: T, incoming: T): T
 }
 
+internal class PreferenceSyncService(
+    database: ServerDatabase,
+    private val serverClock: HybridLogicalClock,
+) : BaseMutableSyncService<SyncPreference>(database) {
+    override fun idOf(item: SyncPreference): String = item.key
+    override fun serverVersionOf(item: SyncPreference): Long = item.serverVersion
+
+    override fun selectAfterCursor(connection: Connection, userId: String, cursor: Long, limit: Int): List<SyncPreference> =
+        connection.prepareStatement(
+            """
+            SELECT * FROM preference
+            WHERE user_id = ? AND server_version > ?
+            ORDER BY server_version ASC
+            LIMIT ?
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setLong(2, cursor)
+            statement.setInt(3, limit)
+            statement.executeQuery().use(::readPreferences)
+        }
+
+    override fun selectAll(connection: Connection, userId: String): List<SyncPreference> =
+        connection.prepareStatement("SELECT * FROM preference WHERE user_id = ? ORDER BY server_version ASC").use { statement ->
+            statement.setString(1, userId)
+            statement.executeQuery().use(::readPreferences)
+        }
+
+    override fun selectOne(connection: Connection, userId: String, id: String, forUpdate: Boolean): SyncPreference? =
+        connection.prepareStatement(
+            "SELECT * FROM preference WHERE user_id = ? AND pref_key = ?${if (forUpdate) " FOR UPDATE" else ""}",
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setString(2, id)
+            statement.executeQuery().use { rs -> if (rs.next()) rs.toSyncPreference() else null }
+        }
+
+    override fun insertNew(connection: Connection, userId: String, incoming: SyncPreference): SyncPreference {
+        val now = now()
+        val version = nextVersion(connection)
+        val canonical = incoming.copy(
+            acceptedFields = incoming.dirtyFields.distinct(),
+            rejectedFields = emptyList(),
+            serverVersion = version,
+            serverUpdatedAt = now,
+            createdAt = incoming.createdAt ?: now,
+        )
+        connection.prepareStatement(
+            """
+            INSERT INTO preference(
+                user_id, pref_key, pref_value, value_type, is_deleted, hlc_map, server_version, server_updated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setString(2, canonical.key)
+            statement.setNullableString(3, canonical.value)
+            statement.setString(4, canonical.valueType.name)
+            statement.setBoolean(5, canonical.isDeleted)
+            statement.setString(6, encodeMap(canonical.hlcMap))
+            statement.setLong(7, canonical.serverVersion)
+            statement.setString(8, canonical.serverUpdatedAt)
+            statement.setString(9, canonical.createdAt)
+            statement.executeUpdate()
+        }
+        return canonical
+    }
+
+    override fun mergeExisting(connection: Connection, userId: String, existing: SyncPreference, incoming: SyncPreference): SyncPreference {
+        var merged = existing
+        val accepted = mutableListOf<String>()
+        val rejected = mutableListOf<String>()
+        for (field in incoming.dirtyFields.distinct()) {
+            val incomingHlc = incoming.hlcMap[field]
+            val existingHlc = existing.hlcMap[field]
+            if (!SyncConflictResolver.shouldAcceptIncoming(incomingHlc, existingHlc)) {
+                rejected += field
+                continue
+            }
+            when (field) {
+                "value" -> {
+                    merged = merged.copy(value = incoming.value, valueType = incoming.valueType, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "delete" -> {
+                    merged = merged.copy(isDeleted = incoming.isDeleted, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                else -> rejected += field
+            }
+        }
+        if (accepted.isNotEmpty()) {
+            val now = now()
+            merged = merged.copy(
+                acceptedFields = accepted,
+                rejectedFields = rejected,
+                serverVersion = nextVersion(connection),
+                serverUpdatedAt = now,
+                createdAt = existing.createdAt ?: now,
+            )
+            connection.prepareStatement(
+                """
+                UPDATE preference
+                SET pref_value = ?, value_type = ?, is_deleted = ?, hlc_map = ?, server_version = ?, server_updated_at = ?
+                WHERE user_id = ? AND pref_key = ?
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setNullableString(1, merged.value)
+                statement.setString(2, merged.valueType.name)
+                statement.setBoolean(3, merged.isDeleted)
+                statement.setString(4, encodeMap(merged.hlcMap))
+                statement.setLong(5, merged.serverVersion)
+                statement.setString(6, merged.serverUpdatedAt)
+                statement.setString(7, userId)
+                statement.setString(8, merged.key)
+                statement.executeUpdate()
+            }
+        } else {
+            merged = existing.copy(acceptedFields = emptyList(), rejectedFields = rejected)
+        }
+        return merged
+    }
+
+    fun putFromBusinessApi(userId: String, key: String, request: PreferencePutRequest): SyncPreference = database.tx { connection ->
+        val existing = selectOne(connection, userId, key, true)
+        val currentHlc = existing?.hlcMap?.get("value")
+        val nextHlc = serverClock.next(currentHlc)
+        val base = existing ?: SyncPreference(key = key, valueType = request.valueType)
+        val incoming = base.copy(
+            key = key,
+            value = request.value,
+            valueType = request.valueType,
+            isDeleted = false,
+            hlcMap = base.hlcMap + ("value" to nextHlc),
+            dirtyFields = listOf("value"),
+        )
+        if (existing == null) insertNew(connection, userId, incoming) else mergeExisting(connection, userId, existing, incoming)
+    }
+
+    fun softDeleteFromBusinessApi(userId: String, key: String): SyncPreference? = database.tx { connection ->
+        val existing = selectOne(connection, userId, key, true) ?: return@tx null
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                isDeleted = true,
+                hlcMap = existing.hlcMap + ("delete" to serverClock.next(existing.hlcMap["delete"])),
+                dirtyFields = listOf("delete"),
+            ),
+        )
+    }
+
+    private fun readPreferences(resultSet: ResultSet): List<SyncPreference> {
+        val items = mutableListOf<SyncPreference>()
+        while (resultSet.next()) items += resultSet.toSyncPreference()
+        return items
+    }
+}
+
 internal class RoutineSyncService(
-    private val database: ServerDatabase,
+    database: ServerDatabase,
+    private val serverClock: HybridLogicalClock,
 ) : BaseMutableSyncService<SyncRoutine>(database) {
     override fun idOf(item: SyncRoutine): String = item.id
     override fun serverVersionOf(item: SyncRoutine): Long = item.serverVersion
@@ -318,6 +487,90 @@ internal class RoutineSyncService(
         return merged
     }
 
+    fun createFromBusinessApi(userId: String, request: RoutineUpsertRequest): SyncRoutine {
+        val id = request.id ?: UUID.randomUUID().toString()
+        val templateHlc = serverClock.next()
+        val scheduleHlc = serverClock.next(templateHlc)
+        return push(
+            userId,
+            listOf(
+                SyncRoutine(
+                    id = id,
+                    templateTitle = request.templateTitle,
+                    cronSchedule = request.cronSchedule,
+                    timezone = request.timezone,
+                    isActive = request.isActive,
+                    hlcMap = mapOf(
+                        "template" to templateHlc,
+                        "schedule" to scheduleHlc,
+                        "active" to serverClock.next(scheduleHlc),
+                    ),
+                    dirtyFields = listOf("template", "schedule", "active"),
+                ),
+            ),
+        ).single()
+    }
+
+    fun patchFromBusinessApi(userId: String, id: String, request: RoutinePatchRequest): SyncRoutine? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        val dirty = mutableListOf<String>()
+        val hlc = existing.hlcMap.toMutableMap()
+        var templateTitle = existing.templateTitle
+        var cronSchedule = existing.cronSchedule
+        var timezone = existing.timezone
+        var isActive = existing.isActive
+        request.templateTitle?.let {
+            templateTitle = it
+            hlc["template"] = serverClock.next(hlc["template"])
+            dirty += "template"
+        }
+        if (request.cronSchedule != null || request.timezone != null) {
+            val nextCron = request.cronSchedule ?: cronSchedule
+            val nextTimezone = request.timezone ?: timezone
+            if (nextCron != cronSchedule || nextTimezone != timezone) {
+                cronSchedule = nextCron
+                timezone = nextTimezone
+                hlc["schedule"] = serverClock.next(hlc["schedule"])
+                dirty += "schedule"
+            }
+        }
+        request.isActive?.let {
+            if (it != isActive) {
+                isActive = it
+                hlc["active"] = serverClock.next(hlc["active"])
+                dirty += "active"
+            }
+        }
+        if (dirty.isEmpty()) return@tx existing
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                templateTitle = templateTitle,
+                cronSchedule = cronSchedule,
+                timezone = timezone,
+                isActive = isActive,
+                hlcMap = hlc,
+                dirtyFields = dirty,
+            ),
+        )
+    }
+
+    fun softDeleteFromBusinessApi(userId: String, id: String): SyncRoutine? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                isDeleted = true,
+                hlcMap = existing.hlcMap + ("delete" to serverClock.next(existing.hlcMap["delete"])),
+                dirtyFields = listOf("delete"),
+            ),
+        )
+    }
+
     private fun updateRoutine(connection: Connection, userId: String, routine: SyncRoutine) {
         connection.prepareStatement(
             """
@@ -348,7 +601,7 @@ internal class RoutineSyncService(
 }
 
 internal class TaskSyncService(
-    private val database: ServerDatabase,
+    database: ServerDatabase,
     private val serverClock: HybridLogicalClock,
 ) : BaseMutableSyncService<SyncTask>(database) {
     override fun idOf(item: SyncTask): String = item.id
@@ -573,7 +826,8 @@ internal class TaskSyncService(
 }
 
 internal class AlarmSyncService(
-    private val database: ServerDatabase,
+    database: ServerDatabase,
+    private val serverClock: HybridLogicalClock,
 ) : BaseMutableSyncService<SyncAlarm>(database) {
     override fun idOf(item: SyncAlarm): String = item.id
     override fun serverVersionOf(item: SyncAlarm): Long = item.serverVersion
@@ -701,6 +955,76 @@ internal class AlarmSyncService(
         return merged
     }
 
+    fun createFromBusinessApi(userId: String, request: AlarmUpsertRequest): SyncAlarm {
+        val id = request.id ?: UUID.randomUUID().toString()
+        val triggerHlc = serverClock.next()
+        val activeHlc = serverClock.next(triggerHlc)
+        return push(
+            userId,
+            listOf(
+                SyncAlarm(
+                    id = id,
+                    taskId = request.taskId,
+                    triggerTime = request.triggerTime,
+                    isActive = request.isActive,
+                    hlcMap = mapOf(
+                        "trigger" to triggerHlc,
+                        "active" to activeHlc,
+                    ),
+                    dirtyFields = listOf("trigger", "active"),
+                ),
+            ),
+        ).single()
+    }
+
+    fun patchFromBusinessApi(userId: String, id: String, request: AlarmPatchRequest): SyncAlarm? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        val dirty = mutableListOf<String>()
+        val hlc = existing.hlcMap.toMutableMap()
+        var triggerTime = existing.triggerTime
+        var isActive = existing.isActive
+        request.triggerTime?.let {
+            if (it != triggerTime) {
+                triggerTime = it
+                hlc["trigger"] = serverClock.next(hlc["trigger"])
+                dirty += "trigger"
+            }
+        }
+        request.isActive?.let {
+            if (it != isActive) {
+                isActive = it
+                hlc["active"] = serverClock.next(hlc["active"])
+                dirty += "active"
+            }
+        }
+        if (dirty.isEmpty()) return@tx existing
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                triggerTime = triggerTime,
+                isActive = isActive,
+                hlcMap = hlc,
+                dirtyFields = dirty,
+            ),
+        )
+    }
+
+    fun softDeleteFromBusinessApi(userId: String, id: String): SyncAlarm? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                isDeleted = true,
+                hlcMap = existing.hlcMap + ("delete" to serverClock.next(existing.hlcMap["delete"])),
+                dirtyFields = listOf("delete"),
+            ),
+        )
+    }
+
     private fun readAlarms(resultSet: ResultSet): List<SyncAlarm> {
         val items = mutableListOf<SyncAlarm>()
         while (resultSet.next()) items += resultSet.toSyncAlarm()
@@ -795,6 +1119,24 @@ internal class TaskEventSyncService(
             ),
         ).single()
 
+    fun allForTask(userId: String, taskId: String): List<SyncTaskEvent> = database.read { connection ->
+        connection.prepareStatement(
+            """
+            SELECT * FROM task_event
+            WHERE user_id = ? AND task_id = ?
+            ORDER BY event_time ASC, created_at ASC
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setString(2, taskId)
+            statement.executeQuery().use { rs ->
+                val items = mutableListOf<SyncTaskEvent>()
+                while (rs.next()) items += rs.toSyncTaskEvent()
+                items
+            }
+        }
+    }
+
     fun journal(userId: String, date: String): List<JournalEntry> = database.read { connection ->
         connection.prepareStatement(
             """
@@ -838,6 +1180,305 @@ internal class TaskEventSyncService(
                 if (items.isEmpty()) null else TaskStatusDeriver.fromEvents(items)
             }
         }
+    }
+}
+
+internal class PomodoroSessionSyncService(
+    database: ServerDatabase,
+    private val serverClock: HybridLogicalClock,
+) : BaseMutableSyncService<SyncPomodoroSession>(database) {
+    override fun idOf(item: SyncPomodoroSession): String = item.id
+    override fun serverVersionOf(item: SyncPomodoroSession): Long = item.serverVersion
+
+    override fun selectAfterCursor(connection: Connection, userId: String, cursor: Long, limit: Int): List<SyncPomodoroSession> =
+        connection.prepareStatement(
+            """
+            SELECT * FROM pomodoro_session
+            WHERE user_id = ? AND server_version > ?
+            ORDER BY server_version ASC
+            LIMIT ?
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setLong(2, cursor)
+            statement.setInt(3, limit)
+            statement.executeQuery().use(::readPomodoroSessions)
+        }
+
+    override fun selectAll(connection: Connection, userId: String): List<SyncPomodoroSession> =
+        connection.prepareStatement("SELECT * FROM pomodoro_session WHERE user_id = ? ORDER BY server_version ASC").use { statement ->
+            statement.setString(1, userId)
+            statement.executeQuery().use(::readPomodoroSessions)
+        }
+
+    override fun selectOne(connection: Connection, userId: String, id: String, forUpdate: Boolean): SyncPomodoroSession? =
+        connection.prepareStatement(
+            "SELECT * FROM pomodoro_session WHERE user_id = ? AND id = ?${if (forUpdate) " FOR UPDATE" else ""}",
+        ).use { statement ->
+            statement.setString(1, userId)
+            statement.setString(2, id)
+            statement.executeQuery().use { rs -> if (rs.next()) rs.toSyncPomodoroSession() else null }
+        }
+
+    override fun insertNew(connection: Connection, userId: String, incoming: SyncPomodoroSession): SyncPomodoroSession {
+        incoming.taskId?.let { require(recordExists(connection, "task", userId, it)) { "task_id does not belong to current user" } }
+        val now = now()
+        val version = nextVersion(connection)
+        val canonical = incoming.copy(
+            acceptedFields = incoming.dirtyFields.distinct(),
+            rejectedFields = emptyList(),
+            serverVersion = version,
+            serverUpdatedAt = now,
+            createdAt = incoming.createdAt ?: now,
+        )
+        connection.prepareStatement(
+            """
+            INSERT INTO pomodoro_session(
+                id, user_id, task_id, phase, state, started_at, ends_at, completed_at, duration_minutes, note,
+                task_update, is_deleted, hlc_map, server_version, server_updated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, canonical.id)
+            statement.setString(2, userId)
+            statement.setNullableString(3, canonical.taskId)
+            statement.setString(4, canonical.phase.name)
+            statement.setString(5, canonical.state.name)
+            statement.setString(6, canonical.startedAt)
+            statement.setString(7, canonical.endsAt)
+            statement.setNullableString(8, canonical.completedAt)
+            statement.setInt(9, canonical.durationMinutes)
+            statement.setNullableString(10, canonical.note)
+            statement.setString(11, canonical.taskUpdate.name)
+            statement.setBoolean(12, canonical.isDeleted)
+            statement.setString(13, encodeMap(canonical.hlcMap))
+            statement.setLong(14, canonical.serverVersion)
+            statement.setString(15, canonical.serverUpdatedAt)
+            statement.setString(16, canonical.createdAt)
+            statement.executeUpdate()
+        }
+        return canonical
+    }
+
+    override fun mergeExisting(connection: Connection, userId: String, existing: SyncPomodoroSession, incoming: SyncPomodoroSession): SyncPomodoroSession {
+        incoming.taskId?.let { require(recordExists(connection, "task", userId, it)) { "task_id does not belong to current user" } }
+        var merged = existing
+        val accepted = mutableListOf<String>()
+        val rejected = mutableListOf<String>()
+        for (field in incoming.dirtyFields.distinct()) {
+            val incomingHlc = incoming.hlcMap[field]
+            val existingHlc = existing.hlcMap[field]
+            if (!SyncConflictResolver.shouldAcceptIncoming(incomingHlc, existingHlc)) {
+                rejected += field
+                continue
+            }
+            when (field) {
+                "task" -> {
+                    merged = merged.copy(taskId = incoming.taskId, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "timing" -> {
+                    merged = merged.copy(
+                        startedAt = incoming.startedAt,
+                        endsAt = incoming.endsAt,
+                        durationMinutes = incoming.durationMinutes,
+                        hlcMap = merged.hlcMap + (field to incomingHlc!!),
+                    )
+                    accepted += field
+                }
+                "state" -> {
+                    merged = merged.copy(
+                        state = incoming.state,
+                        completedAt = incoming.completedAt,
+                        hlcMap = merged.hlcMap + (field to incomingHlc!!),
+                    )
+                    accepted += field
+                }
+                "note" -> {
+                    merged = merged.copy(note = incoming.note, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "outcome" -> {
+                    merged = merged.copy(taskUpdate = incoming.taskUpdate, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "delete" -> {
+                    merged = merged.copy(isDeleted = incoming.isDeleted, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                else -> rejected += field
+            }
+        }
+        if (accepted.isNotEmpty()) {
+            val now = now()
+            merged = merged.copy(
+                acceptedFields = accepted,
+                rejectedFields = rejected,
+                serverVersion = nextVersion(connection),
+                serverUpdatedAt = now,
+                createdAt = existing.createdAt ?: now,
+            )
+            connection.prepareStatement(
+                """
+                UPDATE pomodoro_session
+                SET task_id = ?, phase = ?, state = ?, started_at = ?, ends_at = ?, completed_at = ?, duration_minutes = ?, note = ?,
+                    task_update = ?, is_deleted = ?, hlc_map = ?, server_version = ?, server_updated_at = ?
+                WHERE user_id = ? AND id = ?
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setNullableString(1, merged.taskId)
+                statement.setString(2, merged.phase.name)
+                statement.setString(3, merged.state.name)
+                statement.setString(4, merged.startedAt)
+                statement.setString(5, merged.endsAt)
+                statement.setNullableString(6, merged.completedAt)
+                statement.setInt(7, merged.durationMinutes)
+                statement.setNullableString(8, merged.note)
+                statement.setString(9, merged.taskUpdate.name)
+                statement.setBoolean(10, merged.isDeleted)
+                statement.setString(11, encodeMap(merged.hlcMap))
+                statement.setLong(12, merged.serverVersion)
+                statement.setString(13, merged.serverUpdatedAt)
+                statement.setString(14, userId)
+                statement.setString(15, merged.id)
+                statement.executeUpdate()
+            }
+        } else {
+            merged = existing.copy(acceptedFields = emptyList(), rejectedFields = rejected)
+        }
+        return merged
+    }
+
+    fun createFromBusinessApi(userId: String, request: PomodoroSessionUpsertRequest): SyncPomodoroSession {
+        val id = request.id ?: UUID.randomUUID().toString()
+        val taskHlc = serverClock.next()
+        val timingHlc = serverClock.next(taskHlc)
+        val stateHlc = serverClock.next(timingHlc)
+        val noteHlc = serverClock.next(stateHlc)
+        val outcomeHlc = serverClock.next(noteHlc)
+        return push(
+            userId,
+            listOf(
+                SyncPomodoroSession(
+                    id = id,
+                    taskId = request.taskId,
+                    phase = request.phase,
+                    state = request.state,
+                    startedAt = request.startedAt,
+                    endsAt = request.endsAt,
+                    completedAt = request.completedAt,
+                    durationMinutes = request.durationMinutes,
+                    note = request.note,
+                    taskUpdate = request.taskUpdate,
+                    hlcMap = mapOf(
+                        "task" to taskHlc,
+                        "timing" to timingHlc,
+                        "state" to stateHlc,
+                        "note" to noteHlc,
+                        "outcome" to outcomeHlc,
+                    ),
+                    dirtyFields = listOf("task", "timing", "state", "note", "outcome"),
+                ),
+            ),
+        ).single()
+    }
+
+    fun patchFromBusinessApi(userId: String, id: String, request: PomodoroSessionPatchRequest): SyncPomodoroSession? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        val dirty = mutableListOf<String>()
+        val hlc = existing.hlcMap.toMutableMap()
+        var taskId = existing.taskId
+        var phase = existing.phase
+        var state = existing.state
+        var startedAt = existing.startedAt
+        var endsAt = existing.endsAt
+        var completedAt = existing.completedAt
+        var durationMinutes = existing.durationMinutes
+        var note = existing.note
+        var taskUpdate = existing.taskUpdate
+        if (request.taskId != taskId) {
+            taskId = request.taskId
+            hlc["task"] = serverClock.next(hlc["task"])
+            dirty += "task"
+        }
+        if (
+            request.phase != null ||
+            request.startedAt != null ||
+            request.endsAt != null ||
+            request.durationMinutes != null
+        ) {
+            val nextPhase = request.phase ?: phase
+            val nextStartedAt = request.startedAt ?: startedAt
+            val nextEndsAt = request.endsAt ?: endsAt
+            val nextDuration = request.durationMinutes ?: durationMinutes
+            if (nextPhase != phase || nextStartedAt != startedAt || nextEndsAt != endsAt || nextDuration != durationMinutes) {
+                phase = nextPhase
+                startedAt = nextStartedAt
+                endsAt = nextEndsAt
+                durationMinutes = nextDuration
+                hlc["timing"] = serverClock.next(hlc["timing"])
+                dirty += "timing"
+            }
+        }
+        if (request.state != null || request.completedAt != null) {
+            val nextState = request.state ?: state
+            val nextCompletedAt = request.completedAt ?: completedAt
+            if (nextState != state || nextCompletedAt != completedAt) {
+                state = nextState
+                completedAt = nextCompletedAt
+                hlc["state"] = serverClock.next(hlc["state"])
+                dirty += "state"
+            }
+        }
+        if (request.note != note) {
+            note = request.note
+            hlc["note"] = serverClock.next(hlc["note"])
+            dirty += "note"
+        }
+        if (request.taskUpdate != null && request.taskUpdate != taskUpdate) {
+            taskUpdate = request.taskUpdate
+            hlc["outcome"] = serverClock.next(hlc["outcome"])
+            dirty += "outcome"
+        }
+        if (dirty.isEmpty()) return@tx existing
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                taskId = taskId,
+                phase = phase,
+                state = state,
+                startedAt = startedAt,
+                endsAt = endsAt,
+                completedAt = completedAt,
+                durationMinutes = durationMinutes,
+                note = note,
+                taskUpdate = taskUpdate,
+                hlcMap = hlc,
+                dirtyFields = dirty,
+            ),
+        )
+    }
+
+    fun softDeleteFromBusinessApi(userId: String, id: String): SyncPomodoroSession? = database.tx { connection ->
+        val existing = selectOne(connection, userId, id, true) ?: return@tx null
+        mergeExisting(
+            connection = connection,
+            userId = userId,
+            existing = existing,
+            incoming = existing.copy(
+                isDeleted = true,
+                hlcMap = existing.hlcMap + ("delete" to serverClock.next(existing.hlcMap["delete"])),
+                dirtyFields = listOf("delete"),
+            ),
+        )
+    }
+
+    private fun readPomodoroSessions(resultSet: ResultSet): List<SyncPomodoroSession> {
+        val items = mutableListOf<SyncPomodoroSession>()
+        while (resultSet.next()) items += resultSet.toSyncPomodoroSession()
+        return items
     }
 }
 
@@ -895,6 +1536,35 @@ private fun ResultSet.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
     content = getString("content"),
     eventTime = getString("event_time"),
     isDeleted = getBoolean("is_deleted"),
+    serverVersion = getLong("server_version"),
+    serverUpdatedAt = getString("server_updated_at"),
+    createdAt = getString("created_at"),
+)
+
+private fun ResultSet.toSyncPreference(): SyncPreference = SyncPreference(
+    key = getString("pref_key"),
+    value = getString("pref_value"),
+    valueType = PreferenceValueType.valueOf(getString("value_type")),
+    isDeleted = getBoolean("is_deleted"),
+    hlcMap = decodeMap(getString("hlc_map")),
+    serverVersion = getLong("server_version"),
+    serverUpdatedAt = getString("server_updated_at"),
+    createdAt = getString("created_at"),
+)
+
+private fun ResultSet.toSyncPomodoroSession(): SyncPomodoroSession = SyncPomodoroSession(
+    id = getString("id"),
+    taskId = getString("task_id"),
+    phase = PomodoroPhaseWire.valueOf(getString("phase")),
+    state = PomodoroSessionStateWire.valueOf(getString("state")),
+    startedAt = getString("started_at"),
+    endsAt = getString("ends_at"),
+    completedAt = getString("completed_at"),
+    durationMinutes = getInt("duration_minutes"),
+    note = getString("note"),
+    taskUpdate = PomodoroTaskUpdateWire.valueOf(getString("task_update")),
+    isDeleted = getBoolean("is_deleted"),
+    hlcMap = decodeMap(getString("hlc_map")),
     serverVersion = getLong("server_version"),
     serverUpdatedAt = getString("server_updated_at"),
     createdAt = getString("created_at"),

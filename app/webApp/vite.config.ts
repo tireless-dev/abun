@@ -8,5 +8,11 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-  server: { port: 8080 },
+  server: {
+    port: 4173,
+    proxy: {
+      '/api': 'http://127.0.0.1:8080',
+      '/sync': 'http://127.0.0.1:8080',
+    },
+  },
 });

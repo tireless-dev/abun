@@ -59,6 +59,51 @@ CREATE TABLE sync_state (
     last_server_version INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE app_preferences (
+    id INTEGER NOT NULL PRIMARY KEY,
+    title_prefix TEXT,
+    default_alarm_lead_minutes INTEGER NOT NULL,
+    default_focus_minutes INTEGER NOT NULL,
+    default_short_break_minutes INTEGER NOT NULL,
+    default_long_break_minutes INTEGER NOT NULL,
+    timezone_override TEXT NOT NULL,
+    date_format TEXT NOT NULL,
+    blank_title_policy TEXT NOT NULL
+);
+
+CREATE TABLE preference (
+    pref_key TEXT NOT NULL PRIMARY KEY,
+    pref_value TEXT,
+    value_type TEXT NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE pomodoro_session (
+    id TEXT NOT NULL PRIMARY KEY,
+    task_id TEXT,
+    phase TEXT NOT NULL,
+    state TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ends_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    duration_minutes INTEGER NOT NULL,
+    note TEXT,
+    task_update TEXT NOT NULL DEFAULT 'NONE',
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
 selectTaskById:
 SELECT * FROM task WHERE id = ?;
 
@@ -82,6 +127,9 @@ SELECT * FROM routine WHERE id = ?;
 selectAllRoutines:
 SELECT * FROM routine ORDER BY updated_at DESC, created_at DESC;
 
+selectActiveRoutines:
+SELECT * FROM routine WHERE is_deleted = 0 ORDER BY updated_at DESC, created_at DESC;
+
 selectDirtyRoutines:
 SELECT * FROM routine WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
 
@@ -95,6 +143,9 @@ SELECT * FROM alarm WHERE id = ?;
 
 selectAllAlarms:
 SELECT * FROM alarm ORDER BY updated_at DESC, created_at DESC;
+
+selectActiveAlarms:
+SELECT * FROM alarm WHERE is_deleted = 0 ORDER BY trigger_time ASC, created_at ASC;
 
 selectDirtyAlarms:
 SELECT * FROM alarm WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
@@ -150,3 +201,82 @@ VALUES (?, ?);
 
 selectSyncState:
 SELECT * FROM sync_state WHERE scope = ?;
+
+selectPreferenceByKey:
+SELECT * FROM preference WHERE pref_key = ?;
+selectAllPreferences:
+SELECT * FROM preference WHERE is_deleted = 0 ORDER BY pref_key ASC;
+
+selectDirtyPreferences:
+SELECT * FROM preference WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC;
+
+upsertPreference:
+INSERT OR REPLACE INTO preference(
+    pref_key,
+    pref_value,
+    value_type,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAppPreferences:
+SELECT * FROM app_preferences WHERE id = 1;
+
+upsertAppPreferences:
+INSERT OR REPLACE INTO app_preferences(
+    id,
+    title_prefix,
+    default_alarm_lead_minutes,
+    default_focus_minutes,
+    default_short_break_minutes,
+    default_long_break_minutes,
+    timezone_override,
+    date_format,
+    blank_title_policy
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectPomodoroSessionById:
+SELECT * FROM pomodoro_session WHERE id = ?;
+
+selectActivePomodoroSession:
+SELECT * FROM pomodoro_session
+WHERE is_deleted = 0 AND state = 'ACTIVE'
+ORDER BY started_at DESC, created_at DESC
+LIMIT 1;
+
+selectRecentPomodoroSessions:
+SELECT * FROM pomodoro_session
+WHERE is_deleted = 0
+ORDER BY updated_at DESC, created_at DESC
+LIMIT ?;
+
+selectDirtyPomodoroSessions:
+SELECT * FROM pomodoro_session
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertPomodoroSession:
+INSERT OR REPLACE INTO pomodoro_session(
+    id,
+    task_id,
+    phase,
+    state,
+    started_at,
+    ends_at,
+    completed_at,
+    duration_minutes,
+    note,
+    task_update,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
