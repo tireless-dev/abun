@@ -40,6 +40,7 @@ private val stringListSerializer = ListSerializer(String.serializer())
 
 class AppServices private constructor(
     private val database: ServerDatabase,
+    val authRequired: Boolean = false,
     clock: () -> Instant = Instant::now,
 ) : AutoCloseable {
     private val serverClock = HybridLogicalClock(nodeId = "server") { clock().toEpochMilli() }
@@ -58,9 +59,13 @@ class AppServices private constructor(
 
     companion object {
         fun fromEnvironment(environment: Map<String, String> = System.getenv()): AppServices =
-            AppServices(ServerDatabase.fromConfig(ServerDatabaseConfig.fromEnvironment(environment)))
+            AppServices(
+                database = ServerDatabase.fromConfig(ServerDatabaseConfig.fromEnvironment(environment)),
+                authRequired = environment["ABUN_REQUIRE_AUTH"]?.equals("true", ignoreCase = true) == true,
+            )
 
-        fun forDataSource(dataSource: DataSource): AppServices = AppServices(ServerDatabase(dataSource))
+        fun forDataSource(dataSource: DataSource, authRequired: Boolean = false): AppServices =
+            AppServices(ServerDatabase(dataSource), authRequired = authRequired)
     }
 }
 

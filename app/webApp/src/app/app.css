@@ -1,0 +1,153 @@
+:root {
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: #12263a;
+  background: radial-gradient(circle at 20% 20%, #f2f7ff 0%, #ecf5f2 45%, #f8f5ef 100%);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.topbar-actions,
+.tabs,
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tabs {
+  margin: 10px 0;
+  border-bottom: 1px solid #ced9e6;
+  padding-bottom: 8px;
+}
+
+.tabs button.active {
+  background: #184e77;
+  color: #fff;
+}
+
+.card {
+  background: #ffffffcc;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  padding: 12px;
+  backdrop-filter: blur(3px);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+input,
+select,
+button {
+  width: 100%;
+  padding: 8px;
+  margin: 4px 0;
+  border-radius: 8px;
+  border: 1px solid #b8c8da;
+}
+
+button {
+  background: #f0f7ff;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+button:hover:enabled {
+  background: #dfefff;
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.row {
+  justify-content: space-between;
+  margin: 6px 0;
+}
+
+.row div {
+  display: flex;
+  gap: 6px;
+}
+
+.error {
+  color: #9f1239;
+}
+
+.muted,
+.helper,
+.empty {
+  color: #5f6c7a;
+  font-size: 0.92rem;
+}
+
+.auth-card {
+  max-width: 420px;
+  margin: 80px auto;
+}
+
+.pomodoro-strip {
+  margin-bottom: 12px;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  gap: 8px;
+  width: min(92vw, 360px);
+}
+
+.toast {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.92rem;
+  animation: toast-in 180ms ease;
+}
+
+.toast.success { background: #0f766e; }
+.toast.error { background: #b91c1c; }
+.toast.info { background: #334155; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .row div {
+    width: 100%;
+  }
+}

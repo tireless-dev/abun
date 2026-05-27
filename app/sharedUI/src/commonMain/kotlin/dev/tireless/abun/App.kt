@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -64,6 +65,35 @@ fun App() {
     val state by controller.state.collectAsState()
     val liveNow by rememberLiveNow()
     val activeTimerLabel = state.activePomodoroSession?.let { formatRemaining(it.endsAtEpochMillis - liveNow) }
+    val pendingDeletes = remember { mutableStateListOf<PendingDelete>() }
+    var pendingNow by remember { mutableLongStateOf(liveNow) }
+
+    fun requestDelete(kind: PendingDeleteKind, id: String, label: String) {
+        val key = "$kind:$id"
+        if (pendingDeletes.any { it.key == key }) return
+        pendingDeletes += PendingDelete(key = key, kind = kind, id = id, label = label, executeAtMillis = Clock.System.now().toEpochMilliseconds() + 5_000L)
+    }
+
+    fun undoDelete(key: String) {
+        pendingDeletes.removeAll { it.key == key }
+    }
+
+    LaunchedEffect(pendingDeletes.size) {
+        while (pendingDeletes.isNotEmpty()) {
+            delay(250)
+            val now = Clock.System.now().toEpochMilliseconds()
+            pendingNow = now
+            val due = pendingDeletes.filter { it.executeAtMillis <= now }
+            due.forEach { pending ->
+                when (pending.kind) {
+                    PendingDeleteKind.TASK -> controller.deleteTask(pending.id)
+                    PendingDeleteKind.ROUTINE -> controller.deleteRoutine(pending.id)
+                    PendingDeleteKind.ALARM -> controller.deleteAlarm(pending.id)
+                }
+            }
+            if (due.isNotEmpty()) pendingDeletes.removeAll(due.toSet())
+        }
+    }
 
     MaterialTheme {
         if (state.auth.showGuide) {
@@ -112,11 +142,31 @@ fun App() {
                 if (state.auth.mode == AuthMode.GUEST) {
                     Text("Local-only mode. Login anytime to sync.", style = MaterialTheme.typography.bodySmall)
                 }
+                if (pendingDeletes.isNotEmpty()) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Pending deletes", style = MaterialTheme.typography.titleMedium)
+                            pendingDeletes.forEach { pending ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    val remaining = ((pending.executeAtMillis - pendingNow).coerceAtLeast(0L) + 999L) / 1_000L
+                                    Text("${pending.label} (${remaining}s)", modifier = Modifier.weight(1f))
+                                    TextButton(onClick = { undoDelete(pending.key) }) { Text("Undo") }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 when {
                     state.isPreferencesOpen -> PreferencesScreen(state, controller)
                     state.selectedTab == AppTab.TODAY -> TodayScreen(state)
-                    else -> TaskScreen(state, controller)
+                    else -> TaskScreen(
+                        state = state,
+                        controller = controller,
+                        onDeleteTask = { id, title -> requestDelete(PendingDeleteKind.TASK, id, "Task \"$title\"") },
+                        onDeleteRoutine = { id, title -> requestDelete(PendingDeleteKind.ROUTINE, id, "Routine \"$title\"") },
+                        onDeleteAlarm = { id, title -> requestDelete(PendingDeleteKind.ALARM, id, "Alarm for $title") },
+                    )
                 }
             }
 
@@ -216,20 +266,31 @@ private fun JournalSection(entries: List<JournalEntryView>) {
 }
 
 @Composable
-private fun TaskScreen(state: AppUiState, controller: AbunAppController) {
+private fun TaskScreen(
+    state: AppUiState,
+    controller: AbunAppController,
+    onDeleteTask: (id: String, title: String) -> Unit,
+    onDeleteRoutine: (id: String, title: String) -> Unit,
+    onDeleteAlarm: (id: String, title: String) -> Unit,
+) {
     TabRow(selectedTabIndex = state.selectedTaskSubTab.ordinal) {
         TaskSubTab.entries.forEach { tab ->
             Tab(selected = state.selectedTaskSubTab == tab, onClick = { controller.selectTaskSubTab(tab) }, text = { Text(tab.title()) })
         }
     }
     when (state.selectedTaskSubTab) {
-        TaskSubTab.TASKS -> TasksSubTab(state, controller)
-        TaskSubTab.ALARMS -> AlarmsSubTab(state, controller)
+        TaskSubTab.TASKS -> TasksSubTab(state, controller, onDeleteTask, onDeleteRoutine)
+        TaskSubTab.ALARMS -> AlarmsSubTab(state, controller, onDeleteAlarm)
     }
 }
 
 @Composable
-private fun TasksSubTab(state: AppUiState, controller: AbunAppController) {
+private fun TasksSubTab(
+    state: AppUiState,
+    controller: AbunAppController,
+    onDeleteTask: (id: String, title: String) -> Unit,
+    onDeleteRoutine: (id: String, title: String) -> Unit,
+) {
     var draftTask by remember { mutableStateOf("") }
     var routineTitle by remember { mutableStateOf("") }
     var routineCron by remember { mutableStateOf("0 9 * * *") }
@@ -269,13 +330,13 @@ private fun TasksSubTab(state: AppUiState, controller: AbunAppController) {
         if (state.taskView.tasks.isEmpty()) {
             item { EmptyCard("No tasks yet.") }
         } else {
-            items(state.taskView.tasks, key = { it.id }) { task -> TaskCard(task, controller) }
+            items(state.taskView.tasks, key = { it.id }) { task -> TaskCard(task, controller, onDeleteTask) }
         }
         item { Text("Routines", style = MaterialTheme.typography.titleLarge) }
         if (state.taskView.routines.isEmpty()) {
             item { EmptyCard("No routines yet.") }
         } else {
-            items(state.taskView.routines, key = { it.id }) { routine -> RoutineCard(routine, controller) }
+            items(state.taskView.routines, key = { it.id }) { routine -> RoutineCard(routine, controller, onDeleteRoutine) }
         }
     }
 }
@@ -300,7 +361,11 @@ private fun HeaderTimerSummary(state: AppUiState, controller: AbunAppController)
 }
 
 @Composable
-private fun TaskCard(task: TaskListItemView, controller: AbunAppController) {
+private fun TaskCard(
+    task: TaskListItemView,
+    controller: AbunAppController,
+    onDeleteTask: (id: String, title: String) -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(task.title, style = MaterialTheme.typography.titleMedium)
@@ -309,14 +374,18 @@ private fun TaskCard(task: TaskListItemView, controller: AbunAppController) {
                 Button(onClick = { controller.progressTask(task.id) }) { Text("Progress") }
                 Button(onClick = { controller.completeTask(task.id) }) { Text("Complete") }
                 Button(onClick = { controller.startPomodoro(task.id, PomodoroPhase.FOCUS) }) { Text("Timer") }
-                Button(onClick = { controller.deleteTask(task.id) }) { Text("Delete") }
+                Button(onClick = { onDeleteTask(task.id, task.title) }) { Text("Delete") }
             }
         }
     }
 }
 
 @Composable
-private fun RoutineCard(routine: RoutineListItemView, controller: AbunAppController) {
+private fun RoutineCard(
+    routine: RoutineListItemView,
+    controller: AbunAppController,
+    onDeleteRoutine: (id: String, title: String) -> Unit,
+) {
     var title by remember(routine.id, routine.templateTitle) { mutableStateOf(routine.templateTitle) }
     var cron by remember(routine.id, routine.cronSchedule) { mutableStateOf(routine.cronSchedule) }
     var timezone by remember(routine.id, routine.timezone) { mutableStateOf(routine.timezone) }
@@ -329,14 +398,18 @@ private fun RoutineCard(routine: RoutineListItemView, controller: AbunAppControl
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { controller.updateRoutine(routine.id, title, cron, timezone) }) { Text("Save") }
                 Button(onClick = { controller.toggleRoutineActive(routine.id) }) { Text(if (routine.isActive) "Deactivate" else "Activate") }
-                Button(onClick = { controller.deleteRoutine(routine.id) }) { Text("Delete") }
+                Button(onClick = { onDeleteRoutine(routine.id, routine.templateTitle) }) { Text("Delete") }
             }
         }
     }
 }
 
 @Composable
-private fun AlarmsSubTab(state: AppUiState, controller: AbunAppController) {
+private fun AlarmsSubTab(
+    state: AppUiState,
+    controller: AbunAppController,
+    onDeleteAlarm: (id: String, taskTitle: String) -> Unit,
+) {
     var selectedTaskId by remember(state.taskView.tasks) { mutableStateOf(state.taskView.tasks.firstOrNull()?.id.orEmpty()) }
     var triggerTimeIso by remember { mutableStateOf(controller.suggestedAlarmTriggerTimeIso()) }
     LaunchedEffect(state.preferences.defaultAlarmLeadMinutes) {
@@ -370,13 +443,17 @@ private fun AlarmsSubTab(state: AppUiState, controller: AbunAppController) {
         if (state.taskView.alarms.isEmpty()) {
             item { EmptyCard("No alarms yet.") }
         } else {
-            items(state.taskView.alarms, key = { it.id }) { alarm -> AlarmCard(alarm, controller) }
+            items(state.taskView.alarms, key = { it.id }) { alarm -> AlarmCard(alarm, controller, onDeleteAlarm) }
         }
     }
 }
 
 @Composable
-private fun AlarmCard(alarm: AlarmListItemView, controller: AbunAppController) {
+private fun AlarmCard(
+    alarm: AlarmListItemView,
+    controller: AbunAppController,
+    onDeleteAlarm: (id: String, taskTitle: String) -> Unit,
+) {
     var triggerTimeIso by remember(alarm.id, alarm.triggerTimeIso) { mutableStateOf(alarm.triggerTimeIso) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -387,7 +464,7 @@ private fun AlarmCard(alarm: AlarmListItemView, controller: AbunAppController) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { controller.updateAlarm(alarm.id, triggerTimeIso) }) { Text("Save") }
                 Button(onClick = { controller.toggleAlarmActive(alarm.id) }) { Text(if (alarm.isActive) "Deactivate" else "Activate") }
-                Button(onClick = { controller.deleteAlarm(alarm.id) }) { Text("Delete") }
+                Button(onClick = { onDeleteAlarm(alarm.id, alarm.taskTitle) }) { Text("Delete") }
             }
         }
     }
@@ -623,3 +700,17 @@ private fun formatRemaining(remainingMillis: Long): String {
     val seconds = totalSeconds % 60L
     return "${minutes}m ${seconds.toString().padStart(2, '0')}s"
 }
+
+private enum class PendingDeleteKind {
+    TASK,
+    ROUTINE,
+    ALARM,
+}
+
+private data class PendingDelete(
+    val key: String,
+    val kind: PendingDeleteKind,
+    val id: String,
+    val label: String,
+    val executeAtMillis: Long,
+)

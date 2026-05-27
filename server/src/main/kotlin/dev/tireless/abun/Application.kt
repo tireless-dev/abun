@@ -63,6 +63,9 @@ fun Application.module(services: AppServices = AppServices.fromEnvironment()) {
         exception<IllegalStateException> { call, cause ->
             call.respond(io.ktor.http.HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Invalid request"))
         }
+        exception<UnauthorizedException> { call, cause ->
+            call.respond(io.ktor.http.HttpStatusCode.Unauthorized, ErrorResponse(cause.message ?: "Unauthorized"))
+        }
     }
 
     routing {
@@ -357,6 +360,9 @@ private fun ApplicationCall.userId(): String {
         ?.trim()
     val userId = appServices().auth.parseUserIdFromToken(bearerToken)
     if (userId != null) return userId
+    if (appServices().authRequired) {
+        throw UnauthorizedException("Missing or invalid bearer token")
+    }
     return request.headers["X-User-Id"] ?: "demo-user"
 }
 
@@ -406,6 +412,8 @@ data class TaskStatusResponse(
 data class ErrorResponse(
     val message: String,
 )
+
+class UnauthorizedException(message: String) : RuntimeException(message)
 
 @Serializable
 data class OtpRequestBody(val email: String)

@@ -335,6 +335,16 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.NotFound, missingPreferenceDelete.status)
     }
 
+    @Test
+    fun `auth required mode rejects unauthenticated requests`() = testApplication {
+        application { module(testServices(authRequired = true)) }
+        val jsonClient = jsonClient()
+
+        val response = jsonClient.get("/api/tasks")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertEquals("Missing or invalid bearer token", response.body<ErrorResponse>().message)
+    }
+
     private fun ApplicationTestBuilder.jsonClient() = createClient {
         install(ContentNegotiation) {
             json(
@@ -346,13 +356,13 @@ class ApplicationTest {
         }
     }
 
-    private fun testServices(): AppServices {
+    private fun testServices(authRequired: Boolean = false): AppServices {
         val dataSource = JdbcDataSource().apply {
             setURL("jdbc:h2:mem:${System.nanoTime()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
             user = "sa"
             password = ""
         }
-        return AppServices.forDataSource(dataSource)
+        return AppServices.forDataSource(dataSource, authRequired = authRequired)
     }
 }
 
