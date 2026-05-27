@@ -8,5 +8,8 @@
   "scripts": {
     "build": "npm run build -w webApp",
     "start": "npm run start -w webApp"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
   }
 }
