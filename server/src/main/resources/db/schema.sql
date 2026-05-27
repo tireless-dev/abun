@@ -109,3 +109,16 @@ CREATE TABLE IF NOT EXISTS pomodoro_session (
 
 CREATE INDEX IF NOT EXISTS idx_pomodoro_session_user_server_version ON pomodoro_session(user_id, server_version);
 CREATE INDEX IF NOT EXISTS idx_pomodoro_session_task_id ON pomodoro_session(task_id);
+
+CREATE TABLE IF NOT EXISTS user_account (
+    id VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(320) UNIQUE NOT NULL,
+    created_at VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS otp_code (
+    email VARCHAR(320) PRIMARY KEY,
+    code VARCHAR(16) NOT NULL,
+    expires_at VARCHAR(255) NOT NULL,
+    created_at VARCHAR(255) NOT NULL
+);

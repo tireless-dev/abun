@@ -43,6 +43,7 @@ import dev.tireless.abun.app.AgendaTaskItemView
 import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
+import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
@@ -65,6 +66,10 @@ fun App() {
     val activeTimerLabel = state.activePomodoroSession?.let { formatRemaining(it.endsAtEpochMillis - liveNow) }
 
     MaterialTheme {
+        if (state.auth.showGuide) {
+            GuideScreen(state, controller)
+            return@MaterialTheme
+        }
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -104,6 +109,9 @@ fun App() {
             ) {
                 state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = MaterialTheme.typography.bodySmall) }
                 state.syncState.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (state.auth.mode == AuthMode.GUEST) {
+                    Text("Local-only mode. Login anytime to sync.", style = MaterialTheme.typography.bodySmall)
+                }
 
                 when {
                     state.isPreferencesOpen -> PreferencesScreen(state, controller)
@@ -116,6 +124,46 @@ fun App() {
                 PomodoroDialog(state, controller, liveNow)
             }
         }
+    }
+}
+
+@Composable
+private fun GuideScreen(state: AppUiState, controller: AbunAppController) {
+    var otpCode by remember { mutableStateOf("") }
+    Column(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .safeContentPadding()
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Welcome to abun", style = MaterialTheme.typography.titleLarge)
+        Text("Login with email OTP to enable cloud sync, or skip for local-only mode.")
+        OutlinedTextField(
+            value = state.auth.email,
+            onValueChange = controller::updateLoginEmail,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Email") },
+        )
+        Button(onClick = controller::requestEmailOtp, enabled = !state.auth.isSubmitting) {
+            Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP")
+        }
+        if (state.auth.otpRequested) {
+            OutlinedTextField(
+                value = otpCode,
+                onValueChange = { otpCode = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("OTP code") },
+            )
+            Button(onClick = { controller.verifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting) {
+                Text("Verify and Login")
+            }
+        }
+        TextButton(onClick = controller::skipLogin, enabled = !state.auth.isSubmitting) {
+            Text("Skip for now")
+        }
+        state.auth.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 

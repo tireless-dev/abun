@@ -17,12 +17,39 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class OtpRequest(val email: String)
+
+@Serializable
+data class OtpVerifyRequest(val email: String, val otp: String)
+
+@Serializable
+data class OtpVerifyResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("user_id") val userId: String,
+)
 
 class SyncRemoteApi(
     private val baseUrl: String,
     private val client: HttpClient,
     private val authProvider: AuthProvider,
 ) {
+    suspend fun requestOtp(email: String) {
+        client.post("$baseUrl/auth/otp/request") {
+            contentType(ContentType.Application.Json)
+            setBody(OtpRequest(email.trim()))
+        }
+    }
+
+    suspend fun verifyOtp(email: String, otp: String): OtpVerifyResponse =
+        client.post("$baseUrl/auth/otp/verify") {
+            contentType(ContentType.Application.Json)
+            setBody(OtpVerifyRequest(email.trim(), otp.trim()))
+        }.body()
+
     suspend fun pullPreferences(cursor: Long, limit: Int): PullResponse<SyncPreference> = pull("preferences", cursor, limit)
     suspend fun pullRoutines(cursor: Long, limit: Int): PullResponse<SyncRoutine> = pull("routines", cursor, limit)
     suspend fun pullTasks(cursor: Long, limit: Int): PullResponse<SyncTask> = pull("tasks", cursor, limit)
@@ -50,6 +77,9 @@ class SyncRemoteApi(
         }.body<BatchRequest<T>>().items
 
     private suspend fun io.ktor.client.request.HttpRequestBuilder.authorize() {
-        header(HttpHeaders.Authorization, "Bearer ${authProvider.bearerToken()}")
+        val token = authProvider.bearerToken().trim()
+        if (token.isNotEmpty()) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
     }
 }

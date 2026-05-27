@@ -42,6 +42,7 @@ fun main() {
 }
 
 fun Application.module(services: AppServices = AppServices.fromEnvironment()) {
+    attributes.put(AppServicesKey, services)
     monitor.subscribe(ApplicationStopped) {
         services.close()
     }
@@ -72,9 +73,25 @@ fun Application.module(services: AppServices = AppServices.fromEnvironment()) {
         route("/sync") {
             syncRoutes(services)
         }
+        route("/auth") {
+            authRoutes(services)
+        }
         route("/api") {
             apiRoutes(services)
         }
+    }
+}
+
+private fun Route.authRoutes(services: AppServices) {
+    post("/otp/request") {
+        val request = call.receive<OtpRequestBody>()
+        services.auth.requestOtp(request.email)
+        call.respond(io.ktor.http.HttpStatusCode.NoContent)
+    }
+    post("/otp/verify") {
+        val request = call.receive<OtpVerifyBody>()
+        val (userId, token) = services.auth.verifyOtp(request.email, request.otp)
+        call.respond(OtpVerifyResponse(accessToken = token, userId = userId))
     }
 }
 
@@ -334,12 +351,17 @@ private fun Route.apiRoutes(services: AppServices) {
 
 private fun ApplicationCall.userId(): String {
     val authorization = request.headers["Authorization"]
-    val bearerUserId = authorization
+    val bearerToken = authorization
         ?.takeIf { it.startsWith("Bearer ") }
         ?.removePrefix("Bearer ")
         ?.trim()
-    return bearerUserId ?: request.headers["X-User-Id"] ?: "demo-user"
+    val userId = appServices().auth.parseUserIdFromToken(bearerToken)
+    if (userId != null) return userId
+    return request.headers["X-User-Id"] ?: "demo-user"
 }
+
+private fun ApplicationCall.appServices(): AppServices =
+    application.attributes[AppServicesKey]
 
 private fun ApplicationCall.cursor(): Long = request.queryParameters["cursor"]?.toLongOrNull() ?: 0L
 
@@ -384,3 +406,17 @@ data class TaskStatusResponse(
 data class ErrorResponse(
     val message: String,
 )
+
+@Serializable
+data class OtpRequestBody(val email: String)
+
+@Serializable
+data class OtpVerifyBody(val email: String, val otp: String)
+
+@Serializable
+data class OtpVerifyResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("user_id") val userId: String,
+)
+
+private val AppServicesKey = io.ktor.util.AttributeKey<AppServices>("appServices")

@@ -12,6 +12,10 @@ interface AuthProvider {
     suspend fun bearerToken(): String
 }
 
+interface MutableAuthProvider : AuthProvider {
+    fun updateToken(token: String?)
+}
+
 interface DeviceNodeIdProvider {
     fun nodeId(): String
 }

@@ -11,9 +11,15 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 class DemoAuthProvider(
-    private val token: String = "demo-user",
-) : AuthProvider {
-    override suspend fun bearerToken(): String = token
+    initialToken: String? = null,
+) : MutableAuthProvider {
+    private var token: String? = initialToken
+
+    override suspend fun bearerToken(): String = token.orEmpty()
+
+    override fun updateToken(token: String?) {
+        this.token = token
+    }
 }
 
 class DefaultTimeProvider : TimeProvider {

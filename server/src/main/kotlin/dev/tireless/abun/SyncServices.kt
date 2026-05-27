@@ -50,6 +50,7 @@ class AppServices private constructor(
     internal val alarms = AlarmSyncService(database, serverClock)
     internal val taskEvents = TaskEventSyncService(database)
     internal val pomodoroSessions = PomodoroSessionSyncService(database, serverClock)
+    internal val auth = AuthService(database)
 
     override fun close() {
         database.close()
@@ -60,6 +61,84 @@ class AppServices private constructor(
             AppServices(ServerDatabase.fromConfig(ServerDatabaseConfig.fromEnvironment(environment)))
 
         fun forDataSource(dataSource: DataSource): AppServices = AppServices(ServerDatabase(dataSource))
+    }
+}
+
+internal class AuthService(
+    private val database: ServerDatabase,
+) {
+    fun requestOtp(email: String) {
+        val normalized = email.trim().lowercase()
+        require(normalized.isNotBlank()) { "email is required" }
+        val now = Instant.now()
+        val code = (100000..999999).random().toString()
+        database.tx { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO otp_code(email, code, expires_at, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (email) DO UPDATE SET code = excluded.code, expires_at = excluded.expires_at, created_at = excluded.created_at
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setString(1, normalized)
+                statement.setString(2, code)
+                statement.setString(3, now.plusSeconds(600).toString())
+                statement.setString(4, now.toString())
+                statement.executeUpdate()
+            }
+        }
+        println("OTP for $normalized: $code")
+    }
+
+    fun verifyOtp(email: String, otp: String): Pair<String, String> {
+        val normalized = email.trim().lowercase()
+        val expected = database.read { connection ->
+            connection.prepareStatement("SELECT code, expires_at FROM otp_code WHERE email = ?").use { statement ->
+                statement.setString(1, normalized)
+                statement.executeQuery().use { rs ->
+                    if (!rs.next()) return@use null
+                    rs.getString("code") to rs.getString("expires_at")
+                }
+            }
+        } ?: throw IllegalArgumentException("otp not requested")
+
+        require(expected.first == otp.trim()) { "invalid otp" }
+        require(Instant.parse(expected.second).isAfter(Instant.now())) { "otp expired" }
+
+        val userId = ensureUser(normalized)
+        database.tx { connection ->
+            connection.prepareStatement("DELETE FROM otp_code WHERE email = ?").use {
+                it.setString(1, normalized)
+                it.executeUpdate()
+            }
+        }
+        return userId to "uid:$userId"
+    }
+
+    fun parseUserIdFromToken(raw: String?): String? {
+        val token = raw?.trim().orEmpty()
+        if (token.isBlank()) return null
+        if (token.startsWith("uid:")) {
+            return token.removePrefix("uid:").takeIf { it.isNotBlank() }
+        }
+        return token
+    }
+
+    private fun ensureUser(email: String): String = database.tx { connection ->
+        connection.prepareStatement("SELECT id FROM user_account WHERE email = ?").use { statement ->
+            statement.setString(1, email)
+            statement.executeQuery().use { rs ->
+                if (rs.next()) return@tx rs.getString("id")
+            }
+        }
+        val id = UUID.randomUUID().toString()
+        connection.prepareStatement("INSERT INTO user_account(id, email, created_at) VALUES (?, ?, ?)").use { statement ->
+            statement.setString(1, id)
+            statement.setString(2, email)
+            statement.setString(3, Instant.now().toString())
+            statement.executeUpdate()
+        }
+        id
     }
 }
 

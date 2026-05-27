@@ -16,19 +16,22 @@ class AbunAppController(
 ) {
     private val timeProvider = dependencies.timeProvider
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val authProvider = dependencies.authProvider as? MutableAuthProvider
+        ?: error("App requires MutableAuthProvider for onboarding/auth flow")
     private val store = LocalStore(
         database = createDatabase(dependencies.databaseDriverFactory),
         timeProvider = dependencies.timeProvider,
         idGenerator = dependencies.idGenerator,
         clock = createHybridClock(dependencies.nodeIdProvider, dependencies.timeProvider),
     )
+    private val remoteApi = SyncRemoteApi(
+        baseUrl = dependencies.serverBaseUrl,
+        client = dependencies.httpClient,
+        authProvider = dependencies.authProvider,
+    )
     private val syncEngine = SyncEngine(
         localStore = store,
-        remoteApi = SyncRemoteApi(
-            baseUrl = dependencies.serverBaseUrl,
-            client = dependencies.httpClient,
-            authProvider = dependencies.authProvider,
-        ),
+        remoteApi = remoteApi,
     )
 
     private val _state = MutableStateFlow(
@@ -40,8 +43,70 @@ class AbunAppController(
     private var syncRequestedWhileRunning = false
 
     init {
+        authProvider.updateToken(null)
         refresh()
-        requestSync(immediate = true)
+    }
+
+    fun skipLogin() {
+        _state.value = _state.value.copy(
+            auth = _state.value.auth.copy(
+                showGuide = false,
+                mode = AuthMode.GUEST,
+                errorMessage = null,
+            ),
+            syncState = _state.value.syncState.copy(syncReady = true),
+        )
+    }
+
+    fun updateLoginEmail(email: String) {
+        _state.value = _state.value.copy(auth = _state.value.auth.copy(email = email, errorMessage = null))
+    }
+
+    fun requestEmailOtp() {
+        val email = _state.value.auth.email.trim()
+        if (email.isBlank()) {
+            _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email is required"))
+            return
+        }
+        scope.launch {
+            _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
+            runCatching { remoteApi.requestOtp(email) }
+                .onSuccess {
+                    _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, otpRequested = true))
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, errorMessage = it.message ?: "Failed to request OTP"))
+                }
+        }
+    }
+
+    fun verifyEmailOtp(code: String) {
+        val email = _state.value.auth.email.trim()
+        if (email.isBlank() || code.isBlank()) {
+            _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email and OTP are required"))
+            return
+        }
+        scope.launch {
+            _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
+            runCatching { remoteApi.verifyOtp(email, code) }
+                .onSuccess { response ->
+                    authProvider.updateToken(response.accessToken)
+                    _state.value = _state.value.copy(
+                        auth = _state.value.auth.copy(
+                            showGuide = false,
+                            mode = AuthMode.AUTHENTICATED,
+                            isSubmitting = false,
+                            otpRequested = false,
+                            errorMessage = null,
+                        ),
+                        syncState = _state.value.syncState.copy(syncReady = true),
+                    )
+                    requestSync(immediate = true)
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, errorMessage = it.message ?: "OTP verification failed"))
+                }
+        }
     }
 
     fun selectTab(tab: AppTab) {
@@ -194,6 +259,7 @@ class AbunAppController(
     }
 
     fun syncNow() {
+        if (_state.value.auth.mode != AuthMode.AUTHENTICATED) return
         requestSync(immediate = true)
     }
 
@@ -211,6 +277,10 @@ class AbunAppController(
     }
 
     private fun requestSync(immediate: Boolean = false) {
+        if (_state.value.auth.mode != AuthMode.AUTHENTICATED) {
+            _state.value = _state.value.copy(syncState = _state.value.syncState.copy(isSyncing = false, syncReady = true))
+            return
+        }
         if (isSyncing) {
             syncRequestedWhileRunning = true
             return

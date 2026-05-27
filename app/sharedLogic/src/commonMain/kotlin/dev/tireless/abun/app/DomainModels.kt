@@ -71,6 +71,21 @@ data class SyncStateView(
     val isSyncing: Boolean = false,
     val lastSyncedAt: String? = null,
     val errorMessage: String? = null,
+    val syncReady: Boolean = true,
+)
+
+enum class AuthMode {
+    GUEST,
+    AUTHENTICATED,
+}
+
+data class AuthViewState(
+    val showGuide: Boolean = true,
+    val mode: AuthMode = AuthMode.GUEST,
+    val email: String = "",
+    val otpRequested: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val errorMessage: String? = null,
 )
 
 data class RoutineListItemView(
@@ -140,6 +155,7 @@ data class AppUiState(
     val recentPomodoroSessions: List<PomodoroSessionView> = emptyList(),
     val preferences: PreferencesViewState = PreferencesViewState(),
     val syncState: SyncStateView = SyncStateView(),
+    val auth: AuthViewState = AuthViewState(),
 )
 
 enum class SyncScope(val wireName: String) {
