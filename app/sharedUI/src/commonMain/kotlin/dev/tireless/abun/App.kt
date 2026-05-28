@@ -3,19 +3,14 @@ package dev.tireless.abun
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
@@ -38,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AgendaTaskItemView
 import dev.tireless.abun.app.AlarmListItemView
@@ -48,11 +42,18 @@ import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
-import dev.tireless.abun.app.PomodoroSessionView
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TaskSubTab
+import dev.tireless.abun.designsystem.ActionRow
+import dev.tireless.abun.designsystem.AppTheme
+import dev.tireless.abun.designsystem.ThemeTokens
+import dev.tireless.abun.designsystem.EmptyState
+import dev.tireless.abun.designsystem.InlineError
+import dev.tireless.abun.designsystem.ScreenContainer
+import dev.tireless.abun.designsystem.SectionCard
+import dev.tireless.abun.designsystem.SectionTitle
 import dev.tireless.abun.sync.TaskStatus
 import kotlinx.coroutines.delay
 import kotlin.time.Clock
@@ -95,10 +96,10 @@ fun App() {
         }
     }
 
-    MaterialTheme {
+    AppTheme {
         if (state.auth.showGuide) {
             GuideScreen(state, controller)
-            return@MaterialTheme
+            return@AppTheme
         }
         Scaffold(
             topBar = {
@@ -128,30 +129,24 @@ fun App() {
                 }
             },
         ) { padding ->
-            Column(
+            ScreenContainer(
                 modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface)
-                    .safeContentPadding()
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .background(ThemeTokens.colors.background)
+                    .padding(padding),
             ) {
-                state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = MaterialTheme.typography.bodySmall) }
-                state.syncState.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
+                state.syncState.errorMessage?.let { InlineError(it) }
                 if (state.auth.mode == AuthMode.GUEST) {
-                    Text("Local-only mode. Login anytime to sync.", style = MaterialTheme.typography.bodySmall)
+                    Text("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
                 }
                 if (pendingDeletes.isNotEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Pending deletes", style = MaterialTheme.typography.titleMedium)
-                            pendingDeletes.forEach { pending ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                    val remaining = ((pending.executeAtMillis - pendingNow).coerceAtLeast(0L) + 999L) / 1_000L
-                                    Text("${pending.label} (${remaining}s)", modifier = Modifier.weight(1f))
-                                    TextButton(onClick = { undoDelete(pending.key) }) { Text("Undo") }
-                                }
+                    SectionCard {
+                        SectionTitle("Pending deletes")
+                        pendingDeletes.forEach { pending ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
+                                val remaining = ((pending.executeAtMillis - pendingNow).coerceAtLeast(0L) + 999L) / 1_000L
+                                Text("${pending.label} (${remaining}s)", modifier = Modifier.weight(1f), style = ThemeTokens.type.body)
+                                TextButton(onClick = { undoDelete(pending.key) }) { Text("Undo") }
                             }
                         }
                     }
@@ -180,16 +175,9 @@ fun App() {
 @Composable
 private fun GuideScreen(state: AppUiState, controller: AbunAppController) {
     var otpCode by remember { mutableStateOf("") }
-    Column(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .safeContentPadding()
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Welcome to abun", style = MaterialTheme.typography.titleLarge)
-        Text("Login with email OTP to enable cloud sync, or skip for local-only mode.")
+    ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
+        Text("Welcome to abun", style = ThemeTokens.type.title)
+        Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.body)
         OutlinedTextField(
             value = state.auth.email,
             onValueChange = controller::updateLoginEmail,
@@ -213,13 +201,13 @@ private fun GuideScreen(state: AppUiState, controller: AbunAppController) {
         TextButton(onClick = controller::skipLogin, enabled = !state.auth.isSubmitting) {
             Text("Skip for now")
         }
-        state.auth.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.auth.errorMessage?.let { InlineError(it) }
     }
 }
 
 @Composable
 private fun TodayScreen(state: AppUiState) {
-    Text("Today: ${state.selectedDate}", style = MaterialTheme.typography.titleMedium)
+    Text("Today: ${state.selectedDate}", style = ThemeTokens.type.sectionTitle)
     AgendaSection("Current", state.today.currentTasks)
     AgendaSection("Upcoming", state.today.upcomingTasks)
     JournalSection(state.today.journalEntries)
@@ -227,19 +215,17 @@ private fun TodayScreen(state: AppUiState) {
 
 @Composable
 private fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
-    Text(title, style = MaterialTheme.typography.titleLarge)
+    SectionTitle(title)
     if (items.isEmpty()) {
-        EmptyCard("No tasks in this section.")
+        EmptyState("No tasks in this section.")
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         items.forEach { item ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium)
-                    Text(statusLabel(item.status))
-                    item.triggerTimeLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                }
+            SectionCard {
+                Text(item.title, style = ThemeTokens.type.sectionTitle)
+                Text(statusLabel(item.status), style = ThemeTokens.type.body)
+                item.triggerTimeLabel?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
@@ -247,19 +233,17 @@ private fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
 
 @Composable
 private fun JournalSection(entries: List<JournalEntryView>) {
-    Text("Today journal", style = MaterialTheme.typography.titleLarge)
+    SectionTitle("Today journal")
     if (entries.isEmpty()) {
-        EmptyCard("No journal entries yet.")
+        EmptyState("No journal entries yet.")
         return
     }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         items(entries, key = { it.eventId }) { entry ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(entry.title, fontWeight = FontWeight.SemiBold)
-                    Text("${entry.eventType.name} at ${entry.eventTimeLabel}")
-                    entry.content?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                }
+            SectionCard {
+                Text(entry.title, fontWeight = FontWeight.SemiBold, style = ThemeTokens.type.body)
+                Text("${entry.eventType.name} at ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
+                entry.content?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
@@ -296,45 +280,41 @@ private fun TasksSubTab(
     var routineCron by remember { mutableStateOf("0 9 * * *") }
     var routineTimezone by remember { mutableStateOf(state.preferences.timezoneOverride) }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
         item {
             HeaderTimerSummary(state, controller)
         }
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Add task", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(value = draftTask, onValueChange = { draftTask = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Task title") })
-                    Button(onClick = {
-                        controller.createTask(draftTask)
-                        draftTask = ""
-                    }) { Text("Create task") }
-                }
+            SectionCard {
+                Text("Add task", style = ThemeTokens.type.sectionTitle)
+                OutlinedTextField(value = draftTask, onValueChange = { draftTask = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Task title") })
+                Button(onClick = {
+                    controller.createTask(draftTask)
+                    draftTask = ""
+                }) { Text("Create task") }
             }
         }
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Add routine", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(value = routineTitle, onValueChange = { routineTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Routine title") })
-                    OutlinedTextField(value = routineCron, onValueChange = { routineCron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron schedule") })
-                    OutlinedTextField(value = routineTimezone, onValueChange = { routineTimezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
-                    Button(onClick = {
-                        controller.createRoutine(routineTitle, routineCron, routineTimezone)
-                        routineTitle = ""
-                    }) { Text("Create routine") }
-                }
+            SectionCard {
+                Text("Add routine", style = ThemeTokens.type.sectionTitle)
+                OutlinedTextField(value = routineTitle, onValueChange = { routineTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Routine title") })
+                OutlinedTextField(value = routineCron, onValueChange = { routineCron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron schedule") })
+                OutlinedTextField(value = routineTimezone, onValueChange = { routineTimezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
+                Button(onClick = {
+                    controller.createRoutine(routineTitle, routineCron, routineTimezone)
+                    routineTitle = ""
+                }) { Text("Create routine") }
             }
         }
-        item { Text("Tasks", style = MaterialTheme.typography.titleLarge) }
+        item { SectionTitle("Tasks") }
         if (state.taskView.tasks.isEmpty()) {
-            item { EmptyCard("No tasks yet.") }
+            item { EmptyState("No tasks yet.") }
         } else {
             items(state.taskView.tasks, key = { it.id }) { task -> TaskCard(task, controller, onDeleteTask) }
         }
-        item { Text("Routines", style = MaterialTheme.typography.titleLarge) }
+        item { SectionTitle("Routines") }
         if (state.taskView.routines.isEmpty()) {
-            item { EmptyCard("No routines yet.") }
+            item { EmptyState("No routines yet.") }
         } else {
             items(state.taskView.routines, key = { it.id }) { routine -> RoutineCard(routine, controller, onDeleteRoutine) }
         }
@@ -344,18 +324,16 @@ private fun TasksSubTab(
 @Composable
 private fun HeaderTimerSummary(state: AppUiState, controller: AbunAppController) {
     val liveNow by rememberLiveNow()
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pomodoro", style = MaterialTheme.typography.titleMedium)
-            val active = state.activePomodoroSession
-            if (active == null) {
-                Text("No active timer.")
-                Button(onClick = controller::openPomodoroDialog) { Text("Start timer") }
-            } else {
-                Text(active.taskTitle ?: "Solo focus")
-                Text(formatRemaining(active.endsAtEpochMillis - liveNow))
-                Button(onClick = controller::openPomodoroDialog) { Text("Open timer") }
-            }
+    SectionCard {
+        Text("Pomodoro", style = ThemeTokens.type.sectionTitle)
+        val active = state.activePomodoroSession
+        if (active == null) {
+            Text("No active timer.", style = ThemeTokens.type.body)
+            Button(onClick = controller::openPomodoroDialog) { Text("Start timer") }
+        } else {
+            Text(active.taskTitle ?: "Solo focus", style = ThemeTokens.type.body)
+            Text(formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.bodyMuted)
+            Button(onClick = controller::openPomodoroDialog) { Text("Open timer") }
         }
     }
 }
@@ -366,16 +344,14 @@ private fun TaskCard(
     controller: AbunAppController,
     onDeleteTask: (id: String, title: String) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(task.title, style = MaterialTheme.typography.titleMedium)
-            Text(statusLabel(task.status))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { controller.progressTask(task.id) }) { Text("Progress") }
-                Button(onClick = { controller.completeTask(task.id) }) { Text("Complete") }
-                Button(onClick = { controller.startPomodoro(task.id, PomodoroPhase.FOCUS) }) { Text("Timer") }
-                Button(onClick = { onDeleteTask(task.id, task.title) }) { Text("Delete") }
-            }
+    SectionCard {
+        Text(task.title, style = ThemeTokens.type.sectionTitle)
+        Text(statusLabel(task.status), style = ThemeTokens.type.body)
+        ActionRow {
+            Button(onClick = { controller.progressTask(task.id) }) { Text("Progress") }
+            Button(onClick = { controller.completeTask(task.id) }) { Text("Complete") }
+            Button(onClick = { controller.startPomodoro(task.id, PomodoroPhase.FOCUS) }) { Text("Timer") }
+            Button(onClick = { onDeleteTask(task.id, task.title) }) { Text("Delete") }
         }
     }
 }
@@ -389,17 +365,15 @@ private fun RoutineCard(
     var title by remember(routine.id, routine.templateTitle) { mutableStateOf(routine.templateTitle) }
     var cron by remember(routine.id, routine.cronSchedule) { mutableStateOf(routine.cronSchedule) }
     var timezone by remember(routine.id, routine.timezone) { mutableStateOf(routine.timezone) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Title") })
-            OutlinedTextField(value = cron, onValueChange = { cron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron") })
-            OutlinedTextField(value = timezone, onValueChange = { timezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
-            Text(if (routine.isActive) "Active" else "Inactive", style = MaterialTheme.typography.bodySmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { controller.updateRoutine(routine.id, title, cron, timezone) }) { Text("Save") }
-                Button(onClick = { controller.toggleRoutineActive(routine.id) }) { Text(if (routine.isActive) "Deactivate" else "Activate") }
-                Button(onClick = { onDeleteRoutine(routine.id, routine.templateTitle) }) { Text("Delete") }
-            }
+    SectionCard {
+        OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Title") })
+        OutlinedTextField(value = cron, onValueChange = { cron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron") })
+        OutlinedTextField(value = timezone, onValueChange = { timezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
+        Text(if (routine.isActive) "Active" else "Inactive", style = ThemeTokens.type.bodyMuted)
+        ActionRow {
+            Button(onClick = { controller.updateRoutine(routine.id, title, cron, timezone) }) { Text("Save") }
+            Button(onClick = { controller.toggleRoutineActive(routine.id) }) { Text(if (routine.isActive) "Deactivate" else "Activate") }
+            Button(onClick = { onDeleteRoutine(routine.id, routine.templateTitle) }) { Text("Delete") }
         }
     }
 }
@@ -415,33 +389,31 @@ private fun AlarmsSubTab(
     LaunchedEffect(state.preferences.defaultAlarmLeadMinutes) {
         if (triggerTimeIso.isBlank()) triggerTimeIso = controller.suggestedAlarmTriggerTimeIso()
     }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Add alarm", style = MaterialTheme.typography.titleMedium)
-                    Text("Select task")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.taskView.tasks.forEach { task ->
-                            Button(onClick = { selectedTaskId = task.id }) {
-                                Text(if (selectedTaskId == task.id) "[${task.title}]" else task.title)
-                            }
+            SectionCard {
+                Text("Add alarm", style = ThemeTokens.type.sectionTitle)
+                Text("Select task", style = ThemeTokens.type.body)
+                ActionRow {
+                    state.taskView.tasks.forEach { task ->
+                        Button(onClick = { selectedTaskId = task.id }) {
+                            Text(if (selectedTaskId == task.id) "[${task.title}]" else task.title)
                         }
                     }
-                    OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { triggerTimeIso = controller.suggestedAlarmTriggerTimeIso() }) { Text("Use default") }
-                        Button(onClick = {
-                            controller.createAlarm(selectedTaskId, triggerTimeIso)
-                            triggerTimeIso = controller.suggestedAlarmTriggerTimeIso()
-                        }, enabled = selectedTaskId.isNotBlank()) { Text("Create alarm") }
-                    }
+                }
+                OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
+                Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+                    Button(onClick = { triggerTimeIso = controller.suggestedAlarmTriggerTimeIso() }) { Text("Use default") }
+                    Button(onClick = {
+                        controller.createAlarm(selectedTaskId, triggerTimeIso)
+                        triggerTimeIso = controller.suggestedAlarmTriggerTimeIso()
+                    }, enabled = selectedTaskId.isNotBlank()) { Text("Create alarm") }
                 }
             }
         }
-        item { Text("Alarms", style = MaterialTheme.typography.titleLarge) }
+        item { SectionTitle("Alarms") }
         if (state.taskView.alarms.isEmpty()) {
-            item { EmptyCard("No alarms yet.") }
+            item { EmptyState("No alarms yet.") }
         } else {
             items(state.taskView.alarms, key = { it.id }) { alarm -> AlarmCard(alarm, controller, onDeleteAlarm) }
         }
@@ -455,17 +427,15 @@ private fun AlarmCard(
     onDeleteAlarm: (id: String, taskTitle: String) -> Unit,
 ) {
     var triggerTimeIso by remember(alarm.id, alarm.triggerTimeIso) { mutableStateOf(alarm.triggerTimeIso) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(alarm.taskTitle, style = MaterialTheme.typography.titleMedium)
-            Text(if (alarm.isActive) "Active" else "Inactive")
-            Text(alarm.triggerTimeLabel, style = MaterialTheme.typography.bodySmall)
-            OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { controller.updateAlarm(alarm.id, triggerTimeIso) }) { Text("Save") }
-                Button(onClick = { controller.toggleAlarmActive(alarm.id) }) { Text(if (alarm.isActive) "Deactivate" else "Activate") }
-                Button(onClick = { onDeleteAlarm(alarm.id, alarm.taskTitle) }) { Text("Delete") }
-            }
+    SectionCard {
+        Text(alarm.taskTitle, style = ThemeTokens.type.sectionTitle)
+        Text(if (alarm.isActive) "Active" else "Inactive", style = ThemeTokens.type.body)
+        Text(alarm.triggerTimeLabel, style = ThemeTokens.type.bodyMuted)
+        OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
+        ActionRow {
+            Button(onClick = { controller.updateAlarm(alarm.id, triggerTimeIso) }) { Text("Save") }
+            Button(onClick = { controller.toggleAlarmActive(alarm.id) }) { Text(if (alarm.isActive) "Deactivate" else "Activate") }
+            Button(onClick = { onDeleteAlarm(alarm.id, alarm.taskTitle) }) { Text("Delete") }
         }
     }
 }
@@ -482,11 +452,11 @@ private fun PomodoroDialog(state: AppUiState, controller: AbunAppController, liv
         onDismissRequest = controller::closePomodoroDialog,
         title = { Text(if (active == null) "Start pomodoro" else "Pomodoro timer") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
                 if (active == null) {
-                    Text("Start a new timer with or without a task.")
-                    Text("Task")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Start a new timer with or without a task.", style = ThemeTokens.type.body)
+                    Text("Task", style = ThemeTokens.type.label)
+                    ActionRow {
                         Button(onClick = { selectedTaskId = null }) { Text(if (selectedTaskId == null) "[No task]" else "No task") }
                         state.taskView.tasks.forEach { task ->
                             Button(onClick = { selectedTaskId = task.id }) {
@@ -494,8 +464,8 @@ private fun PomodoroDialog(state: AppUiState, controller: AbunAppController, liv
                             }
                         }
                     }
-                    Text("Mode")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Mode", style = ThemeTokens.type.label)
+                    ActionRow {
                         PomodoroPhase.entries.forEach { phase ->
                             Button(onClick = { selectedPhase = phase }) {
                                 Text(if (selectedPhase == phase) "[${phase.label()}]" else phase.label())
@@ -504,14 +474,14 @@ private fun PomodoroDialog(state: AppUiState, controller: AbunAppController, liv
                     }
                 } else {
                     val remaining = active.endsAtEpochMillis - liveNow
-                    Text(active.taskTitle ?: "Solo focus")
-                    Text("Mode: ${active.phase.label()}")
-                    Text("Remaining: ${formatRemaining(remaining)}")
+                    Text(active.taskTitle ?: "Solo focus", style = ThemeTokens.type.body)
+                    Text("Mode: ${active.phase.label()}", style = ThemeTokens.type.bodyMuted)
+                    Text("Remaining: ${formatRemaining(remaining)}", style = ThemeTokens.type.bodyMuted)
                     if (remaining <= 0 || active.isOverdue) {
-                        Text("Timer finished. Save notes and optionally update the related task.")
+                        Text("Timer finished. Save notes and optionally update the related task.", style = ThemeTokens.type.body)
                         OutlinedTextField(value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Notes") })
                         if (active.taskId != null) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ActionRow {
                                 PomodoroTaskUpdate.entries.forEach { option ->
                                     Button(onClick = { taskUpdate = option }) {
                                         Text(if (taskUpdate == option) "[${option.label()}]" else option.label())
@@ -520,7 +490,7 @@ private fun PomodoroDialog(state: AppUiState, controller: AbunAppController, liv
                             }
                         }
                     } else {
-                        Text("Only one timer can be active at a time.")
+                        Text("Only one timer can be active at a time.", style = ThemeTokens.type.body)
                     }
                 }
             }
@@ -558,7 +528,7 @@ private fun PreferencesScreen(state: AppUiState, controller: AbunAppController) 
     var longBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.longBreakMinutes.toString()) }
     var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
         item {
             PreferenceSection("Task defaults") {
                 OutlinedTextField(value = titlePrefix, onValueChange = {
@@ -569,7 +539,7 @@ private fun PreferencesScreen(state: AppUiState, controller: AbunAppController) 
                     defaultAlarmLead = it
                     if (it.toIntOrNull() != null) updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
                 }, modifier = Modifier.fillMaxWidth(), label = { Text("Default alarm lead minutes") })
-                Text("Blank titles: reject", style = MaterialTheme.typography.bodySmall)
+                Text("Blank titles: reject", style = ThemeTokens.type.bodyMuted)
             }
         }
         item {
@@ -594,8 +564,8 @@ private fun PreferencesScreen(state: AppUiState, controller: AbunAppController) 
                     timezoneOverride = it
                     updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
                 }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone override") })
-                Text("Date format", style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Date format", style = ThemeTokens.type.label)
+                ActionRow {
                     DateFormatPreference.entries.forEach { preference ->
                         Button(onClick = {
                             updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, preference)
@@ -638,18 +608,9 @@ private fun NumericPreferenceField(label: String, value: String, onValueChange: 
 
 @Composable
 private fun PreferenceSection(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun EmptyCard(message: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Text(message, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+    SectionCard {
+        Text(title, style = ThemeTokens.type.sectionTitle)
+        content()
     }
 }
 
