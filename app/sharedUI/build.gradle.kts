@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -45,7 +46,6 @@ kotlin {
             api(projects.app.sharedLogic)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
@@ -57,6 +57,12 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(compose.desktop.currentOs)
+            implementation(libs.compose.uiTest)
+            implementation(libs.roborazzi.composeDesktop)
         }
         iosMain.dependencies {
             implementation(libs.ktor.clientDarwin)

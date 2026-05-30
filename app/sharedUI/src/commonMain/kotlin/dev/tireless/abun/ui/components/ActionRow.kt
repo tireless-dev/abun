@@ -1,12 +1,14 @@
 package dev.tireless.abun.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
@@ -24,5 +26,10 @@ fun ActionRow(
 
 @Composable
 fun SectionDivider(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier = modifier, color = ThemeTokens.colors.border)
+    androidx.compose.foundation.layout.Spacer(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(ThemeTokens.colors.border),
+    )
 }

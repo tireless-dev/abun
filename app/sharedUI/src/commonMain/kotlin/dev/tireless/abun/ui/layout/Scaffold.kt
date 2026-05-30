@@ -1,23 +1,26 @@
 package dev.tireless.abun.ui.layout
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold as MaterialScaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import dev.tireless.abun.ui.components.AppText
 import dev.tireless.abun.ui.components.Fab
 import dev.tireless.abun.ui.theme.ThemeTokens
 
@@ -31,22 +34,29 @@ fun Scaffold(
     onFloatingAction: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    MaterialScaffold(
-        topBar = { TopBar(title = title) },
-        bottomBar = {
+    Box(modifier = Modifier.fillMaxSize().background(ThemeTokens.colors.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopBar(title = title)
+            Box(modifier = Modifier.weight(1f)) {
+                content(PaddingValues())
+            }
             BottomTabs(
                 tabs = tabs,
                 selectedTab = selectedTab,
                 onSelectTab = onSelectTab,
             )
-        },
-        floatingActionButton = {
-            if (floatingActionLabel != null && onFloatingAction != null) {
+        }
+        if (floatingActionLabel != null && onFloatingAction != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = ThemeTokens.spacing.lgDp, bottom = 72.dp),
+            ) {
                 Fab(label = floatingActionLabel, onClick = onFloatingAction)
             }
-        },
-        content = content,
-    )
+        }
+    }
 }
 
 @Composable
@@ -59,7 +69,7 @@ private fun TopBar(title: String) {
             .padding(horizontal = ThemeTokens.spacing.lgDp, vertical = ThemeTokens.spacing.mdDp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = ThemeTokens.type.title, fontWeight = FontWeight.Bold)
+        AppText(title, style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold))
     }
 }
 
@@ -79,22 +89,19 @@ private fun BottomTabs(
     ) {
         tabs.forEach { tab ->
             val selected = selectedTab == tab
-            OutlinedCard(
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onSelectTab(tab) },
-                colors = CardDefaults.outlinedCardColors(
-                    containerColor = if (selected) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surface,
-                ),
+                    .background(
+                        if (selected) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surface,
+                        RoundedCornerShape(ThemeTokens.radii.mediumDp),
+                    )
+                    .border(BorderStroke(1.dp, ThemeTokens.colors.border), RoundedCornerShape(ThemeTokens.radii.mediumDp))
+                    .clickable { onSelectTab(tab) }
+                    .padding(vertical = ThemeTokens.spacing.smDp),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = ThemeTokens.spacing.smDp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(tab, style = ThemeTokens.type.body)
-                }
+                AppText(tab, style = ThemeTokens.type.body)
             }
         }
     }

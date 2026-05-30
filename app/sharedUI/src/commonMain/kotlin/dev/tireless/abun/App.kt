@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,6 +27,7 @@ import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.ui.components.ActionRow
+import dev.tireless.abun.ui.components.AppText
 import dev.tireless.abun.ui.components.Button
 import dev.tireless.abun.ui.components.EmptyState
 import dev.tireless.abun.ui.components.InlineError
@@ -73,7 +72,13 @@ fun App() {
 
     AppTheme {
         if (state.auth.showGuide) {
-            GuideScreen(state, controller)
+            GuideScreenContent(
+                state = state,
+                onUpdateLoginEmail = controller::updateLoginEmail,
+                onRequestEmailOtp = controller::requestEmailOtp,
+                onVerifyEmailOtp = controller::verifyEmailOtp,
+                onSkipLogin = controller::skipLogin,
+            )
             return@AppTheme
         }
 
@@ -99,10 +104,10 @@ fun App() {
                     .padding(padding),
                 applyVerticalSafeInsets = false,
             ) {
-                state.syncState.lastSyncedAt?.let { androidx.compose.material3.Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
+                state.syncState.lastSyncedAt?.let { AppText("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
                 state.syncState.errorMessage?.let { InlineError(it) }
                 if (state.auth.mode == AuthMode.GUEST) {
-                    androidx.compose.material3.Text("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
+                    AppText("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
                 }
 
                 when (state.selectedTab) {
@@ -180,29 +185,35 @@ fun App() {
 }
 
 @Composable
-private fun GuideScreen(state: AppUiState, controller: AbunAppController) {
+internal fun GuideScreenContent(
+    state: AppUiState,
+    onUpdateLoginEmail: (String) -> Unit,
+    onRequestEmailOtp: () -> Unit,
+    onVerifyEmailOtp: (String) -> Unit,
+    onSkipLogin: () -> Unit,
+) {
     var otpCode by remember { mutableStateOf("") }
     ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
-        androidx.compose.material3.Text("Welcome to abun", style = ThemeTokens.type.title)
-        androidx.compose.material3.Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.body)
-        TextField(value = state.auth.email, onValueChange = controller::updateLoginEmail, label = "Email")
-        Button(label = if (state.auth.otpRequested) "Resend OTP" else "Send OTP", onClick = controller::requestEmailOtp, enabled = !state.auth.isSubmitting)
+        AppText("Welcome to abun", style = ThemeTokens.type.title)
+        AppText("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.body)
+        TextField(value = state.auth.email, onValueChange = onUpdateLoginEmail, label = "Email")
+        Button(label = if (state.auth.otpRequested) "Resend OTP" else "Send OTP", onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting)
         if (state.auth.otpRequested) {
             TextField(value = otpCode, onValueChange = { otpCode = it }, label = "OTP code")
-            Button(label = "Verify and Login", onClick = { controller.verifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting)
+            Button(label = "Verify and Login", onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting)
         }
-        Button(label = "Skip for now", onClick = controller::skipLogin, enabled = !state.auth.isSubmitting)
+        Button(label = "Skip for now", onClick = onSkipLogin, enabled = !state.auth.isSubmitting)
         state.auth.errorMessage?.let { InlineError(it) }
     }
 }
 
 @Composable
-private fun TodayScreen(state: AppUiState, isFocusModeActive: Boolean, onStartFocus: () -> Unit) {
+internal fun TodayScreen(state: AppUiState, isFocusModeActive: Boolean, onStartFocus: () -> Unit) {
     Section {
         SectionTitle("Summary")
-        androidx.compose.material3.Text("Date: ${state.selectedDate}", style = ThemeTokens.type.body)
-        androidx.compose.material3.Text("Current tasks: ${state.today.currentTasks.size}", style = ThemeTokens.type.body)
-        androidx.compose.material3.Text("Upcoming tasks: ${state.today.upcomingTasks.size}", style = ThemeTokens.type.body)
+        AppText("Date: ${state.selectedDate}", style = ThemeTokens.type.body)
+        AppText("Current tasks: ${state.today.currentTasks.size}", style = ThemeTokens.type.body)
+        AppText("Upcoming tasks: ${state.today.upcomingTasks.size}", style = ThemeTokens.type.body)
         if (!isFocusModeActive) {
             Button(label = "Start focus", onClick = onStartFocus)
         }
@@ -213,7 +224,7 @@ private fun TodayScreen(state: AppUiState, isFocusModeActive: Boolean, onStartFo
 }
 
 @Composable
-private fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
+internal fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
     SectionTitle(title)
     if (items.isEmpty()) {
         EmptyState("No tasks in this section.")
@@ -222,34 +233,34 @@ private fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         items.forEach { item ->
             Section {
-                androidx.compose.material3.Text(item.title, style = ThemeTokens.type.sectionTitle)
-                androidx.compose.material3.Text(statusLabel(item.status), style = ThemeTokens.type.body)
-                item.triggerTimeLabel?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
+                AppText(item.title, style = ThemeTokens.type.sectionTitle)
+                AppText(statusLabel(item.status), style = ThemeTokens.type.body)
+                item.triggerTimeLabel?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
 }
 
 @Composable
-private fun JournalSection(entries: List<JournalEntryView>) {
+internal fun JournalSection(entries: List<JournalEntryView>) {
     SectionTitle("Today journal")
     if (entries.isEmpty()) {
         EmptyState("No journal entries yet.")
         return
     }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-        items(entries, key = { it.eventId }) { entry ->
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+        entries.forEach { entry ->
             Section {
-                androidx.compose.material3.Text(entry.title, style = ThemeTokens.type.body)
-                androidx.compose.material3.Text("${entry.eventType.name} at ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
-                entry.content?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
+                AppText(entry.title, style = ThemeTokens.type.body)
+                AppText("${entry.eventType.name} at ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
+                entry.content?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
 }
 
 @Composable
-private fun TasksScreen(
+internal fun TasksScreen(
     state: AppUiState,
     isFocusModeActive: Boolean,
     onOpenActions: (TaskListItemView) -> Unit,
@@ -258,11 +269,11 @@ private fun TasksScreen(
     if (state.taskView.tasks.isEmpty()) {
         EmptyState("No tasks yet.")
     } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-            items(state.taskView.tasks, key = { it.id }) { task ->
+        Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+            state.taskView.tasks.forEach { task ->
                 Section {
-                    androidx.compose.material3.Text(task.title, style = ThemeTokens.type.sectionTitle)
-                    androidx.compose.material3.Text(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
+                    AppText(task.title, style = ThemeTokens.type.sectionTitle)
+                    AppText(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
                     if (!isFocusModeActive) {
                         Button(label = "Manage", onClick = { onOpenActions(task) })
                     }
@@ -273,32 +284,32 @@ private fun TasksScreen(
 }
 
 @Composable
-private fun FocusScreen(state: AppUiState, liveNow: Long, onOpenStart: () -> Unit) {
+internal fun FocusScreen(state: AppUiState, liveNow: Long, onOpenStart: () -> Unit) {
     Section {
         SectionTitle("Pomodoro")
         val active = state.activePomodoroSession
         if (active == null) {
-            androidx.compose.material3.Text("No active timer.", style = ThemeTokens.type.body)
+            AppText("No active timer.", style = ThemeTokens.type.body)
             Button(label = "Start timer", onClick = onOpenStart)
         } else {
             val remaining = active.endsAtEpochMillis - liveNow
-            androidx.compose.material3.Text(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
-            androidx.compose.material3.Text("Mode: ${active.phase.label()}", style = ThemeTokens.type.bodyMuted)
-            androidx.compose.material3.Text("Remaining: ${formatRemaining(remaining)}", style = ThemeTokens.type.bodyMuted)
+            AppText(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
+            AppText("Mode: ${active.phase.label()}", style = ThemeTokens.type.bodyMuted)
+            AppText("Remaining: ${formatRemaining(remaining)}", style = ThemeTokens.type.bodyMuted)
             if (remaining > 0) {
-                androidx.compose.material3.Text("Focus mode active. Editing is limited.", style = ThemeTokens.type.label)
+                AppText("Focus mode active. Editing is limited.", style = ThemeTokens.type.label)
             }
         }
     }
 
     if (state.recentPomodoroSessions.isNotEmpty()) {
         SectionTitle("Recent sessions")
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-            items(state.recentPomodoroSessions, key = { it.id }) { session ->
+        Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+            state.recentPomodoroSessions.forEach { session ->
                 Section {
-                    androidx.compose.material3.Text(session.taskTitle ?: "Standalone", style = ThemeTokens.type.body)
-                    androidx.compose.material3.Text("${session.phase.label()} • ${session.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
-                    session.note?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
+                    AppText(session.taskTitle ?: "Standalone", style = ThemeTokens.type.body)
+                    AppText("${session.phase.label()} • ${session.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
+                    session.note?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
                 }
             }
         }
@@ -307,6 +318,22 @@ private fun FocusScreen(state: AppUiState, liveNow: Long, onOpenStart: () -> Uni
 
 @Composable
 private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
+    SettingsScreenContent(state = state, onUpdatePreferences = controller::updatePreferences)
+}
+
+@Composable
+internal fun SettingsScreenContent(
+    state: AppUiState,
+    onUpdatePreferences: (
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+    ) -> Unit,
+) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var defaultAlarmLead by remember(state.preferences) { mutableStateOf(state.preferences.defaultAlarmLeadMinutes.toString()) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
@@ -315,52 +342,46 @@ private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
     var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
     var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
-        item {
-            Section {
-                SectionTitle("Task defaults")
-                TextField(value = titlePrefix, onValueChange = { titlePrefix = it }, label = "Title prefix")
-                TextField(value = defaultAlarmLead, onValueChange = { defaultAlarmLead = it }, label = "Default alarm lead minutes")
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
+        Section {
+            SectionTitle("Task defaults")
+            TextField(value = titlePrefix, onValueChange = { titlePrefix = it }, label = "Title prefix")
+            TextField(value = defaultAlarmLead, onValueChange = { defaultAlarmLead = it }, label = "Default alarm lead minutes")
         }
-        item {
-            Section {
-                SectionTitle("Pomodoro defaults")
-                TextField(value = focusMinutes, onValueChange = { focusMinutes = it }, label = "Focus minutes")
-                TextField(value = shortBreakMinutes, onValueChange = { shortBreakMinutes = it }, label = "Short break minutes")
-                TextField(value = longBreakMinutes, onValueChange = { longBreakMinutes = it }, label = "Long break minutes")
-            }
+        Section {
+            SectionTitle("Pomodoro defaults")
+            TextField(value = focusMinutes, onValueChange = { focusMinutes = it }, label = "Focus minutes")
+            TextField(value = shortBreakMinutes, onValueChange = { shortBreakMinutes = it }, label = "Short break minutes")
+            TextField(value = longBreakMinutes, onValueChange = { longBreakMinutes = it }, label = "Long break minutes")
         }
-        item {
-            Section {
-                SectionTitle("App preferences")
-                TextField(value = timezoneOverride, onValueChange = { timezoneOverride = it }, label = "Timezone override")
-                SegmentedControl(
-                    options = DateFormatPreference.entries.map { it.label() },
-                    selected = selectedDateFormat.label(),
-                    onSelect = { label -> selectedDateFormat = dateFormatFromLabel(label) },
-                )
-                Button(
-                    label = "Save settings",
-                    onClick = {
-                        controller.updatePreferences(
-                            titlePrefix = titlePrefix,
-                            defaultAlarmLeadMinutes = defaultAlarmLead.toIntOrNull() ?: state.preferences.defaultAlarmLeadMinutes,
-                            focusMinutes = focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
-                            shortBreakMinutes = shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
-                            longBreakMinutes = longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
-                            timezoneOverride = timezoneOverride,
-                            dateFormat = selectedDateFormat,
-                        )
-                    },
-                )
-            }
+        Section {
+            SectionTitle("App preferences")
+            TextField(value = timezoneOverride, onValueChange = { timezoneOverride = it }, label = "Timezone override")
+            SegmentedControl(
+                options = DateFormatPreference.entries.map { it.label() },
+                selected = selectedDateFormat.label(),
+                onSelect = { label -> selectedDateFormat = dateFormatFromLabel(label) },
+            )
+            Button(
+                label = "Save settings",
+                onClick = {
+                    onUpdatePreferences(
+                        titlePrefix,
+                        defaultAlarmLead.toIntOrNull() ?: state.preferences.defaultAlarmLeadMinutes,
+                        focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
+                        shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
+                        longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
+                        timezoneOverride,
+                        selectedDateFormat,
+                    )
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+internal fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var draftTask by remember { mutableStateOf("") }
     Sheet(onDismiss = onDismiss) {
         SectionTitle("Create task")
@@ -373,7 +394,7 @@ private fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 }
 
 @Composable
-private fun TaskActionsSheet(
+internal fun TaskActionsSheet(
     task: TaskListItemView?,
     isFocusModeActive: Boolean,
     onDismiss: () -> Unit,
@@ -385,7 +406,7 @@ private fun TaskActionsSheet(
     if (task == null) return
     Sheet(onDismiss = onDismiss) {
         SectionTitle(task.title)
-        androidx.compose.material3.Text(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
+        AppText(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
         if (isFocusModeActive) {
             InlineError("Focus mode is active. Task edits are temporarily disabled.")
         } else {
@@ -400,7 +421,7 @@ private fun TaskActionsSheet(
 }
 
 @Composable
-private fun StartFocusSheet(
+internal fun StartFocusSheet(
     state: AppUiState,
     hasActive: Boolean,
     onDismiss: () -> Unit,
@@ -416,7 +437,7 @@ private fun StartFocusSheet(
             Button(label = "Close", onClick = onDismiss)
             return@Sheet
         }
-        androidx.compose.material3.Text("Task", style = ThemeTokens.type.label)
+        AppText("Task", style = ThemeTokens.type.label)
         SegmentedControl(
             options = listOf("No task") + state.taskView.tasks.map { it.title },
             selected = state.taskView.tasks.firstOrNull { it.id == selectedTaskId }?.title ?: "No task",
@@ -424,7 +445,7 @@ private fun StartFocusSheet(
                 selectedTaskId = state.taskView.tasks.firstOrNull { it.title == label }?.id
             },
         )
-        androidx.compose.material3.Text("Mode", style = ThemeTokens.type.label)
+        AppText("Mode", style = ThemeTokens.type.label)
         SegmentedControl(
             options = PomodoroPhase.entries.map { it.label() },
             selected = selectedPhase.label(),
@@ -438,7 +459,7 @@ private fun StartFocusSheet(
 }
 
 @Composable
-private fun CompleteFocusSheet(
+internal fun CompleteFocusSheet(
     state: AppUiState,
     liveNow: Long,
     onDismiss: () -> Unit,
@@ -452,7 +473,7 @@ private fun CompleteFocusSheet(
 
     Sheet(onDismiss = onDismiss) {
         SectionTitle(if (remaining <= 0) "Session complete" else "Active focus")
-        androidx.compose.material3.Text(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
+        AppText(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
         TextField(value = note, onValueChange = { note = it }, label = "Log note")
         if (active.taskId != null) {
             SegmentedControl(
