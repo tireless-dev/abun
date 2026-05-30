@@ -6,6 +6,8 @@ import dev.tireless.abun.sync.TaskStatus
 enum class AppTab {
     TODAY,
     TASKS,
+    FOCUS,
+    SETTINGS,
 }
 
 enum class TaskSubTab {

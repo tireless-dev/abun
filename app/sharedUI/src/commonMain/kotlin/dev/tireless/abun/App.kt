@@ -8,34 +8,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AgendaTaskItemView
-import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.AuthMode
@@ -43,56 +27,47 @@ import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
-import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListItemView
-import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.designsystem.ActionRow
+import dev.tireless.abun.designsystem.AppButton
+import dev.tireless.abun.designsystem.AppScaffold
+import dev.tireless.abun.designsystem.AppSegmentedControl
+import dev.tireless.abun.designsystem.AppSheet
+import dev.tireless.abun.designsystem.AppTextField
 import dev.tireless.abun.designsystem.AppTheme
-import dev.tireless.abun.designsystem.ThemeTokens
 import dev.tireless.abun.designsystem.EmptyState
 import dev.tireless.abun.designsystem.InlineError
 import dev.tireless.abun.designsystem.ScreenContainer
 import dev.tireless.abun.designsystem.SectionCard
 import dev.tireless.abun.designsystem.SectionTitle
+import dev.tireless.abun.designsystem.ThemeTokens
 import dev.tireless.abun.sync.TaskStatus
 import kotlinx.coroutines.delay
 import kotlin.time.Clock
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class OverlaySheet {
+    CREATE_TASK,
+    TASK_ACTIONS,
+    START_FOCUS,
+    COMPLETE_FOCUS,
+}
+
 @Composable
 @Preview
 fun App() {
     val controller = rememberAbunAppController()
     val state by controller.state.collectAsState()
     val liveNow by rememberLiveNow()
-    val activeTimerLabel = state.activePomodoroSession?.let { formatRemaining(it.endsAtEpochMillis - liveNow) }
-    val pendingDeletes = remember { mutableStateListOf<PendingDelete>() }
-    var pendingNow by remember { mutableLongStateOf(liveNow) }
+    val activeSession = state.activePomodoroSession
+    val activeRemaining = activeSession?.let { it.endsAtEpochMillis - liveNow } ?: 0L
+    val isFocusModeActive = activeSession != null && activeRemaining > 0
+    var currentSheet by remember { mutableStateOf<OverlaySheet?>(null) }
+    var selectedTaskForAction by remember { mutableStateOf<TaskListItemView?>(null) }
 
-    fun requestDelete(kind: PendingDeleteKind, id: String, label: String) {
-        val key = "$kind:$id"
-        if (pendingDeletes.any { it.key == key }) return
-        pendingDeletes += PendingDelete(key = key, kind = kind, id = id, label = label, executeAtMillis = Clock.System.now().toEpochMilliseconds() + 5_000L)
-    }
-
-    fun undoDelete(key: String) {
-        pendingDeletes.removeAll { it.key == key }
-    }
-
-    LaunchedEffect(pendingDeletes.size) {
-        while (pendingDeletes.isNotEmpty()) {
-            delay(250)
-            val now = Clock.System.now().toEpochMilliseconds()
-            pendingNow = now
-            val due = pendingDeletes.filter { it.executeAtMillis <= now }
-            due.forEach { pending ->
-                when (pending.kind) {
-                    PendingDeleteKind.TASK -> controller.deleteTask(pending.id)
-                    PendingDeleteKind.ROUTINE -> controller.deleteRoutine(pending.id)
-                    PendingDeleteKind.ALARM -> controller.deleteAlarm(pending.id)
-                }
-            }
-            if (due.isNotEmpty()) pendingDeletes.removeAll(due.toSet())
+    LaunchedEffect(state.activePomodoroSession?.id, activeRemaining) {
+        if (state.activePomodoroSession != null && activeRemaining <= 0) {
+            currentSheet = OverlaySheet.COMPLETE_FOCUS
+            controller.selectTab(AppTab.FOCUS)
         }
     }
 
@@ -101,73 +76,104 @@ fun App() {
             GuideScreen(state, controller)
             return@AppTheme
         }
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(if (state.isPreferencesOpen) "Preferences" else "abun", fontWeight = FontWeight.Bold) },
-                    actions = {
-                        if (!state.isPreferencesOpen) {
-                            TextButton(onClick = controller::openPomodoroDialog) {
-                                Text(activeTimerLabel?.let { "Timer $it" } ?: "Timer")
-                            }
-                        }
-                        TextButton(onClick = controller::syncNow) {
-                            Text(if (state.syncState.isSyncing) "Syncing..." else "Sync")
-                        }
-                        TextButton(onClick = if (state.isPreferencesOpen) controller::closePreferences else controller::openPreferences) {
-                            Text(if (state.isPreferencesOpen) "Close" else "Settings")
-                        }
-                    },
-                )
-            },
-            bottomBar = {
-                if (!state.isPreferencesOpen) {
-                    NavigationBar {
-                        NavigationBarItem(selected = state.selectedTab == AppTab.TODAY, onClick = { controller.selectTab(AppTab.TODAY) }, label = { Text("Today") }, icon = {})
-                        NavigationBarItem(selected = state.selectedTab == AppTab.TASKS, onClick = { controller.selectTab(AppTab.TASKS) }, label = { Text("Task") }, icon = {})
-                    }
-                }
-            },
+
+        val title = when (state.selectedTab) {
+            AppTab.TODAY -> "Today"
+            AppTab.TASKS -> "Tasks"
+            AppTab.FOCUS -> "Focus"
+            AppTab.SETTINGS -> "Settings"
+        }
+
+        val fabEnabled = state.selectedTab == AppTab.TODAY || state.selectedTab == AppTab.TASKS
+        AppScaffold(
+            title = title,
+            selectedTab = state.selectedTab.tabLabel(),
+            tabs = AppTab.entries.map { it.tabLabel() },
+            onSelectTab = { tabLabel -> controller.selectTab(appTabFromLabel(tabLabel)) },
+            floatingActionLabel = if (fabEnabled && !isFocusModeActive) "Task" else null,
+            onFloatingAction = { currentSheet = OverlaySheet.CREATE_TASK },
         ) { padding ->
             ScreenContainer(
                 modifier = Modifier
                     .background(ThemeTokens.colors.background)
                     .padding(padding),
             ) {
-                state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
+                state.syncState.lastSyncedAt?.let { androidx.compose.material3.Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
                 state.syncState.errorMessage?.let { InlineError(it) }
                 if (state.auth.mode == AuthMode.GUEST) {
-                    Text("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
-                }
-                if (pendingDeletes.isNotEmpty()) {
-                    SectionCard {
-                        SectionTitle("Pending deletes")
-                        pendingDeletes.forEach { pending ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
-                                val remaining = ((pending.executeAtMillis - pendingNow).coerceAtLeast(0L) + 999L) / 1_000L
-                                Text("${pending.label} (${remaining}s)", modifier = Modifier.weight(1f), style = ThemeTokens.type.body)
-                                TextButton(onClick = { undoDelete(pending.key) }) { Text("Undo") }
-                            }
-                        }
-                    }
+                    androidx.compose.material3.Text("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
                 }
 
-                when {
-                    state.isPreferencesOpen -> PreferencesScreen(state, controller)
-                    state.selectedTab == AppTab.TODAY -> TodayScreen(state)
-                    else -> TaskScreen(
+                when (state.selectedTab) {
+                    AppTab.TODAY -> TodayScreen(state, isFocusModeActive) { currentSheet = OverlaySheet.START_FOCUS }
+                    AppTab.TASKS -> TasksScreen(
                         state = state,
-                        controller = controller,
-                        onDeleteTask = { id, title -> requestDelete(PendingDeleteKind.TASK, id, "Task \"$title\"") },
-                        onDeleteRoutine = { id, title -> requestDelete(PendingDeleteKind.ROUTINE, id, "Routine \"$title\"") },
-                        onDeleteAlarm = { id, title -> requestDelete(PendingDeleteKind.ALARM, id, "Alarm for $title") },
+                        isFocusModeActive = isFocusModeActive,
+                        onOpenActions = {
+                            selectedTaskForAction = it
+                            currentSheet = OverlaySheet.TASK_ACTIONS
+                        },
                     )
+                    AppTab.FOCUS -> FocusScreen(state, liveNow) { currentSheet = OverlaySheet.START_FOCUS }
+                    AppTab.SETTINGS -> SettingsScreen(state, controller)
                 }
             }
+        }
 
-            if (state.isPomodoroDialogOpen) {
-                PomodoroDialog(state, controller, liveNow)
-            }
+        when (currentSheet) {
+            OverlaySheet.CREATE_TASK -> CreateTaskSheet(
+                onDismiss = { currentSheet = null },
+                onCreate = {
+                    controller.createTask(it)
+                    currentSheet = null
+                },
+            )
+            OverlaySheet.TASK_ACTIONS -> TaskActionsSheet(
+                task = selectedTaskForAction,
+                isFocusModeActive = isFocusModeActive,
+                onDismiss = { currentSheet = null },
+                onProgress = {
+                    selectedTaskForAction?.let { controller.progressTask(it.id) }
+                    currentSheet = null
+                },
+                onComplete = {
+                    selectedTaskForAction?.let { controller.completeTask(it.id) }
+                    currentSheet = null
+                },
+                onDelete = {
+                    selectedTaskForAction?.let { controller.deleteTask(it.id) }
+                    currentSheet = null
+                },
+                onStartFocus = {
+                    selectedTaskForAction?.let { controller.startPomodoro(it.id, PomodoroPhase.FOCUS) }
+                    controller.selectTab(AppTab.FOCUS)
+                    currentSheet = null
+                },
+            )
+            OverlaySheet.START_FOCUS -> StartFocusSheet(
+                state = state,
+                hasActive = activeSession != null && activeRemaining > 0,
+                onDismiss = { currentSheet = null },
+                onStart = { taskId, phase ->
+                    controller.startPomodoro(taskId, phase)
+                    controller.selectTab(AppTab.FOCUS)
+                    currentSheet = null
+                },
+            )
+            OverlaySheet.COMPLETE_FOCUS -> CompleteFocusSheet(
+                state = state,
+                liveNow = liveNow,
+                onDismiss = { currentSheet = null },
+                onSave = { note, update ->
+                    state.activePomodoroSession?.let { controller.completePomodoro(it.id, note.ifBlank { null }, update) }
+                    currentSheet = null
+                },
+                onStop = { note ->
+                    state.activePomodoroSession?.let { controller.cancelPomodoro(it.id, note.ifBlank { null }) }
+                    currentSheet = null
+                },
+            )
+            null -> Unit
         }
     }
 }
@@ -176,38 +182,30 @@ fun App() {
 private fun GuideScreen(state: AppUiState, controller: AbunAppController) {
     var otpCode by remember { mutableStateOf("") }
     ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
-        Text("Welcome to abun", style = ThemeTokens.type.title)
-        Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.body)
-        OutlinedTextField(
-            value = state.auth.email,
-            onValueChange = controller::updateLoginEmail,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Email") },
-        )
-        Button(onClick = controller::requestEmailOtp, enabled = !state.auth.isSubmitting) {
-            Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP")
-        }
+        androidx.compose.material3.Text("Welcome to abun", style = ThemeTokens.type.title)
+        androidx.compose.material3.Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.body)
+        AppTextField(value = state.auth.email, onValueChange = controller::updateLoginEmail, label = "Email")
+        AppButton(label = if (state.auth.otpRequested) "Resend OTP" else "Send OTP", onClick = controller::requestEmailOtp, enabled = !state.auth.isSubmitting)
         if (state.auth.otpRequested) {
-            OutlinedTextField(
-                value = otpCode,
-                onValueChange = { otpCode = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("OTP code") },
-            )
-            Button(onClick = { controller.verifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting) {
-                Text("Verify and Login")
-            }
+            AppTextField(value = otpCode, onValueChange = { otpCode = it }, label = "OTP code")
+            AppButton(label = "Verify and Login", onClick = { controller.verifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting)
         }
-        TextButton(onClick = controller::skipLogin, enabled = !state.auth.isSubmitting) {
-            Text("Skip for now")
-        }
+        AppButton(label = "Skip for now", onClick = controller::skipLogin, enabled = !state.auth.isSubmitting)
         state.auth.errorMessage?.let { InlineError(it) }
     }
 }
 
 @Composable
-private fun TodayScreen(state: AppUiState) {
-    Text("Today: ${state.selectedDate}", style = ThemeTokens.type.sectionTitle)
+private fun TodayScreen(state: AppUiState, isFocusModeActive: Boolean, onStartFocus: () -> Unit) {
+    SectionCard {
+        SectionTitle("Summary")
+        androidx.compose.material3.Text("Date: ${state.selectedDate}", style = ThemeTokens.type.body)
+        androidx.compose.material3.Text("Current tasks: ${state.today.currentTasks.size}", style = ThemeTokens.type.body)
+        androidx.compose.material3.Text("Upcoming tasks: ${state.today.upcomingTasks.size}", style = ThemeTokens.type.body)
+        if (!isFocusModeActive) {
+            AppButton(label = "Start focus", onClick = onStartFocus)
+        }
+    }
     AgendaSection("Current", state.today.currentTasks)
     AgendaSection("Upcoming", state.today.upcomingTasks)
     JournalSection(state.today.journalEntries)
@@ -223,9 +221,9 @@ private fun AgendaSection(title: String, items: List<AgendaTaskItemView>) {
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         items.forEach { item ->
             SectionCard {
-                Text(item.title, style = ThemeTokens.type.sectionTitle)
-                Text(statusLabel(item.status), style = ThemeTokens.type.body)
-                item.triggerTimeLabel?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
+                androidx.compose.material3.Text(item.title, style = ThemeTokens.type.sectionTitle)
+                androidx.compose.material3.Text(statusLabel(item.status), style = ThemeTokens.type.body)
+                item.triggerTimeLabel?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
@@ -241,376 +239,231 @@ private fun JournalSection(entries: List<JournalEntryView>) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         items(entries, key = { it.eventId }) { entry ->
             SectionCard {
-                Text(entry.title, fontWeight = FontWeight.SemiBold, style = ThemeTokens.type.body)
-                Text("${entry.eventType.name} at ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
-                entry.content?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
+                androidx.compose.material3.Text(entry.title, style = ThemeTokens.type.body)
+                androidx.compose.material3.Text("${entry.eventType.name} at ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
+                entry.content?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
     }
 }
 
 @Composable
-private fun TaskScreen(
+private fun TasksScreen(
     state: AppUiState,
-    controller: AbunAppController,
-    onDeleteTask: (id: String, title: String) -> Unit,
-    onDeleteRoutine: (id: String, title: String) -> Unit,
-    onDeleteAlarm: (id: String, title: String) -> Unit,
+    isFocusModeActive: Boolean,
+    onOpenActions: (TaskListItemView) -> Unit,
 ) {
-    TabRow(selectedTabIndex = state.selectedTaskSubTab.ordinal) {
-        TaskSubTab.entries.forEach { tab ->
-            Tab(selected = state.selectedTaskSubTab == tab, onClick = { controller.selectTaskSubTab(tab) }, text = { Text(tab.title()) })
-        }
-    }
-    when (state.selectedTaskSubTab) {
-        TaskSubTab.TASKS -> TasksSubTab(state, controller, onDeleteTask, onDeleteRoutine)
-        TaskSubTab.ALARMS -> AlarmsSubTab(state, controller, onDeleteAlarm)
-    }
-}
-
-@Composable
-private fun TasksSubTab(
-    state: AppUiState,
-    controller: AbunAppController,
-    onDeleteTask: (id: String, title: String) -> Unit,
-    onDeleteRoutine: (id: String, title: String) -> Unit,
-) {
-    var draftTask by remember { mutableStateOf("") }
-    var routineTitle by remember { mutableStateOf("") }
-    var routineCron by remember { mutableStateOf("0 9 * * *") }
-    var routineTimezone by remember { mutableStateOf(state.preferences.timezoneOverride) }
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
-        item {
-            HeaderTimerSummary(state, controller)
-        }
-        item {
-            SectionCard {
-                Text("Add task", style = ThemeTokens.type.sectionTitle)
-                OutlinedTextField(value = draftTask, onValueChange = { draftTask = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Task title") })
-                Button(onClick = {
-                    controller.createTask(draftTask)
-                    draftTask = ""
-                }) { Text("Create task") }
+    SectionTitle("Tasks")
+    if (state.taskView.tasks.isEmpty()) {
+        EmptyState("No tasks yet.")
+    } else {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+            items(state.taskView.tasks, key = { it.id }) { task ->
+                SectionCard {
+                    androidx.compose.material3.Text(task.title, style = ThemeTokens.type.sectionTitle)
+                    androidx.compose.material3.Text(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
+                    if (!isFocusModeActive) {
+                        AppButton(label = "Manage", onClick = { onOpenActions(task) })
+                    }
+                }
             }
-        }
-        item {
-            SectionCard {
-                Text("Add routine", style = ThemeTokens.type.sectionTitle)
-                OutlinedTextField(value = routineTitle, onValueChange = { routineTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Routine title") })
-                OutlinedTextField(value = routineCron, onValueChange = { routineCron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron schedule") })
-                OutlinedTextField(value = routineTimezone, onValueChange = { routineTimezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
-                Button(onClick = {
-                    controller.createRoutine(routineTitle, routineCron, routineTimezone)
-                    routineTitle = ""
-                }) { Text("Create routine") }
-            }
-        }
-        item { SectionTitle("Tasks") }
-        if (state.taskView.tasks.isEmpty()) {
-            item { EmptyState("No tasks yet.") }
-        } else {
-            items(state.taskView.tasks, key = { it.id }) { task -> TaskCard(task, controller, onDeleteTask) }
-        }
-        item { SectionTitle("Routines") }
-        if (state.taskView.routines.isEmpty()) {
-            item { EmptyState("No routines yet.") }
-        } else {
-            items(state.taskView.routines, key = { it.id }) { routine -> RoutineCard(routine, controller, onDeleteRoutine) }
         }
     }
 }
 
 @Composable
-private fun HeaderTimerSummary(state: AppUiState, controller: AbunAppController) {
-    val liveNow by rememberLiveNow()
+private fun FocusScreen(state: AppUiState, liveNow: Long, onOpenStart: () -> Unit) {
     SectionCard {
-        Text("Pomodoro", style = ThemeTokens.type.sectionTitle)
+        SectionTitle("Pomodoro")
         val active = state.activePomodoroSession
         if (active == null) {
-            Text("No active timer.", style = ThemeTokens.type.body)
-            Button(onClick = controller::openPomodoroDialog) { Text("Start timer") }
+            androidx.compose.material3.Text("No active timer.", style = ThemeTokens.type.body)
+            AppButton(label = "Start timer", onClick = onOpenStart)
         } else {
-            Text(active.taskTitle ?: "Solo focus", style = ThemeTokens.type.body)
-            Text(formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.bodyMuted)
-            Button(onClick = controller::openPomodoroDialog) { Text("Open timer") }
+            val remaining = active.endsAtEpochMillis - liveNow
+            androidx.compose.material3.Text(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
+            androidx.compose.material3.Text("Mode: ${active.phase.label()}", style = ThemeTokens.type.bodyMuted)
+            androidx.compose.material3.Text("Remaining: ${formatRemaining(remaining)}", style = ThemeTokens.type.bodyMuted)
+            if (remaining > 0) {
+                androidx.compose.material3.Text("Focus mode active. Editing is limited.", style = ThemeTokens.type.label)
+            }
         }
     }
-}
 
-@Composable
-private fun TaskCard(
-    task: TaskListItemView,
-    controller: AbunAppController,
-    onDeleteTask: (id: String, title: String) -> Unit,
-) {
-    SectionCard {
-        Text(task.title, style = ThemeTokens.type.sectionTitle)
-        Text(statusLabel(task.status), style = ThemeTokens.type.body)
-        ActionRow {
-            Button(onClick = { controller.progressTask(task.id) }) { Text("Progress") }
-            Button(onClick = { controller.completeTask(task.id) }) { Text("Complete") }
-            Button(onClick = { controller.startPomodoro(task.id, PomodoroPhase.FOCUS) }) { Text("Timer") }
-            Button(onClick = { onDeleteTask(task.id, task.title) }) { Text("Delete") }
-        }
-    }
-}
-
-@Composable
-private fun RoutineCard(
-    routine: RoutineListItemView,
-    controller: AbunAppController,
-    onDeleteRoutine: (id: String, title: String) -> Unit,
-) {
-    var title by remember(routine.id, routine.templateTitle) { mutableStateOf(routine.templateTitle) }
-    var cron by remember(routine.id, routine.cronSchedule) { mutableStateOf(routine.cronSchedule) }
-    var timezone by remember(routine.id, routine.timezone) { mutableStateOf(routine.timezone) }
-    SectionCard {
-        OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Title") })
-        OutlinedTextField(value = cron, onValueChange = { cron = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cron") })
-        OutlinedTextField(value = timezone, onValueChange = { timezone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone") })
-        Text(if (routine.isActive) "Active" else "Inactive", style = ThemeTokens.type.bodyMuted)
-        ActionRow {
-            Button(onClick = { controller.updateRoutine(routine.id, title, cron, timezone) }) { Text("Save") }
-            Button(onClick = { controller.toggleRoutineActive(routine.id) }) { Text(if (routine.isActive) "Deactivate" else "Activate") }
-            Button(onClick = { onDeleteRoutine(routine.id, routine.templateTitle) }) { Text("Delete") }
-        }
-    }
-}
-
-@Composable
-private fun AlarmsSubTab(
-    state: AppUiState,
-    controller: AbunAppController,
-    onDeleteAlarm: (id: String, taskTitle: String) -> Unit,
-) {
-    var selectedTaskId by remember(state.taskView.tasks) { mutableStateOf(state.taskView.tasks.firstOrNull()?.id.orEmpty()) }
-    var triggerTimeIso by remember { mutableStateOf(controller.suggestedAlarmTriggerTimeIso()) }
-    LaunchedEffect(state.preferences.defaultAlarmLeadMinutes) {
-        if (triggerTimeIso.isBlank()) triggerTimeIso = controller.suggestedAlarmTriggerTimeIso()
-    }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
-        item {
-            SectionCard {
-                Text("Add alarm", style = ThemeTokens.type.sectionTitle)
-                Text("Select task", style = ThemeTokens.type.body)
-                ActionRow {
-                    state.taskView.tasks.forEach { task ->
-                        Button(onClick = { selectedTaskId = task.id }) {
-                            Text(if (selectedTaskId == task.id) "[${task.title}]" else task.title)
-                        }
-                    }
-                }
-                OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
-                Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-                    Button(onClick = { triggerTimeIso = controller.suggestedAlarmTriggerTimeIso() }) { Text("Use default") }
-                    Button(onClick = {
-                        controller.createAlarm(selectedTaskId, triggerTimeIso)
-                        triggerTimeIso = controller.suggestedAlarmTriggerTimeIso()
-                    }, enabled = selectedTaskId.isNotBlank()) { Text("Create alarm") }
+    if (state.recentPomodoroSessions.isNotEmpty()) {
+        SectionTitle("Recent sessions")
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+            items(state.recentPomodoroSessions, key = { it.id }) { session ->
+                SectionCard {
+                    androidx.compose.material3.Text(session.taskTitle ?: "Standalone", style = ThemeTokens.type.body)
+                    androidx.compose.material3.Text("${session.phase.label()} • ${session.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
+                    session.note?.let { androidx.compose.material3.Text(it, style = ThemeTokens.type.bodyMuted) }
                 }
             }
         }
-        item { SectionTitle("Alarms") }
-        if (state.taskView.alarms.isEmpty()) {
-            item { EmptyState("No alarms yet.") }
-        } else {
-            items(state.taskView.alarms, key = { it.id }) { alarm -> AlarmCard(alarm, controller, onDeleteAlarm) }
-        }
     }
 }
 
 @Composable
-private fun AlarmCard(
-    alarm: AlarmListItemView,
-    controller: AbunAppController,
-    onDeleteAlarm: (id: String, taskTitle: String) -> Unit,
-) {
-    var triggerTimeIso by remember(alarm.id, alarm.triggerTimeIso) { mutableStateOf(alarm.triggerTimeIso) }
-    SectionCard {
-        Text(alarm.taskTitle, style = ThemeTokens.type.sectionTitle)
-        Text(if (alarm.isActive) "Active" else "Inactive", style = ThemeTokens.type.body)
-        Text(alarm.triggerTimeLabel, style = ThemeTokens.type.bodyMuted)
-        OutlinedTextField(value = triggerTimeIso, onValueChange = { triggerTimeIso = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Trigger time ISO") })
-        ActionRow {
-            Button(onClick = { controller.updateAlarm(alarm.id, triggerTimeIso) }) { Text("Save") }
-            Button(onClick = { controller.toggleAlarmActive(alarm.id) }) { Text(if (alarm.isActive) "Deactivate" else "Activate") }
-            Button(onClick = { onDeleteAlarm(alarm.id, alarm.taskTitle) }) { Text("Delete") }
-        }
-    }
-}
-
-@Composable
-private fun PomodoroDialog(state: AppUiState, controller: AbunAppController, liveNow: Long) {
-    val active = state.activePomodoroSession
-    var selectedTaskId by remember(state.taskView.tasks, active) { mutableStateOf(active?.taskId) }
-    var selectedPhase by remember(active) { mutableStateOf(active?.phase ?: PomodoroPhase.FOCUS) }
-    var note by remember(active?.id) { mutableStateOf(active?.note.orEmpty()) }
-    var taskUpdate by remember(active?.id) { mutableStateOf(PomodoroTaskUpdate.NONE) }
-
-    AlertDialog(
-        onDismissRequest = controller::closePomodoroDialog,
-        title = { Text(if (active == null) "Start pomodoro" else "Pomodoro timer") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
-                if (active == null) {
-                    Text("Start a new timer with or without a task.", style = ThemeTokens.type.body)
-                    Text("Task", style = ThemeTokens.type.label)
-                    ActionRow {
-                        Button(onClick = { selectedTaskId = null }) { Text(if (selectedTaskId == null) "[No task]" else "No task") }
-                        state.taskView.tasks.forEach { task ->
-                            Button(onClick = { selectedTaskId = task.id }) {
-                                Text(if (selectedTaskId == task.id) "[${task.title}]" else task.title)
-                            }
-                        }
-                    }
-                    Text("Mode", style = ThemeTokens.type.label)
-                    ActionRow {
-                        PomodoroPhase.entries.forEach { phase ->
-                            Button(onClick = { selectedPhase = phase }) {
-                                Text(if (selectedPhase == phase) "[${phase.label()}]" else phase.label())
-                            }
-                        }
-                    }
-                } else {
-                    val remaining = active.endsAtEpochMillis - liveNow
-                    Text(active.taskTitle ?: "Solo focus", style = ThemeTokens.type.body)
-                    Text("Mode: ${active.phase.label()}", style = ThemeTokens.type.bodyMuted)
-                    Text("Remaining: ${formatRemaining(remaining)}", style = ThemeTokens.type.bodyMuted)
-                    if (remaining <= 0 || active.isOverdue) {
-                        Text("Timer finished. Save notes and optionally update the related task.", style = ThemeTokens.type.body)
-                        OutlinedTextField(value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Notes") })
-                        if (active.taskId != null) {
-                            ActionRow {
-                                PomodoroTaskUpdate.entries.forEach { option ->
-                                    Button(onClick = { taskUpdate = option }) {
-                                        Text(if (taskUpdate == option) "[${option.label()}]" else option.label())
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Text("Only one timer can be active at a time.", style = ThemeTokens.type.body)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (active == null) {
-                Button(onClick = { controller.startPomodoro(selectedTaskId, selectedPhase) }) { Text("Start") }
-            } else {
-                val remaining = active.endsAtEpochMillis - liveNow
-                if (remaining <= 0 || active.isOverdue) {
-                    Button(onClick = { controller.completePomodoro(active.id, note, if (active.taskId == null) PomodoroTaskUpdate.NONE else taskUpdate) }) { Text("Save session") }
-                } else {
-                    Button(onClick = controller::closePomodoroDialog) { Text("Hide") }
-                }
-            }
-        },
-        dismissButton = {
-            if (active == null) {
-                TextButton(onClick = controller::closePomodoroDialog) { Text("Cancel") }
-            } else {
-                TextButton(onClick = {
-                    controller.cancelPomodoro(active.id, if (note.isBlank()) null else note)
-                }) { Text("Stop timer") }
-            }
-        },
-    )
-}
-
-@Composable
-private fun PreferencesScreen(state: AppUiState, controller: AbunAppController) {
+private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var defaultAlarmLead by remember(state.preferences) { mutableStateOf(state.preferences.defaultAlarmLeadMinutes.toString()) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
     var shortBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.shortBreakMinutes.toString()) }
     var longBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.longBreakMinutes.toString()) }
     var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
+    var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
         item {
-            PreferenceSection("Task defaults") {
-                OutlinedTextField(value = titlePrefix, onValueChange = {
-                    titlePrefix = it
-                    updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }, modifier = Modifier.fillMaxWidth(), label = { Text("Title prefix") })
-                OutlinedTextField(value = defaultAlarmLead, onValueChange = {
-                    defaultAlarmLead = it
-                    if (it.toIntOrNull() != null) updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }, modifier = Modifier.fillMaxWidth(), label = { Text("Default alarm lead minutes") })
-                Text("Blank titles: reject", style = ThemeTokens.type.bodyMuted)
+            SectionCard {
+                SectionTitle("Task defaults")
+                AppTextField(value = titlePrefix, onValueChange = { titlePrefix = it }, label = "Title prefix")
+                AppTextField(value = defaultAlarmLead, onValueChange = { defaultAlarmLead = it }, label = "Default alarm lead minutes")
             }
         }
         item {
-            PreferenceSection("Pomodoro defaults") {
-                NumericPreferenceField("Focus minutes", focusMinutes) {
-                    focusMinutes = it
-                    if (it.toIntOrNull() != null) updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }
-                NumericPreferenceField("Short break minutes", shortBreakMinutes) {
-                    shortBreakMinutes = it
-                    if (it.toIntOrNull() != null) updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }
-                NumericPreferenceField("Long break minutes", longBreakMinutes) {
-                    longBreakMinutes = it
-                    if (it.toIntOrNull() != null) updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }
+            SectionCard {
+                SectionTitle("Pomodoro defaults")
+                AppTextField(value = focusMinutes, onValueChange = { focusMinutes = it }, label = "Focus minutes")
+                AppTextField(value = shortBreakMinutes, onValueChange = { shortBreakMinutes = it }, label = "Short break minutes")
+                AppTextField(value = longBreakMinutes, onValueChange = { longBreakMinutes = it }, label = "Long break minutes")
             }
         }
         item {
-            PreferenceSection("App preferences") {
-                OutlinedTextField(value = timezoneOverride, onValueChange = {
-                    timezoneOverride = it
-                    updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, state.preferences.dateFormat)
-                }, modifier = Modifier.fillMaxWidth(), label = { Text("Timezone override") })
-                Text("Date format", style = ThemeTokens.type.label)
-                ActionRow {
-                    DateFormatPreference.entries.forEach { preference ->
-                        Button(onClick = {
-                            updatePrefs(controller, state, titlePrefix, defaultAlarmLead, focusMinutes, shortBreakMinutes, longBreakMinutes, timezoneOverride, preference)
-                        }) {
-                            Text(if (state.preferences.dateFormat == preference) "[${preference.label()}]" else preference.label())
-                        }
-                    }
-                }
+            SectionCard {
+                SectionTitle("App preferences")
+                AppTextField(value = timezoneOverride, onValueChange = { timezoneOverride = it }, label = "Timezone override")
+                AppSegmentedControl(
+                    options = DateFormatPreference.entries.map { it.label() },
+                    selected = selectedDateFormat.label(),
+                    onSelect = { label -> selectedDateFormat = dateFormatFromLabel(label) },
+                )
+                AppButton(
+                    label = "Save settings",
+                    onClick = {
+                        controller.updatePreferences(
+                            titlePrefix = titlePrefix,
+                            defaultAlarmLeadMinutes = defaultAlarmLead.toIntOrNull() ?: state.preferences.defaultAlarmLeadMinutes,
+                            focusMinutes = focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
+                            shortBreakMinutes = shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
+                            longBreakMinutes = longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
+                            timezoneOverride = timezoneOverride,
+                            dateFormat = selectedDateFormat,
+                        )
+                    },
+                )
             }
         }
     }
 }
 
-private fun updatePrefs(
-    controller: AbunAppController,
-    state: AppUiState,
-    titlePrefix: String,
-    defaultAlarmLead: String,
-    focusMinutes: String,
-    shortBreakMinutes: String,
-    longBreakMinutes: String,
-    timezoneOverride: String,
-    dateFormat: DateFormatPreference,
+@Composable
+private fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var draftTask by remember { mutableStateOf("") }
+    AppSheet(onDismiss = onDismiss) {
+        SectionTitle("Create task")
+        AppTextField(value = draftTask, onValueChange = { draftTask = it }, label = "Task title")
+        ActionRow {
+            AppButton(label = "Cancel", onClick = onDismiss)
+            AppButton(label = "Create", onClick = { onCreate(draftTask) }, enabled = draftTask.isNotBlank())
+        }
+    }
+}
+
+@Composable
+private fun TaskActionsSheet(
+    task: TaskListItemView?,
+    isFocusModeActive: Boolean,
+    onDismiss: () -> Unit,
+    onProgress: () -> Unit,
+    onComplete: () -> Unit,
+    onDelete: () -> Unit,
+    onStartFocus: () -> Unit,
 ) {
-    controller.updatePreferences(
-        titlePrefix = titlePrefix,
-        defaultAlarmLeadMinutes = defaultAlarmLead.toIntOrNull() ?: state.preferences.defaultAlarmLeadMinutes,
-        focusMinutes = focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
-        shortBreakMinutes = shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
-        longBreakMinutes = longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
-        timezoneOverride = timezoneOverride,
-        dateFormat = dateFormat,
-    )
+    if (task == null) return
+    AppSheet(onDismiss = onDismiss) {
+        SectionTitle(task.title)
+        androidx.compose.material3.Text(statusLabel(task.status), style = ThemeTokens.type.bodyMuted)
+        if (isFocusModeActive) {
+            InlineError("Focus mode is active. Task edits are temporarily disabled.")
+        } else {
+            ActionRow {
+                AppButton(label = "Progress", onClick = onProgress)
+                AppButton(label = "Complete", onClick = onComplete)
+                AppButton(label = "Delete", onClick = onDelete)
+                AppButton(label = "Start focus", onClick = onStartFocus)
+            }
+        }
+    }
 }
 
 @Composable
-private fun NumericPreferenceField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), label = { Text(label) })
+private fun StartFocusSheet(
+    state: AppUiState,
+    hasActive: Boolean,
+    onDismiss: () -> Unit,
+    onStart: (String?, PomodoroPhase) -> Unit,
+) {
+    var selectedTaskId by remember(state.taskView.tasks) { mutableStateOf<String?>(state.taskView.tasks.firstOrNull()?.id) }
+    var selectedPhase by remember { mutableStateOf(PomodoroPhase.FOCUS) }
+
+    AppSheet(onDismiss = onDismiss) {
+        SectionTitle("Start focus")
+        if (hasActive) {
+            InlineError("A timer is already active. Stop or complete it first.")
+            AppButton(label = "Close", onClick = onDismiss)
+            return@AppSheet
+        }
+        androidx.compose.material3.Text("Task", style = ThemeTokens.type.label)
+        AppSegmentedControl(
+            options = listOf("No task") + state.taskView.tasks.map { it.title },
+            selected = state.taskView.tasks.firstOrNull { it.id == selectedTaskId }?.title ?: "No task",
+            onSelect = { label ->
+                selectedTaskId = state.taskView.tasks.firstOrNull { it.title == label }?.id
+            },
+        )
+        androidx.compose.material3.Text("Mode", style = ThemeTokens.type.label)
+        AppSegmentedControl(
+            options = PomodoroPhase.entries.map { it.label() },
+            selected = selectedPhase.label(),
+            onSelect = { label -> selectedPhase = pomodoroPhaseFromLabel(label) },
+        )
+        ActionRow {
+            AppButton(label = "Cancel", onClick = onDismiss)
+            AppButton(label = "Start", onClick = { onStart(selectedTaskId, selectedPhase) })
+        }
+    }
 }
 
 @Composable
-private fun PreferenceSection(title: String, content: @Composable () -> Unit) {
-    SectionCard {
-        Text(title, style = ThemeTokens.type.sectionTitle)
-        content()
+private fun CompleteFocusSheet(
+    state: AppUiState,
+    liveNow: Long,
+    onDismiss: () -> Unit,
+    onSave: (String, PomodoroTaskUpdate) -> Unit,
+    onStop: (String) -> Unit,
+) {
+    val active = state.activePomodoroSession ?: return
+    val remaining = active.endsAtEpochMillis - liveNow
+    var note by remember(active.id) { mutableStateOf(active.note.orEmpty()) }
+    var taskUpdate by remember(active.id) { mutableStateOf(PomodoroTaskUpdate.NONE) }
+
+    AppSheet(onDismiss = onDismiss) {
+        SectionTitle(if (remaining <= 0) "Session complete" else "Active focus")
+        androidx.compose.material3.Text(active.taskTitle ?: "Standalone focus", style = ThemeTokens.type.body)
+        AppTextField(value = note, onValueChange = { note = it }, label = "Log note")
+        if (active.taskId != null) {
+            AppSegmentedControl(
+                options = PomodoroTaskUpdate.entries.map { it.label() },
+                selected = taskUpdate.label(),
+                onSelect = { label -> taskUpdate = pomodoroTaskUpdateFromLabel(label) },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
+            AppButton(label = "Stop", onClick = { onStop(note) })
+            AppButton(label = if (remaining <= 0) "Save session" else "Save & close", onClick = { onSave(note, taskUpdate) })
+        }
     }
 }
 
@@ -630,15 +483,32 @@ private fun statusLabel(status: TaskStatus): String = when (status) {
     TaskStatus.UNKNOWN -> "Unknown"
 }
 
-private fun TaskSubTab.title(): String = when (this) {
-    TaskSubTab.TASKS -> "Tasks"
-    TaskSubTab.ALARMS -> "Alarms"
+private fun AppTab.tabLabel(): String = when (this) {
+    AppTab.TODAY -> "Today"
+    AppTab.TASKS -> "Tasks"
+    AppTab.FOCUS -> "Focus"
+    AppTab.SETTINGS -> "Settings"
+}
+
+private fun appTabFromLabel(label: String): AppTab = when (label) {
+    "Today" -> AppTab.TODAY
+    "Tasks" -> AppTab.TASKS
+    "Focus" -> AppTab.FOCUS
+    "Settings" -> AppTab.SETTINGS
+    else -> AppTab.TODAY
 }
 
 private fun PomodoroPhase.label(): String = when (this) {
     PomodoroPhase.FOCUS -> "Focus"
     PomodoroPhase.SHORT_BREAK -> "Short break"
     PomodoroPhase.LONG_BREAK -> "Long break"
+}
+
+private fun pomodoroPhaseFromLabel(label: String): PomodoroPhase = when (label) {
+    "Focus" -> PomodoroPhase.FOCUS
+    "Short break" -> PomodoroPhase.SHORT_BREAK
+    "Long break" -> PomodoroPhase.LONG_BREAK
+    else -> PomodoroPhase.FOCUS
 }
 
 private fun PomodoroTaskUpdate.label(): String = when (this) {
@@ -648,10 +518,25 @@ private fun PomodoroTaskUpdate.label(): String = when (this) {
     PomodoroTaskUpdate.CANCEL -> "Cancel task"
 }
 
+private fun pomodoroTaskUpdateFromLabel(label: String): PomodoroTaskUpdate = when (label) {
+    "No change" -> PomodoroTaskUpdate.NONE
+    "Progress" -> PomodoroTaskUpdate.PROGRESS
+    "Complete" -> PomodoroTaskUpdate.COMPLETE
+    "Cancel task" -> PomodoroTaskUpdate.CANCEL
+    else -> PomodoroTaskUpdate.NONE
+}
+
 private fun DateFormatPreference.label(): String = when (this) {
     DateFormatPreference.ISO -> "ISO"
     DateFormatPreference.MONTH_DAY -> "Month day"
     DateFormatPreference.WEEKDAY_MONTH_DAY -> "Weekday"
+}
+
+private fun dateFormatFromLabel(label: String): DateFormatPreference = when (label) {
+    "ISO" -> DateFormatPreference.ISO
+    "Month day" -> DateFormatPreference.MONTH_DAY
+    "Weekday" -> DateFormatPreference.WEEKDAY_MONTH_DAY
+    else -> DateFormatPreference.ISO
 }
 
 private fun formatRemaining(remainingMillis: Long): String {
@@ -661,17 +546,3 @@ private fun formatRemaining(remainingMillis: Long): String {
     val seconds = totalSeconds % 60L
     return "${minutes}m ${seconds.toString().padStart(2, '0')}s"
 }
-
-private enum class PendingDeleteKind {
-    TASK,
-    ROUTINE,
-    ALARM,
-}
-
-private data class PendingDelete(
-    val key: String,
-    val kind: PendingDeleteKind,
-    val id: String,
-    val label: String,
-    val executeAtMillis: Long,
-)
