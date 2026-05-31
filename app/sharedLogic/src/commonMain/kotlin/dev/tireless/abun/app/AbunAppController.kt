@@ -115,6 +115,10 @@ class AbunAppController(
         _state.value = _state.value.copy(selectedTaskSubTab = tab, selectedTab = AppTab.TASKS)
     }
 
+    fun selectTaskFilter(filter: TaskListFilter) {
+        _state.value = _state.value.copy(selectedTaskFilter = filter, selectedTab = AppTab.TASKS, selectedTaskSubTab = TaskSubTab.TASKS)
+    }
+
     fun openPreferences() {
         _state.value = _state.value.copy(isPreferencesOpen = true)
     }

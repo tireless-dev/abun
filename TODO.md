@@ -62,7 +62,7 @@ Status legend:
 
 ## P1
 
-- [ ] Tasks surface: unified tree, filters, and task detail
+- [-] Tasks surface: unified tree, filters, and task detail
   Goal:
   Implement the new `Tasks` surface and normal-task detail flow.
   Scope:
@@ -82,6 +82,10 @@ Status legend:
   - `Tasks` matches `docs/tasks/functionality-design.md`
   - completion is detail-only, not a quick list action
   - delete is soft-delete backed and secondary/danger scoped
+  Sub-work:
+  - [x] Split `Tasks` / `Routines` management subtabs and add first-level task filters
+  - [ ] Normal-task detail editor shell for mutable task fields
+  - [ ] Task-detail history and lifecycle actions (`complete`, `postpone`, `delete`)
 
 - [ ] Routines: definition model, editor, and lifecycle
   Goal:

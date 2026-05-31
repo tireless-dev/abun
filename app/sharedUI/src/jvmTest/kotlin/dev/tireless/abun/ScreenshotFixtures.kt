@@ -6,22 +6,22 @@ import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.AuthViewState
 import dev.tireless.abun.app.DateFormatPreference
-import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroSessionState
 import dev.tireless.abun.app.PomodoroSessionView
 import dev.tireless.abun.app.PreferencesViewState
 import dev.tireless.abun.app.SyncStateView
 import dev.tireless.abun.app.TaskListItemView
+import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.app.TodayViewState
-import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 
 internal const val ScreenshotNow: Long = 1_779_800_400_000L
 
 internal fun screenshotState(
     selectedTab: AppTab = AppTab.TODAY,
+    selectedTaskSubTab: TaskSubTab = TaskSubTab.TASKS,
     auth: AuthViewState = AuthViewState(showGuide = false, mode = AuthMode.GUEST),
     taskView: TaskViewState = populatedTaskView(),
     today: TodayViewState = populatedTodayView(),
@@ -30,6 +30,7 @@ internal fun screenshotState(
 ): AppUiState = AppUiState(
     selectedDate = "2026-05-30",
     selectedTab = selectedTab,
+    selectedTaskSubTab = selectedTaskSubTab,
     today = today,
     taskView = taskView,
     activePomodoroSession = activePomodoroSession,
@@ -62,10 +63,6 @@ internal fun populatedTodayView(): TodayViewState = TodayViewState(
     ),
     upcomingTasks = listOf(
         AgendaTaskItemView("task-4", "Plan tomorrow priorities", TaskStatus.PENDING, "16:45"),
-    ),
-    journalEntries = listOf(
-        JournalEntryView("task-1", "Review launch checklist", "event-1", TaskEventType.PROGRESSED, "Moved the risky item up.", "09:42"),
-        JournalEntryView("task-3", "Archive finished inbox items", "event-2", TaskEventType.COMPLETED, null, "10:05"),
     ),
 )
 

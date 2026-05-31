@@ -6,13 +6,21 @@ import dev.tireless.abun.sync.TaskStatus
 enum class AppTab {
     TODAY,
     TASKS,
-    FOCUS,
     SETTINGS,
 }
 
 enum class TaskSubTab {
     TASKS,
-    ALARMS,
+    ROUTINES,
+    POMODORO,
+}
+
+enum class TaskListFilter {
+    ALL_ACTIVE,
+    BACKLOG,
+    SCHEDULED,
+    ROUTINE_DERIVED,
+    COMPLETED,
 }
 
 enum class DateFormatPreference {
@@ -153,6 +161,7 @@ data class AppUiState(
     val selectedDate: String,
     val selectedTab: AppTab = AppTab.TODAY,
     val selectedTaskSubTab: TaskSubTab = TaskSubTab.TASKS,
+    val selectedTaskFilter: TaskListFilter = TaskListFilter.ALL_ACTIVE,
     val isPreferencesOpen: Boolean = false,
     val isPomodoroDialogOpen: Boolean = false,
     val today: TodayViewState = TodayViewState(),

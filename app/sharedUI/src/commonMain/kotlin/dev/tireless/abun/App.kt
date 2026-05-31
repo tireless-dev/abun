@@ -35,6 +35,7 @@ import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroSessionView
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.RoutineListItemView
+import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.sync.TaskEventType
@@ -138,6 +139,7 @@ fun App() {
                         liveNow = liveNow,
                         isPomodoroActive = isPomodoroActive,
                         onSelectPanel = controller::selectTaskSubTab,
+                        onSelectTaskFilter = controller::selectTaskFilter,
                         onOpenTask = {
                             selectedTask = it
                             currentSheet = OverlaySheet.TASK_ACTIONS
@@ -328,6 +330,7 @@ internal fun TasksScreen(
     liveNow: Long,
     isPomodoroActive: Boolean,
     onSelectPanel: (TaskSubTab) -> Unit,
+    onSelectTaskFilter: (TaskListFilter) -> Unit,
     onOpenTask: (TaskListItemView) -> Unit,
     onOpenStartPomodoro: () -> Unit,
     onCreateRoutine: () -> Unit,
@@ -340,13 +343,13 @@ internal fun TasksScreen(
     )
 
     when (state.selectedTaskSubTab) {
-        TaskSubTab.LIST -> TaskListScreen(
+        TaskSubTab.TASKS -> TaskListScreen(
             state = state,
             isPomodoroActive = isPomodoroActive,
+            onSelectTaskFilter = onSelectTaskFilter,
             onOpenTask = onOpenTask,
-            onCreateRoutine = onCreateRoutine,
-            onOpenRoutine = onOpenRoutine,
         )
+        TaskSubTab.ROUTINES -> RoutineListScreen(state = state, onCreateRoutine = onCreateRoutine, onOpenRoutine = onOpenRoutine)
         TaskSubTab.POMODORO -> PomodoroScreen(state, liveNow = liveNow, onOpenStart = onOpenStartPomodoro)
     }
 }
@@ -355,38 +358,32 @@ internal fun TasksScreen(
 private fun TaskListScreen(
     state: AppUiState,
     isPomodoroActive: Boolean,
+    onSelectTaskFilter: (TaskListFilter) -> Unit,
     onOpenTask: (TaskListItemView) -> Unit,
+) {
+    val filteredTasks = filterTasksForSurface(state.taskView.tasks, state.selectedTaskFilter)
+    Panel {
+        SectionHeader("Task list", taskListFilterTitle(state.selectedTaskFilter))
+        SegmentedControl(
+            options = TaskListFilter.entries.map { it.label() },
+            selected = state.selectedTaskFilter.label(),
+            onSelect = { onSelectTaskFilter(taskListFilterFromLabel(it)) },
+        )
+        TaskStack(
+            tasks = filteredTasks,
+            empty = taskListFilterEmptyState(state.selectedTaskFilter),
+            onOpenTask = onOpenTask,
+            disabled = isPomodoroActive,
+        )
+    }
+}
+
+@Composable
+private fun RoutineListScreen(
+    state: AppUiState,
     onCreateRoutine: () -> Unit,
     onOpenRoutine: (RoutineListItemView) -> Unit,
 ) {
-    val grouped = groupTasksForSurface(state.taskView.tasks)
-    Panel {
-        SectionHeader("Task list", "Backlog")
-        TaskStack(
-            tasks = grouped.backlog,
-            empty = "No backlog tasks.",
-            onOpenTask = onOpenTask,
-            disabled = isPomodoroActive,
-        )
-    }
-    Panel {
-        SectionHeader("Task list", "Scheduled")
-        TaskStack(
-            tasks = grouped.scheduled,
-            empty = "No scheduled tasks.",
-            onOpenTask = onOpenTask,
-            disabled = isPomodoroActive,
-        )
-    }
-    Panel {
-        SectionHeader("Task list", "Completed")
-        TaskStack(
-            tasks = grouped.completed,
-            empty = "No completed tasks.",
-            onOpenTask = onOpenTask,
-            disabled = isPomodoroActive,
-        )
-    }
     Panel {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -849,6 +846,30 @@ internal fun groupTasksForSurface(tasks: List<TaskListItemView>): TaskSurfaceGro
     )
 }
 
+internal fun filterTasksForSurface(tasks: List<TaskListItemView>, filter: TaskListFilter): List<TaskListItemView> = when (filter) {
+    TaskListFilter.ALL_ACTIVE -> tasks.filter { it.status.isOpen() }
+    TaskListFilter.BACKLOG -> tasks.filter { it.status.isOpen() && it.startNotBefore == null && it.endNotAfter == null }
+    TaskListFilter.SCHEDULED -> tasks.filter { it.status.isOpen() && (it.startNotBefore != null || it.endNotAfter != null) }
+    TaskListFilter.ROUTINE_DERIVED -> tasks.filter { it.status.isOpen() && it.routineId != null }
+    TaskListFilter.COMPLETED -> tasks.filterNot { it.status.isOpen() }
+}
+
+private fun taskListFilterTitle(filter: TaskListFilter): String = when (filter) {
+    TaskListFilter.ALL_ACTIVE -> "All active"
+    TaskListFilter.BACKLOG -> "Backlog"
+    TaskListFilter.SCHEDULED -> "Scheduled"
+    TaskListFilter.ROUTINE_DERIVED -> "Routine-derived"
+    TaskListFilter.COMPLETED -> "Completed"
+}
+
+private fun taskListFilterEmptyState(filter: TaskListFilter): String = when (filter) {
+    TaskListFilter.ALL_ACTIVE -> "No active tasks."
+    TaskListFilter.BACKLOG -> "No backlog tasks."
+    TaskListFilter.SCHEDULED -> "No scheduled tasks."
+    TaskListFilter.ROUTINE_DERIVED -> "No routine-derived tasks."
+    TaskListFilter.COMPLETED -> "No completed tasks."
+}
+
 private fun AppTab.tabLabel(): String = when (this) {
     AppTab.TODAY -> "Day"
     AppTab.TASKS -> "Tasks"
@@ -863,13 +884,31 @@ private fun appTabFromLabel(label: String): AppTab = when (label) {
 }
 
 private fun TaskSubTab.label(): String = when (this) {
-    TaskSubTab.LIST -> "Tasks"
+    TaskSubTab.TASKS -> "Tasks"
+    TaskSubTab.ROUTINES -> "Routines"
     TaskSubTab.POMODORO -> "Pomodoro"
 }
 
 private fun taskSubTabFromLabel(label: String): TaskSubTab = when (label) {
+    "Routines" -> TaskSubTab.ROUTINES
     "Pomodoro" -> TaskSubTab.POMODORO
-    else -> TaskSubTab.LIST
+    else -> TaskSubTab.TASKS
+}
+
+private fun TaskListFilter.label(): String = when (this) {
+    TaskListFilter.ALL_ACTIVE -> "All active"
+    TaskListFilter.BACKLOG -> "Backlog"
+    TaskListFilter.SCHEDULED -> "Scheduled"
+    TaskListFilter.ROUTINE_DERIVED -> "Routine-derived"
+    TaskListFilter.COMPLETED -> "Completed"
+}
+
+private fun taskListFilterFromLabel(label: String): TaskListFilter = when (label) {
+    "Backlog" -> TaskListFilter.BACKLOG
+    "Scheduled" -> TaskListFilter.SCHEDULED
+    "Routine-derived" -> TaskListFilter.ROUTINE_DERIVED
+    "Completed" -> TaskListFilter.COMPLETED
+    else -> TaskListFilter.ALL_ACTIVE
 }
 
 private fun PomodoroPhase.label(): String = when (this) {

@@ -5,6 +5,7 @@ import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.AuthViewState
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
+import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
 import kotlin.test.Test
 
@@ -30,8 +31,8 @@ class AppScreenScreenshotTest {
     @Test
     fun today() = captureScreenshot("screens/today") {
         val state = screenshotState(selectedTab = AppTab.TODAY)
-        ScreenshotScreenFrame("Today", AppTab.TODAY) {
-            TodayScreen(state, isFocusModeActive = false, onStartFocus = {})
+        ScreenshotScreenFrame("Day", AppTab.TODAY) {
+            TodayScreen(state, liveNow = ScreenshotNow, onOpenTask = {}, onStartPomodoro = {})
         }
     }
 
@@ -42,7 +43,17 @@ class AppScreenScreenshotTest {
             taskView = TaskViewState(),
         )
         ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
-            TasksScreen(state, isFocusModeActive = false, onOpenActions = {})
+            TasksScreen(
+                state = state,
+                liveNow = ScreenshotNow,
+                isPomodoroActive = false,
+                onSelectPanel = {},
+                onSelectTaskFilter = {},
+                onOpenTask = {},
+                onOpenStartPomodoro = {},
+                onCreateRoutine = {},
+                onOpenRoutine = {},
+            )
         }
     }
 
@@ -50,26 +61,57 @@ class AppScreenScreenshotTest {
     fun tasksPopulated() = captureScreenshot("screens/tasks_populated") {
         val state = screenshotState(selectedTab = AppTab.TASKS)
         ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
-            TasksScreen(state, isFocusModeActive = false, onOpenActions = {})
+            TasksScreen(
+                state = state,
+                liveNow = ScreenshotNow,
+                isPomodoroActive = false,
+                onSelectPanel = {},
+                onSelectTaskFilter = {},
+                onOpenTask = {},
+                onOpenStartPomodoro = {},
+                onCreateRoutine = {},
+                onOpenRoutine = {},
+            )
         }
     }
 
     @Test
-    fun focusInactive() = captureScreenshot("screens/focus_inactive") {
-        val state = screenshotState(selectedTab = AppTab.FOCUS, activePomodoroSession = null)
-        ScreenshotScreenFrame("Focus", AppTab.FOCUS) {
-            FocusScreen(state, liveNow = ScreenshotNow, onOpenStart = {})
+    fun pomodoroInactive() = captureScreenshot("screens/pomodoro_inactive") {
+        val state = screenshotState(selectedTab = AppTab.TASKS, selectedTaskSubTab = TaskSubTab.POMODORO, activePomodoroSession = null)
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+            TasksScreen(
+                state = state,
+                liveNow = ScreenshotNow,
+                isPomodoroActive = false,
+                onSelectPanel = {},
+                onSelectTaskFilter = {},
+                onOpenTask = {},
+                onOpenStartPomodoro = {},
+                onCreateRoutine = {},
+                onOpenRoutine = {},
+            )
         }
     }
 
     @Test
-    fun focusActive() = captureScreenshot("screens/focus_active") {
+    fun pomodoroActive() = captureScreenshot("screens/pomodoro_active") {
         val state = screenshotState(
-            selectedTab = AppTab.FOCUS,
+            selectedTab = AppTab.TASKS,
+            selectedTaskSubTab = TaskSubTab.POMODORO,
             activePomodoroSession = activePomodoroSession(),
         )
-        ScreenshotScreenFrame("Focus", AppTab.FOCUS) {
-            FocusScreen(state, liveNow = ScreenshotNow, onOpenStart = {})
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+            TasksScreen(
+                state = state,
+                liveNow = ScreenshotNow,
+                isPomodoroActive = true,
+                onSelectPanel = {},
+                onSelectTaskFilter = {},
+                onOpenTask = {},
+                onOpenStartPomodoro = {},
+                onCreateRoutine = {},
+                onOpenRoutine = {},
+            )
         }
     }
 
@@ -93,19 +135,25 @@ class AppScreenScreenshotTest {
     fun taskActionsSheet() = captureScreenshot("sheets/task_actions") {
         TaskActionsSheet(
             task = populatedTaskView().tasks.first(),
-            isFocusModeActive = false,
+            isPomodoroActive = false,
             onDismiss = {},
             onProgress = {},
             onComplete = {},
+            onCancelTask = {},
             onDelete = {},
-            onStartFocus = {},
+            onStartPomodoro = {},
         )
     }
 
     @Test
-    fun startFocusSheet() = captureScreenshot("sheets/start_focus") {
-        StartFocusSheet(
-            state = screenshotState(selectedTab = AppTab.FOCUS),
+    fun createRoutineSheet() = captureScreenshot("sheets/create_routine") {
+        CreateRoutineSheet(onDismiss = {}, onCreate = { _: String, _: String, _: String -> })
+    }
+
+    @Test
+    fun startPomodoroSheet() = captureScreenshot("sheets/start_pomodoro") {
+        StartPomodoroSheet(
+            state = screenshotState(selectedTab = AppTab.TASKS, selectedTaskSubTab = TaskSubTab.POMODORO),
             hasActive = false,
             onDismiss = {},
             onStart = { _: String?, _: PomodoroPhase -> },
@@ -113,10 +161,11 @@ class AppScreenScreenshotTest {
     }
 
     @Test
-    fun completeFocusSheet() = captureScreenshot("sheets/complete_focus") {
-        CompleteFocusSheet(
+    fun completePomodoroSheet() = captureScreenshot("sheets/complete_pomodoro") {
+        CompletePomodoroSheet(
             state = screenshotState(
-                selectedTab = AppTab.FOCUS,
+                selectedTab = AppTab.TASKS,
+                selectedTaskSubTab = TaskSubTab.POMODORO,
                 activePomodoroSession = activePomodoroSession(remainingMinutes = -1),
             ),
             liveNow = ScreenshotNow,
