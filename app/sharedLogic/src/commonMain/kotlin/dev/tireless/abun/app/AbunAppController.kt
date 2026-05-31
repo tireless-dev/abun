@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import dev.tireless.abun.sync.TaskStatus
-
 class AbunAppController(
     dependencies: AppDependencies,
 ) {
@@ -141,14 +139,20 @@ class AbunAppController(
         requestSync()
     }
 
-    fun progressTask(taskId: String) {
-        store.progressTask(taskId, state.value.selectedDate)
+    fun progressTask(taskId: String, note: String? = null) {
+        store.progressTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
 
-    fun completeTask(taskId: String) {
-        store.completeTask(taskId, state.value.selectedDate)
+    fun completeTask(taskId: String, note: String? = null) {
+        store.completeTask(taskId, state.value.selectedDate, note)
+        refresh()
+        requestSync()
+    }
+
+    fun cancelTask(taskId: String, note: String? = null) {
+        store.cancelTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
@@ -323,13 +327,12 @@ class AbunAppController(
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
         val preferences = store.preferences()
         val tasks = store.allTasks()
+        val openTasks = store.openTasksForDate(_state.value.selectedDate)
         val alarms = store.alarms(preferences)
         _state.value = _state.value.copy(
             today = deriveTodayViewState(
-                tasks = tasks,
-                alarms = alarms,
+                openTasks = openTasks,
                 journalEntries = store.journal(_state.value.selectedDate, preferences),
-                nowEpochMillis = timeProvider.nowEpochMillis(),
             ),
             taskView = TaskViewState(
                 tasks = tasks,
@@ -359,45 +362,18 @@ private fun AlarmListItemView.toAgendaItem(task: TaskListItemView): AgendaTaskIt
 )
 
 internal fun deriveTodayViewState(
-    tasks: List<TaskListItemView>,
-    alarms: List<AlarmListItemView>,
+    openTasks: List<TaskListItemView>,
     journalEntries: List<JournalEntryView>,
-    nowEpochMillis: Long,
 ): TodayViewState {
-    val currentAlarmTasks = alarms.asSequence()
-        .filter { it.isActive }
-        .map { alarm ->
-            val task = tasks.find { it.id == alarm.taskId } ?: return@map null
-            alarm to task
-        }
-        .filterNotNull()
-        .filter { (_, task) -> task.status == TaskStatus.PENDING || task.status == TaskStatus.IN_PROGRESS }
-        .toList()
-    val currentAgenda = currentAlarmTasks
-        .filter { it.first.triggerTimeIso.let(::isoStringToEpochMillis) <= nowEpochMillis }
-        .sortedBy { it.first.triggerTimeIso.let(::isoStringToEpochMillis) }
-        .map { (alarm, task) -> alarm.toAgendaItem(task) }
-    val upcomingAgenda = currentAlarmTasks
-        .filter { it.first.triggerTimeIso.let(::isoStringToEpochMillis) > nowEpochMillis }
-        .sortedBy { it.first.triggerTimeIso.let(::isoStringToEpochMillis) }
-        .map { (alarm, task) -> alarm.toAgendaItem(task) }
-    val taskIdsWithActiveAlarms = alarms.filter { it.isActive }.mapTo(mutableSetOf()) { it.taskId }
-    val fallbackCurrent = if (currentAgenda.isEmpty()) {
-        tasks.filter {
-            it.status == TaskStatus.IN_PROGRESS && it.id !in taskIdsWithActiveAlarms
-        }.map {
+    return TodayViewState(
+        currentTasks = openTasks.map {
             AgendaTaskItemView(
                 taskId = it.id,
                 title = it.title,
                 status = it.status,
             )
-        }
-    } else {
-        emptyList()
-    }
-    return TodayViewState(
-        currentTasks = currentAgenda + fallbackCurrent,
-        upcomingTasks = upcomingAgenda,
+        },
+        upcomingTasks = emptyList(),
         journalEntries = journalEntries,
     )
 }

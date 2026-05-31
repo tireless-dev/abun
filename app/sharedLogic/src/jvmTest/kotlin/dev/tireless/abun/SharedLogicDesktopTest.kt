@@ -118,6 +118,34 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `deleted task stays visible before deletion date but not on or after deletion date`() {
+        val store = testStore(
+            timeProvider = object : TimeProvider {
+                private var now = isoStringToEpochMillis("2026-05-25T10:00:00Z")
+
+                override fun nowEpochMillis(): Long = now++
+                override fun today(): LocalDate = LocalDate.parse("2026-05-25")
+            },
+        )
+
+        val taskId = store.createTask(
+            title = "Soon deleted task",
+            journalDate = "2026-05-24",
+            startNotBefore = "2026-05-24T09:00:00Z",
+        )
+
+        store.deleteTask(taskId)
+
+        val beforeDeletion = store.openTasksForDate("2026-05-24")
+        val onDeletionDate = store.openTasksForDate("2026-05-25")
+        val afterDeletion = store.openTasksForDate("2026-05-26")
+
+        assertEquals(listOf(taskId), beforeDeletion.map { it.id })
+        assertTrue(onDeletionDate.none { it.id == taskId })
+        assertTrue(afterDeletion.none { it.id == taskId })
+    }
+
+    @Test
     fun `desktop database factory migrates legacy task table before queries run`() {
         val dbFile = File.createTempFile("abun-legacy", ".db")
         dbFile.deleteOnExit()
@@ -291,64 +319,38 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `today agenda buckets overdue and upcoming alarms and excludes completed tasks`() {
-        val tasks = listOf(
-            TaskListItemView(id = "task-1", title = "Overdue", status = TaskStatus.PENDING),
-            TaskListItemView(id = "task-2", title = "Upcoming", status = TaskStatus.IN_PROGRESS),
-            TaskListItemView(id = "task-3", title = "Done", status = TaskStatus.COMPLETED),
-        )
-        val alarms = listOf(
-            AlarmListItemView(
-                id = "alarm-1",
-                taskId = "task-1",
-                taskTitle = "Overdue",
-                triggerTimeLabel = "2026-05-25 09:00",
-                triggerTimeIso = "2026-05-25T09:00:00Z",
-                isActive = true,
-            ),
-            AlarmListItemView(
-                id = "alarm-2",
-                taskId = "task-2",
-                taskTitle = "Upcoming",
-                triggerTimeLabel = "2026-05-25 18:00",
-                triggerTimeIso = "2026-05-25T18:00:00Z",
-                isActive = true,
-            ),
-            AlarmListItemView(
-                id = "alarm-3",
-                taskId = "task-3",
-                taskTitle = "Done",
-                triggerTimeLabel = "2026-05-25 08:00",
-                triggerTimeIso = "2026-05-25T08:00:00Z",
-                isActive = true,
-            ),
-        )
-
+    fun `day view includes every open task for selected date`() {
         val today = deriveTodayViewState(
-            tasks = tasks,
-            alarms = alarms,
+            openTasks = listOf(
+                TaskListItemView(id = "task-1", title = "Overdue", status = TaskStatus.PENDING),
+                TaskListItemView(id = "task-2", title = "Ready now", status = TaskStatus.IN_PROGRESS),
+            ),
             journalEntries = emptyList(),
-            nowEpochMillis = isoStringToEpochMillis("2026-05-25T12:00:00Z"),
         )
 
-        assertEquals(listOf("task-1"), today.currentTasks.map { it.taskId })
-        assertEquals(listOf("task-2"), today.upcomingTasks.map { it.taskId })
+        assertEquals(listOf("task-1", "task-2"), today.currentTasks.map { it.taskId })
+        assertTrue(today.upcomingTasks.isEmpty())
     }
 
     @Test
-    fun `today agenda falls back to in progress tasks without alarms`() {
-        val today = deriveTodayViewState(
-            tasks = listOf(
-                TaskListItemView(id = "task-1", title = "Deep work", status = TaskStatus.IN_PROGRESS),
-                TaskListItemView(id = "task-2", title = "Later", status = TaskStatus.PENDING),
+    fun `day view preserves journal entries`() {
+        val journal = listOf(
+            JournalEntryView(
+                taskId = "task-1",
+                title = "Deep work",
+                eventId = "event-1",
+                eventType = TaskEventType.CREATED,
+                content = null,
+                eventTimeLabel = "May 25 09:00",
             ),
-            alarms = emptyList(),
-            journalEntries = emptyList(),
-            nowEpochMillis = isoStringToEpochMillis("2026-05-25T12:00:00Z"),
         )
 
-        assertEquals(listOf("task-1"), today.currentTasks.map { it.taskId })
-        assertTrue(today.upcomingTasks.isEmpty())
+        val today = deriveTodayViewState(
+            openTasks = emptyList(),
+            journalEntries = journal,
+        )
+
+        assertEquals(journal, today.journalEntries)
     }
 
     @Test
@@ -532,14 +534,15 @@ class SharedLogicDesktopTest {
         assertEquals(0L, store.syncCursor(SyncScope.TASKS))
     }
 
-    private fun testStore(): LocalStore {
+    private fun testStore(
+        timeProvider: TimeProvider = testTimeProvider(),
+        idGenerator: IdGenerator = testIdGenerator(),
+    ): LocalStore {
         val driverFactory = object : DatabaseDriverFactory {
             override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
                 AbunDatabase.Schema.create(it)
             }
         }
-        val timeProvider = testTimeProvider()
-        val idGenerator = testIdGenerator()
         return LocalStore(
             database = createDatabase(driverFactory),
             timeProvider = timeProvider,

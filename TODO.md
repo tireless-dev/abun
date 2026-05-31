@@ -37,8 +37,10 @@ Status legend:
   Sub-work:
   - [x] Shared schema/sync model for task planning fields and detail
   - [x] Local backlog/day query derivation with planning-window visibility
-  - [ ] Historical deletion handling in day reconstruction
-  - [ ] Controller/UI wiring for `Day` workspace and task surfaces
+  - [x] Historical deletion handling in day reconstruction
+  - [-] Controller/UI wiring for `Day` workspace and task surfaces
+    - [x] `Day` controller/UI wiring for open tasks and day timeline
+    - [ ] `Tasks` surface wiring for backlog/scheduled management
 
 - [ ] Task events: replace legacy vocabulary and add postponed payload
   Goal:

@@ -54,11 +54,12 @@ class LocalStore(
             .filter(::isBacklogTask)
 
     fun openTasksForDate(selectedDate: String): List<TaskListItemView> =
-        queries.selectTasks(::mapTaskRow).executeAsList()
-            .map(::toTaskListItemView)
-            .filter { it.status != TaskStatus.COMPLETED && it.status != TaskStatus.CANCELLED }
-            .filterNot(::isBacklogTask)
-            .filter { it.isVisibleOn(LocalDate.parse(selectedDate)) }
+        queries.selectAllTasks(::mapTaskRow).executeAsList()
+            .map { row -> row to toTaskListItemView(row) }
+            .filter { (_, task) -> task.status != TaskStatus.COMPLETED && task.status != TaskStatus.CANCELLED }
+            .filterNot { (_, task) -> isBacklogTask(task) }
+            .filter { (row, task) -> row.isVisibleOn(LocalDate.parse(selectedDate), task) }
+            .map { (_, task) -> task }
 
     fun routines(): List<RoutineListItemView> = queries.selectActiveRoutines(::mapRoutineRow).executeAsList().map {
         RoutineListItemView(
@@ -938,6 +939,14 @@ private fun TaskListItemView.effectiveVisibilityStartDate(): LocalDate? {
         endStartDate != null -> endStartDate
         else -> null
     }
+}
+
+private fun MutableSyncRow<LocalTask>.isVisibleOn(selectedDate: LocalDate, task: TaskListItemView): Boolean {
+    if (entity.isDeleted) {
+        val deletionDate = epochMillisToIsoString(entity.updatedAt).let(::isoDatePart)
+        if (selectedDate >= deletionDate) return false
+    }
+    return task.isVisibleOn(selectedDate)
 }
 
 private fun isoDatePart(isoTimestamp: String): LocalDate = LocalDate.parse(isoTimestamp.substringBefore('T'))
