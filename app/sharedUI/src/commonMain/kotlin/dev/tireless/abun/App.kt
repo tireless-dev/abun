@@ -192,10 +192,6 @@ fun App() {
                     selectedTask?.let { controller.completeTask(it.id, note.ifBlank { null }) }
                     currentSheet = null
                 },
-                onCancelTask = { note ->
-                    selectedTask?.let { controller.cancelTask(it.id, note.ifBlank { null }) }
-                    currentSheet = null
-                },
                 onDelete = {
                     selectedTask?.let { controller.deleteTask(it.id) }
                     currentSheet = null
@@ -705,7 +701,6 @@ internal fun TaskActionsSheet(
     onSaveTask: (String, String, String?, String?, String?, String?, String?) -> Unit,
     onProgress: (String) -> Unit,
     onComplete: (String) -> Unit,
-    onCancelTask: (String) -> Unit,
     onDelete: () -> Unit,
     onStartPomodoro: () -> Unit,
 ) {
@@ -751,18 +746,26 @@ internal fun TaskActionsSheet(
                 enabled = !isPomodoroActive && title.isNotBlank(),
             )
         }
-        TextField(value = note, onValueChange = { note = it }, label = "Task note")
+        if (taskDetailActionLabels(task).any { it != "Delete task" }) {
+            TextField(value = note, onValueChange = { note = it }, label = "Task note")
+        }
         AppText("History", style = ThemeTokens.type.label)
         JournalTimeline(history)
         if (isPomodoroActive) {
             InlineError("Pomodoro is active. Task edits are temporarily disabled.")
         } else {
-            ActionRow {
-                Button(label = "Progress", onClick = { onProgress(note) })
-                Button(label = "Complete", onClick = { onComplete(note) })
-                Button(label = "Cancel task", onClick = { onCancelTask(note) })
-                Button(label = "Pomodoro", onClick = onStartPomodoro, enabled = task.status.isOpen())
-                Button(label = "Delete", onClick = onDelete)
+            val actions = taskDetailActionLabels(task)
+            if ("Progress" in actions || "Complete" in actions || "Pomodoro" in actions) {
+                ActionRow {
+                    if ("Progress" in actions) Button(label = "Progress", onClick = { onProgress(note) })
+                    if ("Complete" in actions) Button(label = "Complete", onClick = { onComplete(note) })
+                    if ("Pomodoro" in actions) Button(label = "Pomodoro", onClick = onStartPomodoro, enabled = task.status.isOpen())
+                }
+            }
+            if ("Delete task" in actions) {
+                ActionRow {
+                    Button(label = "Delete task", onClick = onDelete)
+                }
             }
         }
     }
@@ -904,6 +907,13 @@ internal fun filterTasksForSurface(tasks: List<TaskListItemView>, filter: TaskLi
     TaskListFilter.ROUTINE_DERIVED -> tasks.filter { it.status.isOpen() && it.routineId != null }
     TaskListFilter.COMPLETED -> tasks.filterNot { it.status.isOpen() }
 }
+
+internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
+    if (task.status.isOpen()) {
+        listOf("Progress", "Complete", "Pomodoro", "Delete task")
+    } else {
+        listOf("Delete task")
+    }
 
 private fun taskListFilterTitle(filter: TaskListFilter): String = when (filter) {
     TaskListFilter.ALL_ACTIVE -> "All active"

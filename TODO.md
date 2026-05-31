@@ -86,7 +86,7 @@ Status legend:
   - [x] Split `Tasks` / `Routines` management subtabs and add first-level task filters
   - [x] Normal-task detail editor shell for mutable task fields
   - [x] Task-detail history section
-  - [ ] Detail lifecycle actions (`complete`, `delete`, progress cleanup)
+  - [x] Detail lifecycle actions (`complete`, `delete`, progress cleanup)
   - [ ] Postpone flow with planning-window update and history event
 
 - [ ] Routines: definition model, editor, and lifecycle
