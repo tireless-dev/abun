@@ -37,6 +37,7 @@ import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TaskSubTab
+import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.components.ActionRow
 import dev.tireless.abun.ui.components.AppText
@@ -564,7 +565,7 @@ private fun JournalTimeline(entries: List<JournalEntryView>) {
                 verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
             ) {
                 AppText(entry.title, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
-                AppText("${statusEventLabel(entry.eventType.name)} • ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
+                AppText("${taskEventLabel(entry.eventType)} • ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
                 entry.content?.takeIf(String::isNotBlank)?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
             }
         }
@@ -822,8 +823,18 @@ private fun statusLabel(status: TaskStatus): String = when (status) {
     TaskStatus.UNKNOWN -> "Unknown"
 }
 
-private fun statusEventLabel(eventType: String): String =
-    eventType.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercaseChar)
+internal fun taskEventLabel(eventType: TaskEventType): String = when (eventType) {
+    TaskEventType.CREATED -> "Created"
+    TaskEventType.PROGRESSED -> "Progressed"
+    TaskEventType.COMPLETED -> "Completed"
+    TaskEventType.POSTPONED -> "Postponed"
+    TaskEventType.DELETED -> "Deleted"
+    TaskEventType.MISSED -> "Missed"
+    TaskEventType.SKIPPED -> "Skipped"
+    TaskEventType.MIGRATED -> "Migrated"
+    TaskEventType.ALARM_FIRED -> "Alarm fired"
+    TaskEventType.CANCELLED -> "Cancelled"
+}
 
 private fun TaskStatus.isOpen(): Boolean = this == TaskStatus.PENDING || this == TaskStatus.IN_PROGRESS || this == TaskStatus.UNKNOWN
 

@@ -19,7 +19,7 @@ Status legend:
 
 ## P0
 
-- [-] Task model: planning fields, backlog, and day workspace
+- [x] Task model: planning fields, backlog, and day workspace
   Goal:
   Replace the legacy scheduling model with the new planning-window and day-workspace model.
   Scope:
@@ -42,7 +42,7 @@ Status legend:
     - [x] `Day` controller/UI wiring for open tasks and day timeline
     - [x] `Tasks` surface wiring for backlog/scheduled management
 
-- [-] Task events: replace legacy vocabulary and add postponed payload
+- [x] Task events: replace legacy vocabulary and add postponed payload
   Goal:
   Replace the legacy task-event semantics with the new product-facing event vocabulary.
   Scope:
@@ -58,7 +58,7 @@ Status legend:
   - [x] Shared event vocabulary and postponed payload schema
   - [x] Local store event write/read migration to new semantics
   - [x] Server sync and business API support for new event model
-  - [ ] Timeline/history UI migration to the new business events
+  - [x] Timeline/history UI migration to the new business events
 
 ## P1
 

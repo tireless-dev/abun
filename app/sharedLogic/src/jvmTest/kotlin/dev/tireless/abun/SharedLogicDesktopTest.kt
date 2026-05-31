@@ -162,6 +162,23 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `journal only exposes business timeline events`() {
+        val store = testStore()
+        val taskId = store.createTask(
+            title = "Legacy event task",
+            journalDate = "2026-05-25",
+        )
+        val alarmId = store.createAlarm(taskId, "2026-05-25T09:00:00Z")
+
+        store.fireAlarm(alarmId, "2026-05-25T09:00:00Z")
+        store.cancelTask(taskId, "2026-05-25", "No longer needed")
+
+        val journal = store.journal("2026-05-25")
+
+        assertEquals(listOf(TaskEventType.CREATED), journal.map { it.eventType })
+    }
+
+    @Test
     fun `desktop database factory migrates legacy task table before queries run`() {
         val dbFile = File.createTempFile("abun-legacy", ".db")
         dbFile.deleteOnExit()

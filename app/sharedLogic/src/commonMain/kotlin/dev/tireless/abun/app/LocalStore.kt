@@ -89,12 +89,14 @@ class LocalStore(
     fun journal(date: String, preferences: PreferencesViewState = preferences()): List<JournalEntryView> = queries.selectJournalEntries(
         date,
         ::mapJournalRow,
-    ).executeAsList().map {
+    ).executeAsList().mapNotNull {
+        val eventType = enumValueOf<TaskEventType>(it.eventType)
+        if (!eventType.isVisibleInDayTimeline()) return@mapNotNull null
         JournalEntryView(
             taskId = it.taskId,
             title = it.title,
             eventId = it.eventId,
-            eventType = enumValueOf(it.eventType),
+            eventType = eventType,
             content = it.content,
             eventTimeLabel = formatDateTimeLabel(it.eventTime, preferences.timezoneOverride, preferences.dateFormat),
         )
@@ -1300,6 +1302,19 @@ private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
     serverVersion = serverVersion,
     createdAt = epochMillisToIsoString(createdAt),
 )
+
+private fun TaskEventType.isVisibleInDayTimeline(): Boolean = when (this) {
+    TaskEventType.CREATED,
+    TaskEventType.PROGRESSED,
+    TaskEventType.COMPLETED,
+    TaskEventType.POSTPONED,
+    TaskEventType.DELETED,
+    TaskEventType.MISSED,
+    TaskEventType.SKIPPED -> true
+    TaskEventType.MIGRATED,
+    TaskEventType.ALARM_FIRED,
+    TaskEventType.CANCELLED -> false
+}
 
 private fun SyncTask.toLocalTask(): LocalTask = LocalTask(
     id = id,
