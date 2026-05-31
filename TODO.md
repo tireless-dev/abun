@@ -42,7 +42,7 @@ Status legend:
     - [x] `Day` controller/UI wiring for open tasks and day timeline
     - [x] `Tasks` surface wiring for backlog/scheduled management
 
-- [ ] Task events: replace legacy vocabulary and add postponed payload
+- [-] Task events: replace legacy vocabulary and add postponed payload
   Goal:
   Replace the legacy task-event semantics with the new product-facing event vocabulary.
   Scope:
@@ -54,6 +54,11 @@ Status legend:
   - legacy event naming no longer drives task UI logic
   - `Postponed` records previous and new `start_not_before` / `end_not_after`
   - `Day timeline` and per-task history render the new event model consistently
+  Sub-work:
+  - [x] Shared event vocabulary and postponed payload schema
+  - [ ] Local store event write/read migration to new semantics
+  - [ ] Server sync and business API support for new event model
+  - [ ] Timeline/history UI migration to the new business events
 
 ## P1
 

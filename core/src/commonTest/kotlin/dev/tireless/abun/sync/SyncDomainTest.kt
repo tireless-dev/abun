@@ -58,4 +58,26 @@ class SyncDomainTest {
 
         assertEquals(TaskStatus.COMPLETED, status)
     }
+
+    @Test
+    fun `postponed payload keeps both previous and next planning windows`() {
+        val event = SyncTaskEvent(
+            id = "event-1",
+            taskId = "task-1",
+            journalDate = "2026-05-24",
+            eventType = TaskEventType.POSTPONED,
+            postponed = TaskPostponedPayload(
+                previousStartNotBefore = "2026-05-24T09:00:00Z",
+                newStartNotBefore = "2026-05-25T09:00:00Z",
+                previousEndNotAfter = "2026-05-24T17:00:00Z",
+                newEndNotAfter = "2026-05-25T17:00:00Z",
+            ),
+            eventTime = "2026-05-24T08:00:00Z",
+        )
+
+        assertEquals("2026-05-24T09:00:00Z", event.postponed?.previousStartNotBefore)
+        assertEquals("2026-05-25T09:00:00Z", event.postponed?.newStartNotBefore)
+        assertEquals("2026-05-24T17:00:00Z", event.postponed?.previousEndNotAfter)
+        assertEquals("2026-05-25T17:00:00Z", event.postponed?.newEndNotAfter)
+    }
 }

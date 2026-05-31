@@ -75,12 +75,21 @@ data class SyncTaskEvent(
     @SerialName("journal_date") val journalDate: String,
     @SerialName("event_type") val eventType: TaskEventType,
     val content: String? = null,
+    val postponed: TaskPostponedPayload? = null,
     @SerialName("event_time") val eventTime: String,
     @SerialName("is_deleted") val isDeleted: Boolean = false,
     @SerialName("accepted") val accepted: Boolean? = null,
     @SerialName("server_version") val serverVersion: Long = 0,
     @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class TaskPostponedPayload(
+    @SerialName("previous_start_not_before") val previousStartNotBefore: String? = null,
+    @SerialName("new_start_not_before") val newStartNotBefore: String? = null,
+    @SerialName("previous_end_not_after") val previousEndNotAfter: String? = null,
+    @SerialName("new_end_not_after") val newEndNotAfter: String? = null,
 )
 
 @Serializable
@@ -123,6 +132,10 @@ data class SyncPreference(
 @Serializable
 enum class TaskEventType {
     CREATED,
+    POSTPONED,
+    DELETED,
+    MISSED,
+    SKIPPED,
     MIGRATED,
     PROGRESSED,
     ALARM_FIRED,
@@ -175,9 +188,16 @@ object TaskStatusDeriver {
             .maxWithOrNull(compareBy<SyncTaskEvent>({ it.eventTime }, { it.createdAt ?: "" }))
             ?: return TaskStatus.UNKNOWN
         return when (latest.eventType) {
-            TaskEventType.CREATED, TaskEventType.MIGRATED, TaskEventType.ALARM_FIRED -> TaskStatus.PENDING
+            TaskEventType.CREATED,
+            TaskEventType.POSTPONED,
+            TaskEventType.MIGRATED,
+            TaskEventType.ALARM_FIRED,
+            -> TaskStatus.PENDING
             TaskEventType.PROGRESSED -> TaskStatus.IN_PROGRESS
             TaskEventType.COMPLETED -> TaskStatus.COMPLETED
+            TaskEventType.DELETED,
+            TaskEventType.MISSED,
+            TaskEventType.SKIPPED,
             TaskEventType.CANCELLED -> TaskStatus.CANCELLED
         }
     }
