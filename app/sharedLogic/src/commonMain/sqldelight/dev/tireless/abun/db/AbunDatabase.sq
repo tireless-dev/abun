@@ -189,7 +189,6 @@ FROM task_event e
 JOIN task t ON e.task_id = t.id
 WHERE e.journal_date = ?
   AND e.is_deleted = 0
-  AND t.is_deleted = 0
 ORDER BY e.event_time ASC, e.created_at ASC;
 
 selectTaskLatestEvent:

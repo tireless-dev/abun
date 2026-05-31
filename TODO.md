@@ -56,7 +56,7 @@ Status legend:
   - `Day timeline` and per-task history render the new event model consistently
   Sub-work:
   - [x] Shared event vocabulary and postponed payload schema
-  - [ ] Local store event write/read migration to new semantics
+  - [x] Local store event write/read migration to new semantics
   - [ ] Server sync and business API support for new event model
   - [ ] Timeline/history UI migration to the new business events
 

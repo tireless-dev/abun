@@ -55,7 +55,7 @@ class LocalStore(
 
     fun openTasksForDate(selectedDate: String): List<TaskListItemView> =
         queries.selectAllTasks(::mapTaskRow).executeAsList()
-            .map { row -> row to toTaskListItemView(row) }
+            .map { row -> row to toTaskListItemView(row, selectedDate) }
             .filter { (_, task) -> task.status != TaskStatus.COMPLETED && task.status != TaskStatus.CANCELLED }
             .filterNot { (_, task) -> isBacklogTask(task) }
             .filter { (row, task) -> row.isVisibleOn(LocalDate.parse(selectedDate), task) }
@@ -320,8 +320,9 @@ class LocalStore(
         appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
     }
 
-    fun deleteTask(taskId: String) = database.transaction {
+    fun deleteTask(taskId: String, journalDate: String) = database.transaction {
         val existing = queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull() ?: return@transaction
+        val now = timeProvider.nowEpochMillis()
         val deleteHlc = clock.next(existing.hlcMap["delete"])
         val dirty = (existing.dirtyFields + "delete").distinct()
         persistTask(
@@ -330,7 +331,19 @@ class LocalStore(
             dirtyFields = dirty,
             isDirty = true,
             createdAt = existing.entity.createdAt,
-            updatedAt = timeProvider.nowEpochMillis(),
+            updatedAt = now,
+        )
+        queries.upsertTaskEvent(
+            id = idGenerator.randomId(),
+            task_id = taskId,
+            journal_date = journalDate,
+            event_type = TaskEventType.DELETED.name,
+            content = null,
+            event_time = now,
+            is_deleted = 0,
+            server_version = 0,
+            is_dirty = 1,
+            created_at = now,
         )
     }
 
@@ -868,15 +881,30 @@ class LocalStore(
     }
 
     private fun toTaskListItemView(row: MutableSyncRow<LocalTask>): TaskListItemView {
-        val latestEvent = queries.selectTaskLatestEvent(row.entity.id, ::mapTaskEventRow).executeAsOneOrNull()?.entity?.eventType
+        return toTaskListItemView(row, selectedDate = null)
+    }
+
+    private fun toTaskListItemView(row: MutableSyncRow<LocalTask>, selectedDate: String?): TaskListItemView {
+        val latestEvent = queries.selectTaskEventsForTask(row.entity.id, ::mapTaskEventRow).executeAsList()
+            .map { it.entity }
+            .filter { selectedDate == null || it.journalDate <= selectedDate }
+            .maxWithOrNull(compareBy<LocalTaskEvent>({ it.eventTime }, { it.createdAt }))
+            ?.eventType
         return TaskListItemView(
             id = row.entity.id,
             title = row.entity.title,
             status = when (latestEvent) {
                 null -> TaskStatus.UNKNOWN
-                TaskEventType.CREATED, TaskEventType.MIGRATED, TaskEventType.ALARM_FIRED -> TaskStatus.PENDING
+                TaskEventType.CREATED,
+                TaskEventType.POSTPONED,
+                TaskEventType.MIGRATED,
+                TaskEventType.ALARM_FIRED,
+                -> TaskStatus.PENDING
                 TaskEventType.PROGRESSED -> TaskStatus.IN_PROGRESS
                 TaskEventType.COMPLETED -> TaskStatus.COMPLETED
+                TaskEventType.DELETED,
+                TaskEventType.MISSED,
+                TaskEventType.SKIPPED,
                 TaskEventType.CANCELLED -> TaskStatus.CANCELLED
             },
             detail = row.entity.detail,
@@ -1260,7 +1288,18 @@ private fun MutableSyncRow<LocalPomodoroSession>.toSyncPomodoroSession(): SyncPo
     createdAt = epochMillisToIsoString(entity.createdAt),
 )
 
-private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(id, taskId, journalDate, eventType, content, epochMillisToIsoString(eventTime), isDeleted, serverVersion = serverVersion, createdAt = epochMillisToIsoString(createdAt))
+private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
+    id = id,
+    taskId = taskId,
+    journalDate = journalDate,
+    eventType = eventType,
+    content = content,
+    postponed = null,
+    eventTime = epochMillisToIsoString(eventTime),
+    isDeleted = isDeleted,
+    serverVersion = serverVersion,
+    createdAt = epochMillisToIsoString(createdAt),
+)
 
 private fun SyncTask.toLocalTask(): LocalTask = LocalTask(
     id = id,

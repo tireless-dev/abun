@@ -134,7 +134,7 @@ class SharedLogicDesktopTest {
             startNotBefore = "2026-05-24T09:00:00Z",
         )
 
-        store.deleteTask(taskId)
+        store.deleteTask(taskId, "2026-05-25")
 
         val beforeDeletion = store.openTasksForDate("2026-05-24")
         val onDeletionDate = store.openTasksForDate("2026-05-25")
@@ -143,6 +143,22 @@ class SharedLogicDesktopTest {
         assertEquals(listOf(taskId), beforeDeletion.map { it.id })
         assertTrue(onDeletionDate.none { it.id == taskId })
         assertTrue(afterDeletion.none { it.id == taskId })
+    }
+
+    @Test
+    fun `delete task appends deleted event for day timeline history`() {
+        val store = testStore()
+        val taskId = store.createTask(
+            title = "Delete me later",
+            journalDate = "2026-05-24",
+            startNotBefore = "2026-05-24T09:00:00Z",
+        )
+
+        store.deleteTask(taskId, "2026-05-25")
+
+        val journal = store.journal("2026-05-25")
+
+        assertTrue(journal.any { it.taskId == taskId && it.eventType == TaskEventType.DELETED })
     }
 
     @Test

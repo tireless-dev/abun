@@ -158,7 +158,7 @@ class AbunAppController(
     }
 
     fun deleteTask(taskId: String) {
-        store.deleteTask(taskId)
+        store.deleteTask(taskId, state.value.selectedDate)
         refresh()
         requestSync()
     }
