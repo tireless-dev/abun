@@ -155,6 +155,21 @@ class AbunAppController(
         requestSync()
     }
 
+    fun updateTask(
+        taskId: String,
+        title: String,
+        detail: String? = null,
+        parentId: String? = null,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+    ) {
+        if (title.isBlank()) return
+        store.updateTask(taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
+        refresh()
+        requestSync()
+    }
+
     fun cancelTask(taskId: String, note: String? = null) {
         store.cancelTask(taskId, state.value.selectedDate, note)
         refresh()

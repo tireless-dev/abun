@@ -173,8 +173,15 @@ fun App() {
             )
             OverlaySheet.TASK_ACTIONS -> TaskActionsSheet(
                 task = selectedTask,
+                availableParents = state.taskView.tasks.filter { candidate ->
+                    candidate.id != selectedTask?.id && candidate.routineId == null
+                },
                 isPomodoroActive = isPomodoroActive,
                 onDismiss = { currentSheet = null },
+                onSaveTask = { taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration ->
+                    controller.updateTask(taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
+                    currentSheet = null
+                },
                 onProgress = { note ->
                     selectedTask?.let { controller.progressTask(it.id, note.ifBlank { null }) }
                     currentSheet = null
@@ -689,8 +696,10 @@ internal fun CreateRoutineSheet(onDismiss: () -> Unit, onCreate: (String, String
 @Composable
 internal fun TaskActionsSheet(
     task: TaskListItemView?,
+    availableParents: List<TaskListItemView>,
     isPomodoroActive: Boolean,
     onDismiss: () -> Unit,
+    onSaveTask: (String, String, String?, String?, String?, String?, String?) -> Unit,
     onProgress: (String) -> Unit,
     onComplete: (String) -> Unit,
     onCancelTask: (String) -> Unit,
@@ -698,10 +707,47 @@ internal fun TaskActionsSheet(
     onStartPomodoro: () -> Unit,
 ) {
     if (task == null) return
+    var title by remember(task.id) { mutableStateOf(task.title) }
+    var detail by remember(task.id) { mutableStateOf(task.detail.orEmpty()) }
+    var parentId by remember(task.id) { mutableStateOf(task.parentId) }
+    var startNotBefore by remember(task.id) { mutableStateOf(task.startNotBefore.orEmpty()) }
+    var endNotAfter by remember(task.id) { mutableStateOf(task.endNotAfter.orEmpty()) }
+    var estimatedDuration by remember(task.id) { mutableStateOf(task.estimatedDuration.orEmpty()) }
     var note by remember(task.id) { mutableStateOf("") }
     Sheet(onDismiss = onDismiss) {
         SectionTitle(task.title)
         StatusPill(task.status)
+        TextField(value = title, onValueChange = { title = it }, label = "Title")
+        TextField(value = detail, onValueChange = { detail = it }, label = "Detail")
+        AppText("Parent task", style = ThemeTokens.type.label)
+        SegmentedControl(
+            options = listOf("No parent") + availableParents.map { it.title },
+            selected = availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent",
+            onSelect = { label ->
+                parentId = availableParents.firstOrNull { it.title == label }?.id
+            },
+        )
+        TextField(value = startNotBefore, onValueChange = { startNotBefore = it }, label = "Start not before")
+        TextField(value = endNotAfter, onValueChange = { endNotAfter = it }, label = "End not after")
+        TextField(value = estimatedDuration, onValueChange = { estimatedDuration = it }, label = "Estimated duration")
+        ActionRow {
+            Button(label = "Close", onClick = onDismiss)
+            Button(
+                label = "Save",
+                onClick = {
+                    onSaveTask(
+                        task.id,
+                        title,
+                        detail.ifBlank { null },
+                        parentId,
+                        startNotBefore.ifBlank { null },
+                        endNotAfter.ifBlank { null },
+                        estimatedDuration.ifBlank { null },
+                    )
+                },
+                enabled = !isPomodoroActive && title.isNotBlank(),
+            )
+        }
         TextField(value = note, onValueChange = { note = it }, label = "Task note")
         if (isPomodoroActive) {
             InlineError("Pomodoro is active. Task edits are temporarily disabled.")

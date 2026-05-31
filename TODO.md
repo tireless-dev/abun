@@ -84,7 +84,7 @@ Status legend:
   - delete is soft-delete backed and secondary/danger scoped
   Sub-work:
   - [x] Split `Tasks` / `Routines` management subtabs and add first-level task filters
-  - [ ] Normal-task detail editor shell for mutable task fields
+  - [x] Normal-task detail editor shell for mutable task fields
   - [ ] Task-detail history and lifecycle actions (`complete`, `postpone`, `delete`)
 
 - [ ] Routines: definition model, editor, and lifecycle

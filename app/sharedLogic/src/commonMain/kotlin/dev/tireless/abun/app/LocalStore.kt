@@ -318,6 +318,70 @@ class LocalStore(
         appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
     }
 
+    fun updateTask(
+        taskId: String,
+        title: String,
+        detail: String? = null,
+        parentId: String? = null,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+    ) = database.transaction {
+        val existing = queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull() ?: return@transaction
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isBlank()) return@transaction
+        val normalizedDetail = detail?.trim().orEmpty().ifBlank { null }
+        val normalizedParentId = parentId?.trim().orEmpty().ifBlank { null }?.takeUnless { it == taskId }
+        val normalizedStart = startNotBefore?.trim().orEmpty().ifBlank { null }
+        val normalizedEnd = endNotAfter?.trim().orEmpty().ifBlank { null }
+        val normalizedDuration = estimatedDuration?.trim().orEmpty().ifBlank { null }
+        val updatedTask = existing.entity.copy(
+            title = normalizedTitle,
+            detail = normalizedDetail,
+            parentId = normalizedParentId,
+            startNotBefore = normalizedStart,
+            endNotAfter = normalizedEnd,
+            estimatedDuration = normalizedDuration,
+        )
+        if (updatedTask == existing.entity) return@transaction
+
+        val updatedHlc = existing.hlcMap.toMutableMap()
+        val dirty = existing.dirtyFields.toMutableSet()
+        if (existing.entity.title != normalizedTitle) {
+            updatedHlc["title"] = clock.next(existing.hlcMap["title"])
+            dirty += "title"
+        }
+        if (existing.entity.detail != normalizedDetail) {
+            updatedHlc["detail"] = clock.next(existing.hlcMap["detail"])
+            dirty += "detail"
+        }
+        if (existing.entity.parentId != normalizedParentId) {
+            updatedHlc["parent"] = clock.next(existing.hlcMap["parent"])
+            dirty += "parent"
+        }
+        if (existing.entity.startNotBefore != normalizedStart) {
+            updatedHlc["start_not_before"] = clock.next(existing.hlcMap["start_not_before"])
+            dirty += "start_not_before"
+        }
+        if (existing.entity.endNotAfter != normalizedEnd) {
+            updatedHlc["end_not_after"] = clock.next(existing.hlcMap["end_not_after"])
+            dirty += "end_not_after"
+        }
+        if (existing.entity.estimatedDuration != normalizedDuration) {
+            updatedHlc["estimated_duration"] = clock.next(existing.hlcMap["estimated_duration"])
+            dirty += "estimated_duration"
+        }
+
+        persistTask(
+            task = updatedTask,
+            hlcMap = updatedHlc,
+            dirtyFields = dirty.toList(),
+            isDirty = true,
+            createdAt = existing.entity.createdAt,
+            updatedAt = timeProvider.nowEpochMillis(),
+        )
+    }
+
     fun cancelTask(taskId: String, journalDate: String, note: String? = null) {
         appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
     }

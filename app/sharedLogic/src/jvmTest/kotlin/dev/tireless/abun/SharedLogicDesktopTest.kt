@@ -91,6 +91,37 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `update task persists editable detail planning window and parent fields`() {
+        val store = testStore()
+        val parentId = store.createTask(title = "Parent task", journalDate = "2026-05-24")
+        val taskId = store.createTask(title = "Draft task", journalDate = "2026-05-25")
+
+        store.updateTask(
+            taskId = taskId,
+            title = "Refined task",
+            detail = "Add implementation notes",
+            parentId = parentId,
+            startNotBefore = "2026-05-26T09:00:00Z",
+            endNotAfter = "2026-05-26T12:00:00Z",
+            estimatedDuration = "PT45M",
+        )
+
+        val task = store.allTasks().single { it.id == taskId }
+        val dirtyTask = store.dirtyTasks().single { it.id == taskId }
+
+        assertEquals("Refined task", task.title)
+        assertEquals("Add implementation notes", task.detail)
+        assertEquals(parentId, task.parentId)
+        assertEquals("2026-05-26T09:00:00Z", task.startNotBefore)
+        assertEquals("2026-05-26T12:00:00Z", task.endNotAfter)
+        assertEquals("PT45M", task.estimatedDuration)
+        assertEquals(
+            setOf("title", "detail", "parent", "start_not_before", "end_not_after", "estimated_duration"),
+            dirtyTask.dirtyFields.toSet(),
+        )
+    }
+
+    @Test
     fun `backlog tasks stay out of day open tasks until scheduled`() {
         val store = testStore()
 
