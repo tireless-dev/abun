@@ -112,7 +112,8 @@ Status legend:
   - [x] Shared schema/sync/business API support for routine detail and defaults
   - [x] Routine create/detail editor for title, detail, recurrence, and default planning fields
   - [x] Routine activate/deactivate and delete lifecycle in the new detail flow
-  - [ ] Human-readable recurrence rule editor/presentation
+  - [x] Human-readable recurrence rule presentation
+  - [ ] Structured recurrence rule editor
 
 - [ ] Routine occurrences: execution, bounded postpone, skip, and miss
   Goal:

@@ -27,4 +27,20 @@ class RoutineDetailActionsTest {
             draft,
         )
     }
+
+    @Test
+    fun `daily recurrence rule is described in human readable form`() {
+        assertEquals(
+            "Every day at 09:00",
+            describeRecurrenceRule("RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0"),
+        )
+    }
+
+    @Test
+    fun `weekly recurrence rule lists weekday summary`() {
+        assertEquals(
+            "Every Mon, Wed, Fri at 08:30",
+            describeRecurrenceRule("RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;BYHOUR=8;BYMINUTE=30"),
+        )
+    }
 }

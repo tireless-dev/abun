@@ -655,7 +655,7 @@ private fun RoutineRow(routine: RoutineListItemView, onOpen: (RoutineListItemVie
     ) {
         AppText(routine.templateTitle, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
         routine.templateDetail?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
-        AppText(routine.recurrenceRule, style = ThemeTokens.type.bodyMuted)
+        AppText(describeRecurrenceRule(routine.recurrenceRule), style = ThemeTokens.type.bodyMuted)
         routine.defaultStartNotBefore?.let { AppText("Default start: $it", style = ThemeTokens.type.label) }
         routine.defaultEstimatedDuration?.let { AppText("Default duration: $it", style = ThemeTokens.type.label) }
         AppText(if (routine.isActive) "Active" else "Paused", style = ThemeTokens.type.label)
@@ -706,7 +706,8 @@ internal fun CreateRoutineSheet(
         SectionTitle("Create routine")
         TextField(value = title, onValueChange = { title = it }, label = "Routine title")
         TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule")
+        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule (RRULE)")
+        AppText(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
         TextField(value = defaultStartNotBefore, onValueChange = { defaultStartNotBefore = it }, label = "Default start not before")
         TextField(value = defaultEstimatedDuration, onValueChange = { defaultEstimatedDuration = it }, label = "Default estimated duration")
         ActionRow {
@@ -841,7 +842,8 @@ internal fun RoutineActionsSheet(
         SectionTitle(routine.templateTitle)
         TextField(value = title, onValueChange = { title = it }, label = "Routine title")
         TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule")
+        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule (RRULE)")
+        AppText(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
         TextField(
             value = defaultStartNotBefore,
             onValueChange = { defaultStartNotBefore = it },
@@ -1031,6 +1033,47 @@ internal fun normalizeRoutineSaveDraft(
     defaultStartNotBefore = defaultStartNotBefore.ifBlank { null },
     defaultEstimatedDuration = defaultEstimatedDuration.ifBlank { null },
 )
+
+internal fun describeRecurrenceRule(rule: String): String {
+    val normalized = rule.removePrefix("RRULE:")
+    val parts = normalized.split(";")
+        .mapNotNull { entry ->
+            val separator = entry.indexOf('=')
+            if (separator <= 0) null else entry.substring(0, separator) to entry.substring(separator + 1)
+        }
+        .toMap()
+    val time = recurrenceTimeLabel(parts["BYHOUR"], parts["BYMINUTE"])
+    return when (parts["FREQ"]) {
+        "DAILY" -> listOf("Every day", time?.let { "at $it" }).filterNotNull().joinToString(" ")
+        "WEEKLY" -> {
+            val daySummary = parts["BYDAY"]
+                ?.split(",")
+                ?.mapNotNull(::weekdayLabel)
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString(", ")
+                ?: "week"
+            listOf("Every $daySummary", time?.let { "at $it" }).filterNotNull().joinToString(" ")
+        }
+        else -> "Custom recurrence"
+    }
+}
+
+private fun recurrenceTimeLabel(hour: String?, minute: String?): String? {
+    val parsedHour = hour?.toIntOrNull() ?: return null
+    val parsedMinute = minute?.toIntOrNull() ?: return null
+    return "%02d:%02d".format(parsedHour, parsedMinute)
+}
+
+private fun weekdayLabel(code: String): String? = when (code) {
+    "MO" -> "Mon"
+    "TU" -> "Tue"
+    "WE" -> "Wed"
+    "TH" -> "Thu"
+    "FR" -> "Fri"
+    "SA" -> "Sat"
+    "SU" -> "Sun"
+    else -> null
+}
 
 private fun taskListFilterTitle(filter: TaskListFilter): String = when (filter) {
     TaskListFilter.ALL_ACTIVE -> "All active"
