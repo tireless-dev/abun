@@ -225,7 +225,7 @@ private fun Route.apiRoutes(services: AppServices) {
         post {
             call.respond(
                 io.ktor.http.HttpStatusCode.Created,
-                services.tasks.createFromBusinessApi(call.userId(), call.receive<TaskUpsertRequest>()).toResponse(),
+                services.createTaskFromBusinessApi(call.userId(), call.receive<TaskUpsertRequest>()).toResponse(),
             )
         }
         patch("/{id}") {
@@ -382,15 +382,25 @@ private fun ApplicationCall.requirePath(name: String): String =
 data class TaskUpsertRequest(
     val id: String? = null,
     val title: String,
+    val detail: String? = null,
     @SerialName("parent_id") val parentId: String? = null,
     @SerialName("routine_id") val routineId: String? = null,
+    @SerialName("start_not_before") val startNotBefore: String? = null,
+    @SerialName("end_not_after") val endNotAfter: String? = null,
+    @SerialName("estimated_duration") val estimatedDuration: String? = null,
+    @SerialName("journal_date") val journalDate: String? = null,
+    @SerialName("event_time") val eventTime: String? = null,
 )
 
 @Serializable
 data class TaskPatchRequest(
     val title: String? = null,
+    val detail: String? = null,
     @SerialName("parent_id") val parentId: String? = null,
     @SerialName("routine_id") val routineId: String? = null,
+    @SerialName("start_not_before") val startNotBefore: String? = null,
+    @SerialName("end_not_after") val endNotAfter: String? = null,
+    @SerialName("estimated_duration") val estimatedDuration: String? = null,
 )
 
 @Serializable

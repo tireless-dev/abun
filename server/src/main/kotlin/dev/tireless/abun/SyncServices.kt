@@ -53,6 +53,23 @@ class AppServices private constructor(
     internal val pomodoroSessions = PomodoroSessionSyncService(database, serverClock)
     internal val auth = AuthService(database)
 
+    fun createTaskFromBusinessApi(userId: String, request: TaskUpsertRequest): SyncTask {
+        val task = tasks.createFromBusinessApi(userId, request)
+        if (task.isDeleted || taskEvents.deriveStatus(userId, task.id) != null) return task
+
+        val eventTime = request.eventTime ?: Instant.now().toString()
+        taskEvents.createFromBusinessApi(
+            userId,
+            TaskEventCreateRequest(
+                taskId = task.id,
+                journalDate = request.journalDate ?: eventTime.substringBefore('T'),
+                eventType = TaskEventType.CREATED,
+                eventTime = eventTime,
+            ),
+        )
+        return task
+    }
+
     override fun close() {
         database.close()
     }
@@ -735,8 +752,8 @@ internal class TaskSyncService(
         connection.prepareStatement(
             """
             INSERT INTO task(
-                id, user_id, parent_id, routine_id, title, is_deleted, hlc_map, server_version, server_updated_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, user_id, parent_id, routine_id, title, detail, start_not_before, end_not_after, estimated_duration, is_deleted, hlc_map, server_version, server_updated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
         ).use { statement ->
             statement.setString(1, canonical.id)
@@ -744,11 +761,15 @@ internal class TaskSyncService(
             statement.setNullableString(3, canonical.parentId)
             statement.setNullableString(4, canonical.routineId)
             statement.setString(5, canonical.title)
-            statement.setBoolean(6, canonical.isDeleted)
-            statement.setString(7, encodeMap(canonical.hlcMap))
-            statement.setLong(8, canonical.serverVersion)
-            statement.setString(9, canonical.serverUpdatedAt)
-            statement.setString(10, canonical.createdAt)
+            statement.setNullableString(6, canonical.detail)
+            statement.setNullableString(7, canonical.startNotBefore)
+            statement.setNullableString(8, canonical.endNotAfter)
+            statement.setNullableString(9, canonical.estimatedDuration)
+            statement.setBoolean(10, canonical.isDeleted)
+            statement.setString(11, encodeMap(canonical.hlcMap))
+            statement.setLong(12, canonical.serverVersion)
+            statement.setString(13, canonical.serverUpdatedAt)
+            statement.setString(14, canonical.createdAt)
             statement.executeUpdate()
         }
         return canonical
@@ -777,6 +798,22 @@ internal class TaskSyncService(
                 }
                 "routine" -> {
                     merged = merged.copy(routineId = incoming.routineId, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "detail" -> {
+                    merged = merged.copy(detail = incoming.detail, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "start_not_before" -> {
+                    merged = merged.copy(startNotBefore = incoming.startNotBefore, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "end_not_after" -> {
+                    merged = merged.copy(endNotAfter = incoming.endNotAfter, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "estimated_duration" -> {
+                    merged = merged.copy(estimatedDuration = incoming.estimatedDuration, hlcMap = merged.hlcMap + (field to incomingHlc!!))
                     accepted += field
                 }
                 "delete" -> {
@@ -813,15 +850,27 @@ internal class TaskSyncService(
                     parentId = request.parentId,
                     routineId = request.routineId,
                     title = request.title,
+                    detail = request.detail,
+                    startNotBefore = request.startNotBefore,
+                    endNotAfter = request.endNotAfter,
+                    estimatedDuration = request.estimatedDuration,
                     hlcMap = buildMap {
                         put("title", titleHlc)
                         request.parentId?.let { put("parent", serverClock.next(titleHlc)) }
                         request.routineId?.let { put("routine", serverClock.next(titleHlc)) }
+                        request.detail?.let { put("detail", serverClock.next(titleHlc)) }
+                        request.startNotBefore?.let { put("start_not_before", serverClock.next(titleHlc)) }
+                        request.endNotAfter?.let { put("end_not_after", serverClock.next(titleHlc)) }
+                        request.estimatedDuration?.let { put("estimated_duration", serverClock.next(titleHlc)) }
                     },
                     dirtyFields = buildList {
                         add("title")
                         if (request.parentId != null) add("parent")
                         if (request.routineId != null) add("routine")
+                        if (request.detail != null) add("detail")
+                        if (request.startNotBefore != null) add("start_not_before")
+                        if (request.endNotAfter != null) add("end_not_after")
+                        if (request.estimatedDuration != null) add("estimated_duration")
                     },
                 ),
             ),
@@ -833,12 +882,21 @@ internal class TaskSyncService(
         val dirty = mutableListOf<String>()
         val hlc = existing.hlcMap.toMutableMap()
         var title = existing.title
+        var detail = existing.detail
         var parentId = existing.parentId
         var routineId = existing.routineId
+        var startNotBefore = existing.startNotBefore
+        var endNotAfter = existing.endNotAfter
+        var estimatedDuration = existing.estimatedDuration
         request.title?.let {
             title = it
             hlc["title"] = serverClock.next(hlc["title"])
             dirty += "title"
+        }
+        if (request.detail != existing.detail) {
+            detail = request.detail
+            hlc["detail"] = serverClock.next(hlc["detail"])
+            dirty += "detail"
         }
         if (request.parentId != existing.parentId) {
             parentId = request.parentId
@@ -850,12 +908,37 @@ internal class TaskSyncService(
             hlc["routine"] = serverClock.next(hlc["routine"])
             dirty += "routine"
         }
+        if (request.startNotBefore != existing.startNotBefore) {
+            startNotBefore = request.startNotBefore
+            hlc["start_not_before"] = serverClock.next(hlc["start_not_before"])
+            dirty += "start_not_before"
+        }
+        if (request.endNotAfter != existing.endNotAfter) {
+            endNotAfter = request.endNotAfter
+            hlc["end_not_after"] = serverClock.next(hlc["end_not_after"])
+            dirty += "end_not_after"
+        }
+        if (request.estimatedDuration != existing.estimatedDuration) {
+            estimatedDuration = request.estimatedDuration
+            hlc["estimated_duration"] = serverClock.next(hlc["estimated_duration"])
+            dirty += "estimated_duration"
+        }
         if (dirty.isEmpty()) return@tx existing
         mergeExisting(
             connection = connection,
             userId = userId,
             existing = existing,
-            incoming = existing.copy(title = title, parentId = parentId, routineId = routineId, hlcMap = hlc, dirtyFields = dirty),
+            incoming = existing.copy(
+                title = title,
+                detail = detail,
+                parentId = parentId,
+                routineId = routineId,
+                startNotBefore = startNotBefore,
+                endNotAfter = endNotAfter,
+                estimatedDuration = estimatedDuration,
+                hlcMap = hlc,
+                dirtyFields = dirty,
+            ),
         )
     }
 
@@ -876,19 +959,23 @@ internal class TaskSyncService(
     private fun updateTask(connection: Connection, userId: String, task: SyncTask) {
         connection.prepareStatement(
             """
-            UPDATE task SET parent_id = ?, routine_id = ?, title = ?, is_deleted = ?, hlc_map = ?, server_version = ?, server_updated_at = ?
+            UPDATE task SET parent_id = ?, routine_id = ?, title = ?, detail = ?, start_not_before = ?, end_not_after = ?, estimated_duration = ?, is_deleted = ?, hlc_map = ?, server_version = ?, server_updated_at = ?
             WHERE user_id = ? AND id = ?
             """.trimIndent(),
         ).use { statement ->
             statement.setNullableString(1, task.parentId)
             statement.setNullableString(2, task.routineId)
             statement.setString(3, task.title)
-            statement.setBoolean(4, task.isDeleted)
-            statement.setString(5, encodeMap(task.hlcMap))
-            statement.setLong(6, task.serverVersion)
-            statement.setString(7, task.serverUpdatedAt)
-            statement.setString(8, userId)
-            statement.setString(9, task.id)
+            statement.setNullableString(4, task.detail)
+            statement.setNullableString(5, task.startNotBefore)
+            statement.setNullableString(6, task.endNotAfter)
+            statement.setNullableString(7, task.estimatedDuration)
+            statement.setBoolean(8, task.isDeleted)
+            statement.setString(9, encodeMap(task.hlcMap))
+            statement.setLong(10, task.serverVersion)
+            statement.setString(11, task.serverUpdatedAt)
+            statement.setString(12, userId)
+            statement.setString(13, task.id)
             statement.executeUpdate()
         }
     }
@@ -1593,6 +1680,10 @@ private fun ResultSet.toSyncTask(): SyncTask = SyncTask(
     parentId = getString("parent_id"),
     routineId = getString("routine_id"),
     title = getString("title"),
+    detail = getString("detail"),
+    startNotBefore = getString("start_not_before"),
+    endNotAfter = getString("end_not_after"),
+    estimatedDuration = getString("estimated_duration"),
     isDeleted = getBoolean("is_deleted"),
     hlcMap = decodeMap(getString("hlc_map")),
     serverVersion = getLong("server_version"),

@@ -148,11 +148,19 @@ class ApplicationTest {
                 TaskUpsertRequest(
                     id = "task-1",
                     title = "Plan day",
+                    detail = "Work through the new planning window",
                     routineId = routine.id,
+                    startNotBefore = "2026-05-25T09:00:00Z",
+                    endNotAfter = "2026-05-25T17:00:00Z",
+                    estimatedDuration = "PT2H",
                 ),
             )
         }.body<TaskResponse>()
         assertEquals("task-1", task.id)
+        assertEquals("Work through the new planning window", task.detail)
+        assertEquals("2026-05-25T09:00:00Z", task.startNotBefore)
+        assertEquals("2026-05-25T17:00:00Z", task.endNotAfter)
+        assertEquals("PT2H", task.estimatedDuration)
 
         val alarm = jsonClient.post("/api/alarms") {
             auth("user-1")
@@ -191,6 +199,23 @@ class ApplicationTest {
         }.body<RoutineResponse>()
         assertEquals(false, patchedRoutine.isActive)
 
+        val patchedTask = jsonClient.patch("/api/tasks/task-1") {
+            auth("user-1")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(
+                TaskPatchRequest(
+                    detail = "Updated plan",
+                    startNotBefore = "2026-05-25T10:00:00Z",
+                    endNotAfter = "2026-05-25T18:00:00Z",
+                    estimatedDuration = "PT3H",
+                ),
+            )
+        }.body<TaskResponse>()
+        assertEquals("Updated plan", patchedTask.detail)
+        assertEquals("2026-05-25T10:00:00Z", patchedTask.startNotBefore)
+        assertEquals("2026-05-25T18:00:00Z", patchedTask.endNotAfter)
+        assertEquals("PT3H", patchedTask.estimatedDuration)
+
         val patchedAlarm = jsonClient.patch("/api/alarms/alarm-1") {
             auth("user-1")
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
@@ -223,6 +248,10 @@ class ApplicationTest {
         }.body<PullResponse<SyncTask>>()
         assertEquals(1, pulledTasks.items.size)
         assertEquals(true, pulledTasks.items.single().isDeleted)
+        assertEquals("Updated plan", pulledTasks.items.single().detail)
+        assertEquals("2026-05-25T10:00:00Z", pulledTasks.items.single().startNotBefore)
+        assertEquals("2026-05-25T18:00:00Z", pulledTasks.items.single().endNotAfter)
+        assertEquals("PT3H", pulledTasks.items.single().estimatedDuration)
     }
 
     @Test
@@ -233,10 +262,57 @@ class ApplicationTest {
         jsonClient.post("/api/tasks") {
             auth("user-1")
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(TaskUpsertRequest(id = "task-1", title = "Ledger task"))
+            setBody(
+                TaskUpsertRequest(
+                    id = "task-1",
+                    title = "Ledger task",
+                    journalDate = "2026-05-24",
+                    eventTime = "2026-05-24T08:00:00Z",
+                ),
+            )
         }
 
-        val created = jsonClient.post("/api/tasks/task-1/events") {
+        val initialEvents = jsonClient.get("/api/tasks/task-1/events") {
+            auth("user-1")
+        }.body<List<TaskEventResponse>>()
+        assertEquals(1, initialEvents.size)
+        assertEquals(TaskEventType.CREATED, initialEvents.single().eventType)
+
+        val initialStatus = jsonClient.get("/api/tasks/task-1/status") {
+            auth("user-1")
+        }.body<TaskStatusResponse>()
+        assertEquals(TaskStatus.PENDING, initialStatus.status)
+
+        val initialJournal = jsonClient.get("/api/journals/2026-05-24") {
+            auth("user-1")
+        }.body<List<JournalEntry>>()
+        assertEquals(1, initialJournal.size)
+        assertEquals(TaskEventType.CREATED, initialJournal.single().eventType)
+
+        jsonClient.post("/api/tasks") {
+            auth("user-1")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(
+                TaskUpsertRequest(
+                    id = "task-1",
+                    title = "Ledger task renamed",
+                    journalDate = "2026-05-24",
+                    eventTime = "2026-05-24T08:15:00Z",
+                ),
+            )
+        }
+
+        val eventsAfterUpsert = jsonClient.get("/api/tasks/task-1/events") {
+            auth("user-1")
+        }.body<List<TaskEventResponse>>()
+        assertEquals(1, eventsAfterUpsert.size)
+
+        val task = jsonClient.get("/api/tasks/task-1") {
+            auth("user-1")
+        }.body<TaskResponse>()
+        assertEquals("Ledger task renamed", task.title)
+
+        val progressed = jsonClient.post("/api/tasks/task-1/events") {
             auth("user-1")
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(
@@ -244,8 +320,23 @@ class ApplicationTest {
                     id = "event-1",
                     taskId = "ignored-by-route",
                     journalDate = "2026-05-24",
-                    eventType = TaskEventType.CREATED,
+                    eventType = TaskEventType.PROGRESSED,
                     eventTime = "2026-05-24T09:00:00Z",
+                ),
+            )
+        }
+        assertEquals(HttpStatusCode.Created, progressed.status)
+
+        val created = jsonClient.post("/api/tasks/task-1/events") {
+            auth("user-1")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(
+                TaskEventCreateRequest(
+                    id = "event-extra",
+                    taskId = "ignored-by-route",
+                    journalDate = "2026-05-24",
+                    eventType = TaskEventType.CREATED,
+                    eventTime = "2026-05-24T09:10:00Z",
                 ),
             )
         }
@@ -279,7 +370,7 @@ class ApplicationTest {
                             id = "event-1",
                             taskId = "task-1",
                             journalDate = "2026-05-24",
-                            eventType = TaskEventType.CREATED,
+                            eventType = TaskEventType.PROGRESSED,
                             eventTime = "2026-05-24T09:00:00Z",
                         ),
                     ),
@@ -291,7 +382,7 @@ class ApplicationTest {
         val events = jsonClient.get("/api/tasks/task-1/events") {
             auth("user-1")
         }.body<List<TaskEventResponse>>()
-        assertEquals(2, events.size)
+        assertEquals(4, events.size)
 
         val status = jsonClient.get("/api/tasks/task-1/status") {
             auth("user-1")
@@ -301,8 +392,8 @@ class ApplicationTest {
         val journal = jsonClient.get("/api/journals/2026-05-24") {
             auth("user-1")
         }.body<List<JournalEntry>>()
-        assertEquals(1, journal.size)
-        assertEquals(TaskEventType.CREATED, journal.single().eventType)
+        assertEquals(3, journal.size)
+        assertEquals(listOf(TaskEventType.CREATED, TaskEventType.PROGRESSED, TaskEventType.CREATED), journal.map { it.eventType })
     }
 
     @Test

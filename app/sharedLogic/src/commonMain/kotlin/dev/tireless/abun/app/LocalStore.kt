@@ -14,6 +14,7 @@ import dev.tireless.abun.sync.SyncTaskEvent
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.sync.PreferenceValueType
+import kotlinx.datetime.LocalDate
 
 internal data class MutableSyncRow<T>(
     val entity: T,
@@ -46,6 +47,18 @@ class LocalStore(
     }
 
     fun allTasks(): List<TaskListItemView> = queries.selectTasks(::mapTaskRow).executeAsList().map(::toTaskListItemView)
+
+    fun backlogTasks(): List<TaskListItemView> =
+        queries.selectTasks(::mapTaskRow).executeAsList()
+            .map(::toTaskListItemView)
+            .filter(::isBacklogTask)
+
+    fun openTasksForDate(selectedDate: String): List<TaskListItemView> =
+        queries.selectTasks(::mapTaskRow).executeAsList()
+            .map(::toTaskListItemView)
+            .filter { it.status != TaskStatus.COMPLETED && it.status != TaskStatus.CANCELLED }
+            .filterNot(::isBacklogTask)
+            .filter { it.isVisibleOn(LocalDate.parse(selectedDate)) }
 
     fun routines(): List<RoutineListItemView> = queries.selectActiveRoutines(::mapRoutineRow).executeAsList().map {
         RoutineListItemView(
@@ -220,17 +233,34 @@ class LocalStore(
         persistPomodoroSession(updated, updatedHlc, dirty, isDirty = true)
     }
 
-    fun createTask(title: String, journalDate: String, parentId: String? = null, routineId: String? = null): String =
+    fun createTask(
+        title: String,
+        journalDate: String,
+        parentId: String? = null,
+        routineId: String? = null,
+        detail: String? = null,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+    ): String =
         database.transactionWithResult {
             val now = timeProvider.nowEpochMillis()
             val taskId = idGenerator.randomId()
             val titleHlc = clock.next()
             val parentHlc = parentId?.let { clock.next(titleHlc) }
             val routineHlc = routineId?.let { clock.next(titleHlc) }
+            val detailHlc = detail?.let { clock.next(routineHlc ?: parentHlc ?: titleHlc) }
+            val startHlc = startNotBefore?.let { clock.next(detailHlc ?: routineHlc ?: parentHlc ?: titleHlc) }
+            val endHlc = endNotAfter?.let { clock.next(startHlc ?: detailHlc ?: routineHlc ?: parentHlc ?: titleHlc) }
+            val durationHlc = estimatedDuration?.let { clock.next(endHlc ?: startHlc ?: detailHlc ?: routineHlc ?: parentHlc ?: titleHlc) }
             val dirty = buildList {
                 add("title")
                 if (parentId != null) add("parent")
                 if (routineId != null) add("routine")
+                if (detail != null) add("detail")
+                if (startNotBefore != null) add("start_not_before")
+                if (endNotAfter != null) add("end_not_after")
+                if (estimatedDuration != null) add("estimated_duration")
             }
 
             queries.upsertTask(
@@ -238,12 +268,20 @@ class LocalStore(
                 parent_id = parentId,
                 routine_id = routineId,
                 title = title,
+                detail = detail,
+                start_not_before = startNotBefore,
+                end_not_after = endNotAfter,
+                estimated_duration = estimatedDuration,
                 is_deleted = 0,
                 hlc_map = JsonCodecs.encodeMap(
                     buildMap {
                         put("title", titleHlc)
                         parentHlc?.let { put("parent", it) }
                         routineHlc?.let { put("routine", it) }
+                        detailHlc?.let { put("detail", it) }
+                        startHlc?.let { put("start_not_before", it) }
+                        endHlc?.let { put("end_not_after", it) }
+                        durationHlc?.let { put("estimated_duration", it) }
                     },
                 ),
                 dirty_fields = JsonCodecs.encodeList(dirty),
@@ -275,6 +313,10 @@ class LocalStore(
 
     fun completeTask(taskId: String, journalDate: String, note: String? = null) {
         appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
+    }
+
+    fun cancelTask(taskId: String, journalDate: String, note: String? = null) {
+        appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
     }
 
     fun deleteTask(taskId: String) = database.transaction {
@@ -435,6 +477,10 @@ class LocalStore(
                 parent_id = null,
                 routine_id = routineId,
                 title = title,
+                detail = null,
+                start_not_before = null,
+                end_not_after = null,
+                estimated_duration = null,
                 is_deleted = 0,
                 hlc_map = JsonCodecs.encodeMap(
                     mapOf(
@@ -580,6 +626,10 @@ class LocalStore(
                 "title" -> mergedTask = mergedTask.copy(title = remote.title)
                 "parent" -> mergedTask = mergedTask.copy(parentId = remote.parentId)
                 "routine" -> mergedTask = mergedTask.copy(routineId = remote.routineId)
+                "detail" -> mergedTask = mergedTask.copy(detail = remote.detail)
+                "start_not_before" -> mergedTask = mergedTask.copy(startNotBefore = remote.startNotBefore)
+                "end_not_after" -> mergedTask = mergedTask.copy(endNotAfter = remote.endNotAfter)
+                "estimated_duration" -> mergedTask = mergedTask.copy(estimatedDuration = remote.estimatedDuration)
                 "delete" -> mergedTask = mergedTask.copy(isDeleted = remote.isDeleted)
             }
             mergedHlc[field] = incomingHlc
@@ -714,7 +764,23 @@ class LocalStore(
     }
 
     private fun persistTask(task: LocalTask, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean, createdAt: Long, updatedAt: Long) {
-        queries.upsertTask(task.id, task.parentId, task.routineId, task.title, task.isDeleted.toLong(), JsonCodecs.encodeMap(hlcMap), JsonCodecs.encodeList(dirtyFields), isDirty.toLong(), task.serverVersion, createdAt, updatedAt)
+        queries.upsertTask(
+            task.id,
+            task.parentId,
+            task.routineId,
+            task.title,
+            task.detail,
+            task.startNotBefore,
+            task.endNotAfter,
+            task.estimatedDuration,
+            task.isDeleted.toLong(),
+            JsonCodecs.encodeMap(hlcMap),
+            JsonCodecs.encodeList(dirtyFields),
+            isDirty.toLong(),
+            task.serverVersion,
+            createdAt,
+            updatedAt,
+        )
     }
 
     private fun persistRoutine(routine: LocalRoutine, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean) {
@@ -812,6 +878,10 @@ class LocalStore(
                 TaskEventType.COMPLETED -> TaskStatus.COMPLETED
                 TaskEventType.CANCELLED -> TaskStatus.CANCELLED
             },
+            detail = row.entity.detail,
+            startNotBefore = row.entity.startNotBefore,
+            endNotAfter = row.entity.endNotAfter,
+            estimatedDuration = row.entity.estimatedDuration,
             parentId = row.entity.parentId,
             routineId = row.entity.routineId,
         )
@@ -848,11 +918,53 @@ class LocalStore(
     }
 }
 
+private fun isBacklogTask(task: TaskListItemView): Boolean =
+    task.startNotBefore == null && task.endNotAfter == null
+
+private fun TaskListItemView.isVisibleOn(selectedDate: LocalDate): Boolean {
+    val visibleStart = effectiveVisibilityStartDate() ?: return false
+    return selectedDate >= visibleStart
+}
+
+private fun TaskListItemView.effectiveVisibilityStartDate(): LocalDate? {
+    val startDate = startNotBefore?.let(::isoDatePart)
+    val endStartDate = endNotAfter?.let { end ->
+        val durationMillis = estimatedDuration?.let(::parseIsoDurationMillis) ?: 0L
+        isoStringToEpochMillis(end).minus(durationMillis).let(::epochMillisToIsoString).let(::isoDatePart)
+    }
+    return when {
+        startDate != null && endStartDate != null -> maxOf(startDate, endStartDate)
+        startDate != null -> startDate
+        endStartDate != null -> endStartDate
+        else -> null
+    }
+}
+
+private fun isoDatePart(isoTimestamp: String): LocalDate = LocalDate.parse(isoTimestamp.substringBefore('T'))
+
+private fun parseIsoDurationMillis(value: String): Long {
+    val match = ISO_DURATION_PATTERN.matchEntire(value)
+        ?: error("Unsupported ISO-8601 duration: $value")
+    val days = match.groups[1]?.value?.toLongOrNull() ?: 0L
+    val hours = match.groups[2]?.value?.toLongOrNull() ?: 0L
+    val minutes = match.groups[3]?.value?.toLongOrNull() ?: 0L
+    val seconds = match.groups[4]?.value?.toLongOrNull() ?: 0L
+    return (((days * 24 + hours) * 60 + minutes) * 60 + seconds).secondsToMillis()
+}
+
+private fun Long.secondsToMillis(): Long = this * 1_000L
+
+private val ISO_DURATION_PATTERN = Regex("""P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?""")
+
 internal data class LocalTask(
     val id: String,
     val parentId: String?,
     val routineId: String?,
     val title: String,
+    val detail: String?,
+    val startNotBefore: String?,
+    val endNotAfter: String?,
+    val estimatedDuration: String?,
     val isDeleted: Boolean,
     val serverVersion: Long,
     val createdAt: Long,
@@ -948,6 +1060,10 @@ private fun mapTaskRow(
     parent_id: String?,
     routine_id: String?,
     title: String,
+    detail: String?,
+    start_not_before: String?,
+    end_not_after: String?,
+    estimated_duration: String?,
     is_deleted: Long,
     hlc_map: String,
     dirty_fields: String,
@@ -955,7 +1071,11 @@ private fun mapTaskRow(
     server_version: Long,
     created_at: Long,
     updated_at: Long,
-): MutableSyncRow<LocalTask> = MutableSyncRow(LocalTask(id, parent_id, routine_id, title, is_deleted != 0L, server_version, created_at, updated_at), JsonCodecs.decodeMap(hlc_map), if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList())
+): MutableSyncRow<LocalTask> = MutableSyncRow(
+    LocalTask(id, parent_id, routine_id, title, detail, start_not_before, end_not_after, estimated_duration, is_deleted != 0L, server_version, created_at, updated_at),
+    JsonCodecs.decodeMap(hlc_map),
+    if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
+)
 
 private fun mapRoutineRow(
     id: String,
@@ -1093,7 +1213,21 @@ private fun MutableSyncRow<LocalPreference>.toSyncPreference(): SyncPreference =
     createdAt = epochMillisToIsoString(entity.createdAt),
 )
 
-private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(entity.id, entity.parentId, entity.routineId, entity.title, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
+private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(
+    id = entity.id,
+    parentId = entity.parentId,
+    routineId = entity.routineId,
+    title = entity.title,
+    detail = entity.detail,
+    startNotBefore = entity.startNotBefore,
+    endNotAfter = entity.endNotAfter,
+    estimatedDuration = entity.estimatedDuration,
+    isDeleted = entity.isDeleted,
+    hlcMap = hlcMap,
+    dirtyFields = dirtyFields,
+    serverVersion = entity.serverVersion,
+    createdAt = epochMillisToIsoString(entity.createdAt),
+)
 
 private fun MutableSyncRow<LocalRoutine>.toSyncRoutine(): SyncRoutine = SyncRoutine(entity.id, entity.templateTitle, entity.cronSchedule, entity.timezone, entity.isActive, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
 
@@ -1119,7 +1253,20 @@ private fun MutableSyncRow<LocalPomodoroSession>.toSyncPomodoroSession(): SyncPo
 
 private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(id, taskId, journalDate, eventType, content, epochMillisToIsoString(eventTime), isDeleted, serverVersion = serverVersion, createdAt = epochMillisToIsoString(createdAt))
 
-private fun SyncTask.toLocalTask(): LocalTask = LocalTask(id, parentId, routineId, title, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
+private fun SyncTask.toLocalTask(): LocalTask = LocalTask(
+    id = id,
+    parentId = parentId,
+    routineId = routineId,
+    title = title,
+    detail = detail,
+    startNotBefore = startNotBefore,
+    endNotAfter = endNotAfter,
+    estimatedDuration = estimatedDuration,
+    isDeleted = isDeleted,
+    serverVersion = serverVersion,
+    createdAt = createdAt?.let(::isoStringToEpochMillis) ?: 0L,
+    updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
+)
 
 private fun SyncRoutine.toLocalRoutine(): LocalRoutine = LocalRoutine(id, templateTitle, cronSchedule, timezone, isActive, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
 

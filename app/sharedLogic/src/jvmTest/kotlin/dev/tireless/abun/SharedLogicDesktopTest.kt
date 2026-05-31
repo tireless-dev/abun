@@ -10,6 +10,7 @@ import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.JournalEntryView
+import dev.tireless.abun.app.JvmDatabaseDriverFactory
 import dev.tireless.abun.app.LocalStore
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
@@ -39,6 +40,8 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.test.runTest
+import java.io.File
+import java.sql.DriverManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,6 +63,231 @@ class SharedLogicDesktopTest {
         assertEquals(1, tasks.size)
         assertEquals(TaskStatus.COMPLETED, tasks.single().status)
         assertEquals(listOf(TaskEventType.CREATED, TaskEventType.PROGRESSED, TaskEventType.COMPLETED), journal.map { it.eventType })
+    }
+
+    @Test
+    fun `create task persists planning window fields and detail in sync payload`() {
+        val store = testStore()
+
+        val taskId = store.createTask(
+            title = "Plan sync client",
+            journalDate = "2026-05-25",
+            detail = "Break the migration into thin slices",
+            startNotBefore = "2026-05-26T09:00:00Z",
+            endNotAfter = "2026-05-27T17:00:00Z",
+            estimatedDuration = "PT2H",
+        )
+
+        val dirtyTask = store.dirtyTasks().single { it.id == taskId }
+
+        assertEquals("Break the migration into thin slices", dirtyTask.detail)
+        assertEquals("2026-05-26T09:00:00Z", dirtyTask.startNotBefore)
+        assertEquals("2026-05-27T17:00:00Z", dirtyTask.endNotAfter)
+        assertEquals("PT2H", dirtyTask.estimatedDuration)
+        assertEquals(
+            setOf("title", "detail", "start_not_before", "end_not_after", "estimated_duration"),
+            dirtyTask.dirtyFields.toSet(),
+        )
+    }
+
+    @Test
+    fun `backlog tasks stay out of day open tasks until scheduled`() {
+        val store = testStore()
+
+        val backlogId = store.createTask(
+            title = "Unscheduled idea",
+            journalDate = "2026-05-25",
+        )
+        val scheduledId = store.createTask(
+            title = "Windowed work",
+            journalDate = "2026-05-25",
+            startNotBefore = "2026-05-26T09:00:00Z",
+            endNotAfter = "2026-05-26T17:00:00Z",
+            estimatedDuration = "PT4H",
+        )
+
+        val backlog = store.backlogTasks()
+        val may25OpenTasks = store.openTasksForDate("2026-05-25")
+        val may26OpenTasks = store.openTasksForDate("2026-05-26")
+
+        assertEquals(listOf(backlogId), backlog.map { it.id })
+        assertTrue(may25OpenTasks.none { it.id == backlogId })
+        assertTrue(may26OpenTasks.none { it.id == backlogId })
+        assertTrue(may25OpenTasks.none { it.id == scheduledId })
+        assertEquals(listOf(scheduledId), may26OpenTasks.map { it.id })
+    }
+
+    @Test
+    fun `desktop database factory migrates legacy task table before queries run`() {
+        val dbFile = File.createTempFile("abun-legacy", ".db")
+        dbFile.deleteOnExit()
+        DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE task (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        parent_id TEXT,
+                        routine_id TEXT,
+                        title TEXT NOT NULL,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        hlc_map TEXT NOT NULL DEFAULT '{}',
+                        dirty_fields TEXT NOT NULL DEFAULT '[]',
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE task_event (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        task_id TEXT NOT NULL,
+                        journal_date TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        content TEXT,
+                        event_time INTEGER NOT NULL,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE routine (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        template_title TEXT NOT NULL,
+                        cron_schedule TEXT NOT NULL,
+                        timezone TEXT NOT NULL,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        hlc_map TEXT NOT NULL DEFAULT '{}',
+                        dirty_fields TEXT NOT NULL DEFAULT '[]',
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE alarm (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        task_id TEXT NOT NULL,
+                        trigger_time INTEGER NOT NULL,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        hlc_map TEXT NOT NULL DEFAULT '{}',
+                        dirty_fields TEXT NOT NULL DEFAULT '[]',
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE sync_state (
+                        scope TEXT NOT NULL PRIMARY KEY,
+                        last_server_version INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE app_preferences (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        title_prefix TEXT,
+                        default_alarm_lead_minutes INTEGER NOT NULL,
+                        default_focus_minutes INTEGER NOT NULL,
+                        default_short_break_minutes INTEGER NOT NULL,
+                        default_long_break_minutes INTEGER NOT NULL,
+                        timezone_override TEXT NOT NULL,
+                        date_format TEXT NOT NULL,
+                        blank_title_policy TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE preference (
+                        pref_key TEXT NOT NULL PRIMARY KEY,
+                        pref_value TEXT,
+                        value_type TEXT NOT NULL,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        hlc_map TEXT NOT NULL DEFAULT '{}',
+                        dirty_fields TEXT NOT NULL DEFAULT '[]',
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE pomodoro_session (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        task_id TEXT,
+                        phase TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        started_at INTEGER NOT NULL,
+                        ends_at INTEGER NOT NULL,
+                        completed_at INTEGER,
+                        duration_minutes INTEGER NOT NULL,
+                        note TEXT,
+                        task_update TEXT NOT NULL DEFAULT 'NONE',
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        hlc_map TEXT NOT NULL DEFAULT '{}',
+                        dirty_fields TEXT NOT NULL DEFAULT '[]',
+                        is_dirty INTEGER NOT NULL DEFAULT 0,
+                        server_version INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    INSERT INTO task (
+                        id, parent_id, routine_id, title, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
+                    ) VALUES (
+                        'task-1', NULL, NULL, 'Legacy task', 0, '{}', '[]', 0, 0, 1, 1
+                    )
+                    """.trimIndent(),
+                )
+                statement.executeUpdate(
+                    """
+                    INSERT INTO task_event (
+                        id, task_id, journal_date, event_type, content, event_time, is_deleted, server_version, is_dirty, created_at
+                    ) VALUES (
+                        'event-1', 'task-1', '2026-05-25', 'CREATED', NULL, 1, 0, 0, 0, 1
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        val store = LocalStore(
+            database = createDatabase(object : DatabaseDriverFactory {
+                override fun createDriver(): SqlDriver = JvmDatabaseDriverFactory("jdbc:sqlite:${dbFile.absolutePath}").createDriver()
+            }),
+            timeProvider = testTimeProvider(),
+            idGenerator = testIdGenerator(),
+            clock = createHybridClock(object : DeviceNodeIdProvider {
+                override fun nodeId(): String = "test-device"
+            }, testTimeProvider()),
+        )
+
+        val tasks = store.allTasks()
+
+        assertEquals(listOf("Legacy task"), tasks.map { it.title })
     }
 
     @Test
@@ -310,22 +538,8 @@ class SharedLogicDesktopTest {
                 AbunDatabase.Schema.create(it)
             }
         }
-        val timeProvider = object : TimeProvider {
-            private var now = 1_748_120_000_000L
-
-            override fun nowEpochMillis(): Long = now++
-            override fun today(): LocalDate = LocalDate.parse("2026-05-25")
-        }
-        val idGenerator = object : IdGenerator {
-            private var index = 0
-
-            override fun randomId(): String {
-                index += 1
-                return "id-$index"
-            }
-
-            override fun deterministicId(namespace: String, seed: String): String = "$namespace:$seed"
-        }
+        val timeProvider = testTimeProvider()
+        val idGenerator = testIdGenerator()
         return LocalStore(
             database = createDatabase(driverFactory),
             timeProvider = timeProvider,
@@ -334,5 +548,23 @@ class SharedLogicDesktopTest {
                 override fun nodeId(): String = "test-device"
             }, timeProvider),
         )
+    }
+
+    private fun testTimeProvider(): TimeProvider = object : TimeProvider {
+        private var now = 1_748_120_000_000L
+
+        override fun nowEpochMillis(): Long = now++
+        override fun today(): LocalDate = LocalDate.parse("2026-05-25")
+    }
+
+    private fun testIdGenerator(): IdGenerator = object : IdGenerator {
+        private var index = 0
+
+        override fun randomId(): String {
+            index += 1
+            return "id-$index"
+        }
+
+        override fun deterministicId(namespace: String, seed: String): String = "$namespace:$seed"
     }
 }

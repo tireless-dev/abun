@@ -48,6 +48,10 @@ data class TaskListItemView(
     val id: String,
     val title: String,
     val status: TaskStatus,
+    val detail: String? = null,
+    val startNotBefore: String? = null,
+    val endNotAfter: String? = null,
+    val estimatedDuration: String? = null,
     val parentId: String? = null,
     val routineId: String? = null,
 )

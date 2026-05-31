@@ -44,12 +44,21 @@ CREATE TABLE IF NOT EXISTS task (
     parent_id VARCHAR(255),
     routine_id VARCHAR(255),
     title TEXT NOT NULL,
+    detail TEXT,
+    start_not_before VARCHAR(255),
+    end_not_after VARCHAR(255),
+    estimated_duration VARCHAR(255),
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     hlc_map TEXT NOT NULL,
     server_version BIGINT NOT NULL,
     server_updated_at VARCHAR(255) NOT NULL,
     created_at VARCHAR(255) NOT NULL
 );
+
+ALTER TABLE task ADD COLUMN IF NOT EXISTS detail TEXT;
+ALTER TABLE task ADD COLUMN IF NOT EXISTS start_not_before VARCHAR(255);
+ALTER TABLE task ADD COLUMN IF NOT EXISTS end_not_after VARCHAR(255);
+ALTER TABLE task ADD COLUMN IF NOT EXISTS estimated_duration VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_task_user_server_version ON task(user_id, server_version);
 CREATE INDEX IF NOT EXISTS idx_task_parent_id ON task(parent_id);
