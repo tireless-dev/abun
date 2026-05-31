@@ -53,6 +53,7 @@ class AppScreenScreenshotTest {
                 onOpenStartPomodoro = {},
                 onCreateRoutine = {},
                 onOpenRoutine = {},
+                onRunRoutine = {},
             )
         }
     }
@@ -71,6 +72,7 @@ class AppScreenScreenshotTest {
                 onOpenStartPomodoro = {},
                 onCreateRoutine = {},
                 onOpenRoutine = {},
+                onRunRoutine = {},
             )
         }
     }
@@ -89,6 +91,7 @@ class AppScreenScreenshotTest {
                 onOpenStartPomodoro = {},
                 onCreateRoutine = {},
                 onOpenRoutine = {},
+                onRunRoutine = {},
             )
         }
     }
@@ -111,6 +114,7 @@ class AppScreenScreenshotTest {
                 onOpenStartPomodoro = {},
                 onCreateRoutine = {},
                 onOpenRoutine = {},
+                onRunRoutine = {},
             )
         }
     }
@@ -121,7 +125,7 @@ class AppScreenScreenshotTest {
         ScreenshotScreenFrame("Settings", AppTab.SETTINGS) {
             SettingsScreenContent(
                 state = state,
-                onUpdatePreferences = { _, _, _, _, _, _, _ -> },
+                onUpdatePreferences = { _, _, _, _, _, _, _, _ -> },
             )
         }
     }
@@ -137,6 +141,7 @@ class AppScreenScreenshotTest {
             task = populatedTaskView().tasks.first(),
             history = populatedTodayView().journalEntries,
             availableParents = populatedTaskView().tasks.drop(1),
+            availableRoutines = emptyList(),
             isPomodoroActive = false,
             onDismiss = {},
             onSaveTask = { _, _, _, _, _, _, _ -> },

@@ -34,9 +34,15 @@ import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroSessionView
 import dev.tireless.abun.app.PomodoroTaskUpdate
+import dev.tireless.abun.app.RecurrenceFrequency
 import dev.tireless.abun.app.RoutineListItemView
+import dev.tireless.abun.app.StructuredRecurrence
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
@@ -44,6 +50,7 @@ import dev.tireless.abun.ui.components.ActionRow
 import dev.tireless.abun.ui.components.AppText
 import dev.tireless.abun.ui.components.Button
 import dev.tireless.abun.ui.components.EmptyState
+import dev.tireless.abun.ui.components.RecurrenceRuleEditor
 import dev.tireless.abun.ui.components.InlineError
 import dev.tireless.abun.ui.components.Section
 import dev.tireless.abun.ui.components.SectionTitle
@@ -55,7 +62,6 @@ import dev.tireless.abun.ui.layout.ScreenContainer
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import kotlinx.coroutines.delay
-import kotlin.time.Clock
 
 private enum class OverlaySheet {
     CREATE_TASK,
@@ -151,6 +157,7 @@ fun App() {
                             selectedRoutine = it
                             currentSheet = OverlaySheet.ROUTINE_ACTIONS
                         },
+                        onRunRoutine = { controller.runRoutine(it.id) },
                     )
                     AppTab.SETTINGS -> SettingsScreen(state, controller)
                 }
@@ -178,6 +185,7 @@ fun App() {
                 availableParents = state.taskView.tasks.filter { candidate ->
                     candidate.id != selectedTask?.id && candidate.routineId == null
                 },
+                availableRoutines = state.taskView.routines,
                 isPomodoroActive = isPomodoroActive,
                 onDismiss = { currentSheet = null },
                 onSaveTask = { taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration ->
@@ -355,6 +363,7 @@ internal fun TasksScreen(
     onOpenStartPomodoro: () -> Unit,
     onCreateRoutine: () -> Unit,
     onOpenRoutine: (RoutineListItemView) -> Unit,
+    onRunRoutine: (RoutineListItemView) -> Unit,
 ) {
     SegmentedControl(
         options = TaskSubTab.entries.map { it.label() },
@@ -369,7 +378,12 @@ internal fun TasksScreen(
             onSelectTaskFilter = onSelectTaskFilter,
             onOpenTask = onOpenTask,
         )
-        TaskSubTab.ROUTINES -> RoutineListScreen(state = state, onCreateRoutine = onCreateRoutine, onOpenRoutine = onOpenRoutine)
+        TaskSubTab.ROUTINES -> RoutineListScreen(
+            state = state,
+            onCreateRoutine = onCreateRoutine,
+            onOpenRoutine = onOpenRoutine,
+            onRunRoutine = onRunRoutine,
+        )
         TaskSubTab.POMODORO -> PomodoroScreen(state, liveNow = liveNow, onOpenStart = onOpenStartPomodoro)
     }
 }
@@ -403,6 +417,7 @@ private fun RoutineListScreen(
     state: AppUiState,
     onCreateRoutine: () -> Unit,
     onOpenRoutine: (RoutineListItemView) -> Unit,
+    onRunRoutine: (RoutineListItemView) -> Unit,
 ) {
     Panel {
         Row(
@@ -417,7 +432,7 @@ private fun RoutineListScreen(
             EmptyState("No routines.")
         } else {
             state.taskView.routines.forEach { routine ->
-                RoutineRow(routine, onOpenRoutine)
+                RoutineRow(routine, onOpenRoutine, onRunRoutine)
             }
         }
     }
@@ -466,6 +481,7 @@ internal fun SettingsScreenContent(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        rolloverTime: String,
     ) -> Unit,
 ) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
@@ -474,6 +490,7 @@ internal fun SettingsScreenContent(
     var longBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.longBreakMinutes.toString()) }
     var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
     var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
+    var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
     Panel {
         SectionHeader("Defaults", "Task")
@@ -488,6 +505,7 @@ internal fun SettingsScreenContent(
     Panel {
         SectionHeader("App", "Preferences")
         TextField(value = timezoneOverride, onValueChange = { timezoneOverride = it }, label = "Timezone override")
+        TextField(value = rolloverTime, onValueChange = { rolloverTime = it }, label = "Rollover time (HH:MM)")
         SegmentedControl(
             options = DateFormatPreference.entries.map { it.label() },
             selected = selectedDateFormat.label(),
@@ -504,6 +522,7 @@ internal fun SettingsScreenContent(
                     longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
                     timezoneOverride,
                     selectedDateFormat,
+                    rolloverTime,
                 )
             },
         )
@@ -645,7 +664,11 @@ private fun StatusPill(status: TaskStatus) {
 }
 
 @Composable
-private fun RoutineRow(routine: RoutineListItemView, onOpen: (RoutineListItemView) -> Unit) {
+private fun RoutineRow(
+    routine: RoutineListItemView,
+    onOpen: (RoutineListItemView) -> Unit,
+    onRun: (RoutineListItemView) -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -659,7 +682,10 @@ private fun RoutineRow(routine: RoutineListItemView, onOpen: (RoutineListItemVie
         routine.defaultStartNotBefore?.let { AppText("Default start: $it", style = ThemeTokens.type.label) }
         routine.defaultEstimatedDuration?.let { AppText("Default duration: $it", style = ThemeTokens.type.label) }
         AppText(if (routine.isActive) "Active" else "Paused", style = ThemeTokens.type.label)
-        Button(label = "Manage", onClick = { onOpen(routine) })
+        ActionRow {
+            Button(label = "Run today", onClick = { onRun(routine) }, enabled = routine.isActive)
+            Button(label = "Manage", onClick = { onOpen(routine) })
+        }
     }
 }
 
@@ -706,7 +732,7 @@ internal fun CreateRoutineSheet(
         SectionTitle("Create routine")
         TextField(value = title, onValueChange = { title = it }, label = "Routine title")
         TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule (RRULE)")
+        RecurrenceRuleEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
         AppText(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
         TextField(value = defaultStartNotBefore, onValueChange = { defaultStartNotBefore = it }, label = "Default start not before")
         TextField(value = defaultEstimatedDuration, onValueChange = { defaultEstimatedDuration = it }, label = "Default estimated duration")
@@ -734,6 +760,7 @@ internal fun TaskActionsSheet(
     task: TaskListItemView?,
     history: List<JournalEntryView>,
     availableParents: List<TaskListItemView>,
+    availableRoutines: List<RoutineListItemView>,
     isPomodoroActive: Boolean,
     onDismiss: () -> Unit,
     onSaveTask: (String, String, String?, String?, String?, String?, String?) -> Unit,
@@ -744,6 +771,9 @@ internal fun TaskActionsSheet(
     onStartPomodoro: () -> Unit,
 ) {
     if (task == null) return
+    val routine = remember(task.id) { availableRoutines.find { it.id == task.routineId } }
+    val isRoutineDerived = routine != null
+
     var title by remember(task.id) { mutableStateOf(task.title) }
     var detail by remember(task.id) { mutableStateOf(task.detail.orEmpty()) }
     var parentId by remember(task.id) { mutableStateOf(task.parentId) }
@@ -751,39 +781,68 @@ internal fun TaskActionsSheet(
     var endNotAfter by remember(task.id) { mutableStateOf(task.endNotAfter.orEmpty()) }
     var estimatedDuration by remember(task.id) { mutableStateOf(task.estimatedDuration.orEmpty()) }
     var note by remember(task.id) { mutableStateOf("") }
+
+    val nextOccurrence = remember(routine, startNotBefore) {
+        if (routine == null) return@remember null
+        val structured = StructuredRecurrence.fromRRule(routine.recurrenceRule)
+        val after = try {
+            if (startNotBefore.isNotBlank()) {
+                Instant.parse(startNotBefore).toLocalDateTime(TimeZone.currentSystemDefault())
+            } else {
+                Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            }
+        } catch (e: Exception) {
+            Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        }
+        structured.nextOccurrence(after)
+    }
+
     Sheet(onDismiss = onDismiss) {
-        SectionTitle(task.title)
+        SectionTitle(if (isRoutineDerived) "Routine: ${task.title}" else task.title)
+        if (isRoutineDerived) {
+            AppText("Routine: ${routine?.templateTitle}", style = ThemeTokens.type.bodyMuted)
+            nextOccurrence?.let {
+                AppText("Next occurrence: $it", style = ThemeTokens.type.bodyMuted)
+            }
+        }
         StatusPill(task.status)
-        TextField(value = title, onValueChange = { title = it }, label = "Title")
-        TextField(value = detail, onValueChange = { detail = it }, label = "Detail")
-        AppText("Parent task", style = ThemeTokens.type.label)
-        SegmentedControl(
-            options = listOf("No parent") + availableParents.map { it.title },
-            selected = availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent",
-            onSelect = { label ->
-                parentId = availableParents.firstOrNull { it.title == label }?.id
-            },
-        )
-        TextField(value = startNotBefore, onValueChange = { startNotBefore = it }, label = "Start not before")
-        TextField(value = endNotAfter, onValueChange = { endNotAfter = it }, label = "End not after")
-        TextField(value = estimatedDuration, onValueChange = { estimatedDuration = it }, label = "Estimated duration")
+        TextField(value = title, onValueChange = { title = it }, label = "Title", enabled = !isRoutineDerived)
+        TextField(value = detail, onValueChange = { detail = it }, label = "Detail", enabled = !isRoutineDerived)
+
+        if (!isRoutineDerived) {
+            AppText("Parent task", style = ThemeTokens.type.label)
+            SegmentedControl(
+                options = listOf("No parent") + availableParents.map { it.title },
+                selected = availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent",
+                onSelect = { label ->
+                    parentId = availableParents.firstOrNull { it.title == label }?.id
+                },
+            )
+        }
+
+        TextField(value = startNotBefore, onValueChange = { startNotBefore = it }, label = "Start not before", enabled = !isRoutineDerived)
+        TextField(value = endNotAfter, onValueChange = { endNotAfter = it }, label = "End not after", enabled = !isRoutineDerived)
+        TextField(value = estimatedDuration, onValueChange = { estimatedDuration = it }, label = "Estimated duration", enabled = !isRoutineDerived)
+
         ActionRow {
             Button(label = "Close", onClick = onDismiss)
-            Button(
-                label = "Save",
-                onClick = {
-                    onSaveTask(
-                        task.id,
-                        title,
-                        detail.ifBlank { null },
-                        parentId,
-                        startNotBefore.ifBlank { null },
-                        endNotAfter.ifBlank { null },
-                        estimatedDuration.ifBlank { null },
-                    )
-                },
-                enabled = !isPomodoroActive && title.isNotBlank(),
-            )
+            if (!isRoutineDerived) {
+                Button(
+                    label = "Save",
+                    onClick = {
+                        onSaveTask(
+                            task.id,
+                            title,
+                            detail.ifBlank { null },
+                            parentId,
+                            startNotBefore.ifBlank { null },
+                            endNotAfter.ifBlank { null },
+                            estimatedDuration.ifBlank { null },
+                        )
+                    },
+                    enabled = !isPomodoroActive && title.isNotBlank(),
+                )
+            }
         }
         if (taskDetailActionLabels(task).any { it != "Delete task" }) {
             TextField(value = note, onValueChange = { note = it }, label = "Task note")
@@ -842,7 +901,7 @@ internal fun RoutineActionsSheet(
         SectionTitle(routine.templateTitle)
         TextField(value = title, onValueChange = { title = it }, label = "Routine title")
         TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule (RRULE)")
+        RecurrenceRuleEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
         AppText(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
         TextField(
             value = defaultStartNotBefore,
@@ -1061,7 +1120,9 @@ internal fun describeRecurrenceRule(rule: String): String {
 private fun recurrenceTimeLabel(hour: String?, minute: String?): String? {
     val parsedHour = hour?.toIntOrNull() ?: return null
     val parsedMinute = minute?.toIntOrNull() ?: return null
-    return "%02d:%02d".format(parsedHour, parsedMinute)
+    val hh = if (parsedHour < 10) "0$parsedHour" else "$parsedHour"
+    val mm = if (parsedMinute < 10) "0$parsedMinute" else "$parsedMinute"
+    return "$hh:$mm"
 }
 
 private fun weekdayLabel(code: String): String? = when (code) {

@@ -188,6 +188,12 @@ class AbunAppController(
         requestSync()
     }
 
+    fun skipTask(taskId: String, note: String? = null) {
+        store.skipTask(taskId, state.value.selectedDate, note)
+        refresh()
+        requestSync()
+    }
+
     fun deleteTask(taskId: String) {
         store.deleteTask(taskId, state.value.selectedDate)
         refresh()
@@ -244,6 +250,13 @@ class AbunAppController(
 
     fun deleteRoutine(routineId: String) {
         store.deleteRoutine(routineId)
+        refresh()
+        requestSync()
+    }
+
+    fun runRoutine(routineId: String) {
+        val today = timeProvider.today().toString()
+        store.runRoutine(routineId, today)
         refresh()
         requestSync()
     }
@@ -307,6 +320,7 @@ class AbunAppController(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        rolloverTime: String,
     ) {
         store.updatePreferences(
             titlePrefix = titlePrefix,
@@ -316,6 +330,7 @@ class AbunAppController(
             longBreakMinutes = longBreakMinutes,
             timezoneOverride = timezoneOverride,
             dateFormat = dateFormat,
+            rolloverTime = rolloverTime,
         )
         refresh()
         requestSync()
@@ -384,6 +399,7 @@ class AbunAppController(
     }
 
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
+        store.autoMarkMissedTasks()
         val preferences = store.preferences()
         val tasks = store.allTasks()
         val openTasks = store.openTasksForDate(_state.value.selectedDate)

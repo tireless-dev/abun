@@ -145,6 +145,7 @@ data class PreferencesViewState(
     val timezoneOverride: String = "SYSTEM",
     val dateFormat: DateFormatPreference = DateFormatPreference.ISO,
     val blankTitlePolicy: BlankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
+    val rolloverTime: String = "02:00",
 )
 
 data class TodayViewState(

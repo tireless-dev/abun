@@ -15,7 +15,7 @@ import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.sync.PreferenceValueType
-import kotlinx.datetime.LocalDate
+import kotlinx.datetime.*
 
 internal data class MutableSyncRow<T>(
     val entity: T,
@@ -31,6 +31,7 @@ private const val PREF_POMODORO_SHORT_BREAK_MINUTES = "pomodoro.short_break_minu
 private const val PREF_POMODORO_LONG_BREAK_MINUTES = "pomodoro.long_break_minutes"
 private const val PREF_APP_TIMEZONE_OVERRIDE = "app.timezone_override"
 private const val PREF_APP_DATE_FORMAT = "app.date_format"
+val PREF_APP_ROLLOVER_TIME = "app.rollover_time"
 
 class LocalStore(
     private val database: AbunDatabase,
@@ -112,6 +113,7 @@ class LocalStore(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        rolloverTime: String,
     ) {
         persistPreferences(
             PreferencesViewState(
@@ -123,6 +125,7 @@ class LocalStore(
                 timezoneOverride = timezoneOverride.ifBlank { "SYSTEM" },
                 dateFormat = dateFormat,
                 blankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
+                rolloverTime = rolloverTime,
             ),
         )
     }
@@ -330,6 +333,27 @@ class LocalStore(
         val normalizedStart = startNotBefore?.trim().orEmpty().ifBlank { null }
         val normalizedEnd = endNotAfter?.trim().orEmpty().ifBlank { null }
         val normalizedDuration = estimatedDuration?.trim().orEmpty().ifBlank { null }
+
+        if (existing.entity.routineId != null) {
+            val routine = queries.selectRoutineById(existing.entity.routineId, ::mapRoutineRow).executeAsOneOrNull()?.entity
+            if (routine != null) {
+                val structured = StructuredRecurrence.fromRRule(routine.recurrenceRule)
+                val baseTime = if (existing.entity.startNotBefore != null) {
+                    try { Instant.parse(existing.entity.startNotBefore).toLocalDateTime(TimeZone.currentSystemDefault()) }
+                    catch (e: Exception) { Instant.fromEpochMilliseconds(existing.entity.createdAt).toLocalDateTime(TimeZone.currentSystemDefault()) }
+                } else {
+                    Instant.fromEpochMilliseconds(existing.entity.createdAt).toLocalDateTime(TimeZone.currentSystemDefault())
+                }
+                val nextOccurrence = structured.nextOccurrence(baseTime)
+                val nextOccurrenceInstant = nextOccurrence.toInstant(TimeZone.currentSystemDefault())
+
+                if (normalizedStart != null) {
+                    val newStartInstant = Instant.parse(normalizedStart)
+                    if (newStartInstant >= nextOccurrenceInstant) return@transaction
+                }
+            }
+        }
+
         if (
             existing.entity.startNotBefore == normalizedStart &&
             existing.entity.endNotAfter == normalizedEnd &&
@@ -452,6 +476,10 @@ class LocalStore(
 
     fun cancelTask(taskId: String, journalDate: String, note: String? = null) {
         appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
+    }
+
+    fun skipTask(taskId: String, journalDate: String, note: String? = null) {
+        appendTaskEvent(taskId, journalDate, TaskEventType.SKIPPED, note)
     }
 
     fun deleteTask(taskId: String, journalDate: String) = database.transaction {
@@ -739,6 +767,36 @@ class LocalStore(
                 is_dirty = 1,
                 created_at = timeProvider.nowEpochMillis(),
             )
+        }
+    }
+
+    fun autoMarkMissedTasks() {
+        val prefs = preferences()
+        val now = timeProvider.nowEpochMillis()
+        val zoneId = if (prefs.timezoneOverride == "SYSTEM") TimeZone.currentSystemDefault().id else prefs.timezoneOverride
+        val tz = TimeZone.of(zoneId)
+
+        val allRoutineTasks = queries.selectTasks(::mapTaskRow).executeAsList()
+            .filter { it.entity.routineId != null }
+            .map { toTaskListItemView(it) }
+            .filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS }
+
+        for (task in allRoutineTasks) {
+            val events = queries.selectTaskEventsForTask(task.id, ::mapTaskEventRow).executeAsList()
+            val createdEvent = events.find { it.entity.eventType == TaskEventType.CREATED } ?: continue
+            val journalDate = createdEvent.entity.journalDate
+
+            val rolloverDate = LocalDate.parse(journalDate).plus(1, DateTimeUnit.DAY)
+            val rolloverParts = prefs.rolloverTime.split(":")
+            val hour = rolloverParts.getOrNull(0)?.toIntOrNull() ?: 0
+            val minute = rolloverParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+            val rolloverDateTime = LocalDateTime(rolloverDate.year, rolloverDate.month, rolloverDate.day, hour, minute)
+            val rolloverInstant = rolloverDateTime.toInstant(tz)
+
+            if (Instant.fromEpochMilliseconds(now) > rolloverInstant) {
+                appendTaskEvent(task.id, journalDate, TaskEventType.MISSED, null)
+            }
         }
     }
 
@@ -1047,6 +1105,7 @@ class LocalStore(
         persistPreferenceEntry(PREF_POMODORO_LONG_BREAK_MINUTES, preferences.longBreakMinutes.toString(), PreferenceValueType.INT)
         persistPreferenceEntry(PREF_APP_TIMEZONE_OVERRIDE, preferences.timezoneOverride, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_APP_DATE_FORMAT, preferences.dateFormat.name, PreferenceValueType.ENUM)
+        persistPreferenceEntry(PREF_APP_ROLLOVER_TIME, preferences.rolloverTime, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_TASK_BLANK_TITLE_POLICY, preferences.blankTitlePolicy.name, PreferenceValueType.ENUM)
     }
 
@@ -1494,6 +1553,7 @@ private fun List<MutableSyncRow<LocalPreference>>.toPreferencesViewState(): Pref
         timezoneOverride = byKey[PREF_APP_TIMEZONE_OVERRIDE]?.entity?.value ?: "SYSTEM",
         dateFormat = byKey[PREF_APP_DATE_FORMAT]?.entity?.value?.let(DateFormatPreference::valueOf) ?: DateFormatPreference.ISO,
         blankTitlePolicy = byKey[PREF_TASK_BLANK_TITLE_POLICY]?.entity?.value?.let(BlankTitlePolicy::valueOf) ?: BlankTitlePolicy.REJECT_BLANK,
+        rolloverTime = byKey[PREF_APP_ROLLOVER_TIME]?.entity?.value ?: "02:00",
     )
 }
 

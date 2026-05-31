@@ -537,6 +537,7 @@ class SharedLogicDesktopTest {
             longBreakMinutes = 18,
             timezoneOverride = "UTC",
             dateFormat = DateFormatPreference.MONTH_DAY,
+            rolloverTime = "04:00",
         )
 
         val preferences = store.preferences()
@@ -556,6 +557,7 @@ class SharedLogicDesktopTest {
                 "pomodoro.long_break_minutes",
                 "app.timezone_override",
                 "app.date_format",
+                "app.rollover_time",
                 "task.blank_title_policy",
             ),
             store.dirtyPreferences().map { it.key }.toSet(),

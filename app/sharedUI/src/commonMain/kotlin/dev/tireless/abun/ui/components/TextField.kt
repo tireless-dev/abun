@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
-fun TextField(value: String, onValueChange: (String) -> Unit, label: String) {
+fun TextField(value: String, onValueChange: (String) -> Unit, label: String, enabled: Boolean = true) {
     Column(modifier = Modifier.fillMaxWidth()) {
         AppText(label, style = ThemeTokens.type.label, modifier = Modifier.padding(bottom = ThemeTokens.spacing.xsDp))
         BasicTextField(
@@ -19,10 +19,14 @@ fun TextField(value: String, onValueChange: (String) -> Unit, label: String) {
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.mediumDp))
+                .background(
+                    if (enabled) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.background,
+                    RoundedCornerShape(ThemeTokens.radii.mediumDp)
+                )
                 .padding(horizontal = ThemeTokens.spacing.mdDp, vertical = ThemeTokens.spacing.mdDp),
-            textStyle = ThemeTokens.type.body,
+            textStyle = if (enabled) ThemeTokens.type.body else ThemeTokens.type.bodyMuted,
             singleLine = true,
+            enabled = enabled,
         )
     }
 }
