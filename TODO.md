@@ -110,8 +110,9 @@ Status legend:
   - existing occurrences remain reviewable and executable as defined
   Sub-work:
   - [x] Shared schema/sync/business API support for routine detail and defaults
-  - [ ] Routine create/detail editor for title, detail, recurrence, and default planning fields
-  - [ ] Routine activate/deactivate and delete lifecycle in the new detail flow
+  - [x] Routine create/detail editor for title, detail, recurrence, and default planning fields
+  - [x] Routine activate/deactivate and delete lifecycle in the new detail flow
+  - [ ] Human-readable recurrence rule editor/presentation
 
 - [ ] Routine occurrences: execution, bounded postpone, skip, and miss
   Goal:

@@ -209,6 +209,17 @@ fun App() {
             OverlaySheet.ROUTINE_ACTIONS -> RoutineActionsSheet(
                 routine = selectedRoutine,
                 onDismiss = { currentSheet = null },
+                onSave = { routineId, title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration ->
+                    controller.updateRoutine(
+                        routineId = routineId,
+                        templateTitle = title,
+                        templateDetail = detail,
+                        recurrenceRule = recurrenceRule,
+                        defaultStartNotBefore = defaultStartNotBefore,
+                        defaultEstimatedDuration = defaultEstimatedDuration,
+                    )
+                    currentSheet = null
+                },
                 onToggle = {
                     selectedRoutine?.let { controller.toggleRoutineActive(it.id) }
                     currentSheet = null
@@ -816,17 +827,54 @@ internal fun TaskActionsSheet(
 internal fun RoutineActionsSheet(
     routine: RoutineListItemView?,
     onDismiss: () -> Unit,
+    onSave: (String, String, String?, String, String?, String?) -> Unit,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
     if (routine == null) return
+    var title by remember(routine.id) { mutableStateOf(routine.templateTitle) }
+    var detail by remember(routine.id) { mutableStateOf(routine.templateDetail.orEmpty()) }
+    var recurrenceRule by remember(routine.id) { mutableStateOf(routine.recurrenceRule) }
+    var defaultStartNotBefore by remember(routine.id) { mutableStateOf(routine.defaultStartNotBefore.orEmpty()) }
+    var defaultEstimatedDuration by remember(routine.id) { mutableStateOf(routine.defaultEstimatedDuration.orEmpty()) }
     Sheet(onDismiss = onDismiss) {
         SectionTitle(routine.templateTitle)
-        routine.templateDetail?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
-        AppText(routine.recurrenceRule, style = ThemeTokens.type.bodyMuted)
-        routine.defaultStartNotBefore?.let { AppText("Default start: $it", style = ThemeTokens.type.label) }
-        routine.defaultEstimatedDuration?.let { AppText("Default duration: $it", style = ThemeTokens.type.label) }
+        TextField(value = title, onValueChange = { title = it }, label = "Routine title")
+        TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
+        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule")
+        TextField(
+            value = defaultStartNotBefore,
+            onValueChange = { defaultStartNotBefore = it },
+            label = "Default start not before",
+        )
+        TextField(
+            value = defaultEstimatedDuration,
+            onValueChange = { defaultEstimatedDuration = it },
+            label = "Default estimated duration",
+        )
         ActionRow {
+            Button(
+                label = "Save",
+                onClick = {
+                    val draft = normalizeRoutineSaveDraft(
+                        id = routine.id,
+                        title = title,
+                        detail = detail,
+                        recurrenceRule = recurrenceRule,
+                        defaultStartNotBefore = defaultStartNotBefore,
+                        defaultEstimatedDuration = defaultEstimatedDuration,
+                    )
+                    onSave(
+                        draft.id,
+                        draft.title,
+                        draft.detail,
+                        draft.recurrenceRule,
+                        draft.defaultStartNotBefore,
+                        draft.defaultEstimatedDuration,
+                    )
+                },
+                enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
+            )
             Button(label = if (routine.isActive) "Pause" else "Activate", onClick = onToggle)
             Button(label = "Delete", onClick = onDelete)
             Button(label = "Close", onClick = onDismiss)
@@ -958,6 +1006,31 @@ internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
     } else {
         listOf("Delete task")
     }
+
+internal data class RoutineSaveDraft(
+    val id: String,
+    val title: String,
+    val detail: String?,
+    val recurrenceRule: String,
+    val defaultStartNotBefore: String?,
+    val defaultEstimatedDuration: String?,
+)
+
+internal fun normalizeRoutineSaveDraft(
+    id: String,
+    title: String,
+    detail: String,
+    recurrenceRule: String,
+    defaultStartNotBefore: String,
+    defaultEstimatedDuration: String,
+): RoutineSaveDraft = RoutineSaveDraft(
+    id = id,
+    title = title,
+    detail = detail.ifBlank { null },
+    recurrenceRule = recurrenceRule,
+    defaultStartNotBefore = defaultStartNotBefore.ifBlank { null },
+    defaultEstimatedDuration = defaultEstimatedDuration.ifBlank { null },
+)
 
 private fun taskListFilterTitle(filter: TaskListFilter): String = when (filter) {
     TaskListFilter.ALL_ACTIVE -> "All active"
