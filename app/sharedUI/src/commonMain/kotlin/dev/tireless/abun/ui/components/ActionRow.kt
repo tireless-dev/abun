@@ -30,6 +30,6 @@ fun SectionDivider(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(ThemeTokens.colors.border),
+            .background(ThemeTokens.colors.surfaceElevated),
     )
 }

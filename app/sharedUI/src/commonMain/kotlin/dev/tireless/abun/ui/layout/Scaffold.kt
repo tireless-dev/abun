@@ -1,8 +1,6 @@
 package dev.tireless.abun.ui.layout
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -96,7 +94,6 @@ private fun BottomTabs(
                         if (selected) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surface,
                         RoundedCornerShape(ThemeTokens.radii.mediumDp),
                     )
-                    .border(BorderStroke(1.dp, ThemeTokens.colors.border), RoundedCornerShape(ThemeTokens.radii.mediumDp))
                     .clickable { onSelectTab(tab) }
                     .padding(vertical = ThemeTokens.spacing.smDp),
                 contentAlignment = Alignment.Center,

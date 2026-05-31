@@ -5,7 +5,7 @@ export interface ApiClientOptions {
   maxReadRetries?: number;
 }
 
-export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TaskStatus = 'UNKNOWN' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type TaskEventType = 'CREATED' | 'PROGRESSED' | 'COMPLETED' | 'CANCELLED' | 'ALARM_FIRED';
 export type PomodoroPhase = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 export type PomodoroSessionState = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -54,6 +54,8 @@ export interface TaskUpsertRequest {
   title: string;
   parent_id?: string | null;
   routine_id?: string | null;
+  journal_date?: string | null;
+  event_time?: string | null;
 }
 
 export interface TaskPatchRequest {
