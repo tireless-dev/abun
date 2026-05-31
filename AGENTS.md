@@ -1,22 +1,34 @@
 # AGENTS Guidance
 
-## Desktop App Workflow
+## Core Principles
 
-For app UI work, ignore the web app unless the user explicitly asks for it. Build, run, and test the Kotlin Multiplatform desktop app instead.
+- **Ignore Web App**: For all development work, ignore the web app (`app/webApp`) unless explicitly requested.
+- **Cross-Platform Alignment**: Ensure all changes align with the Kotlin Multiplatform (KMP) architecture and the server-side implementation.
+- **TDD (Test-Driven Development)**: Follow TDD for every step of development. Write failing tests before implementing logic.
+- **Target Support**: Ensure changes work for both Desktop and Android targets.
+- **No Integration Tests**: Automated integration tests are not required for AI agents (they will be executed manually by the user). Focus on unit and component tests.
 
-Use this command to run the desktop app:
+## Workflow & Verification
 
+Use the Kotlin Multiplatform desktop app for routine UI and logic verification.
+
+### Run Desktop App
 ```bash
 ./gradlew :app:desktopApp:run
 ```
 
-Use these commands to verify desktop/shared UI changes:
-
+### Verify Changes (Unit/UI Tests)
 ```bash
-./gradlew :app:desktopApp:test
+# Verify shared UI components
 ./gradlew :app:sharedUI:jvmTest
+
+# Verify desktop specific logic
+./gradlew :app:desktopApp:test
+
+# Verify core logic (common)
+./gradlew :core:commonTest
 ```
 
-Notes:
-- Do not start the Vite dev server or capture web screenshots for routine UI work.
-- Prefer the desktop app and shared Compose UI tests as the source of truth.
+## Notes
+- Do not start the Vite dev server or capture web screenshots.
+- Prefer the desktop app and shared Compose UI tests as the source of truth for UI validation.
