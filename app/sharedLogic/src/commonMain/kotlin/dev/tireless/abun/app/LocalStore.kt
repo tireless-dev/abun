@@ -66,8 +66,10 @@ class LocalStore(
         RoutineListItemView(
             id = it.entity.id,
             templateTitle = it.entity.templateTitle,
-            cronSchedule = it.entity.cronSchedule,
-            timezone = it.entity.timezone,
+            templateDetail = it.entity.templateDetail,
+            recurrenceRule = it.entity.recurrenceRule,
+            defaultStartNotBefore = it.entity.defaultStartNotBefore,
+            defaultEstimatedDuration = it.entity.defaultEstimatedDuration,
             isActive = it.entity.isActive,
         )
     }
@@ -480,15 +482,23 @@ class LocalStore(
         )
     }
 
-    fun createRoutine(templateTitle: String, cronSchedule: String, timezone: String): String = database.transactionWithResult {
+    fun createRoutine(
+        templateTitle: String,
+        templateDetail: String?,
+        recurrenceRule: String,
+        defaultStartNotBefore: String?,
+        defaultEstimatedDuration: String?,
+    ): String = database.transactionWithResult {
         val now = timeProvider.nowEpochMillis()
         val routineId = idGenerator.randomId()
         persistRoutine(
             routine = LocalRoutine(
                 id = routineId,
                 templateTitle = templateTitle.trim(),
-                cronSchedule = cronSchedule.trim(),
-                timezone = timezone.ifBlank { "SYSTEM" },
+                templateDetail = templateDetail?.trim()?.takeIf(String::isNotEmpty),
+                recurrenceRule = recurrenceRule.trim(),
+                defaultStartNotBefore = defaultStartNotBefore?.trim()?.takeIf(String::isNotEmpty),
+                defaultEstimatedDuration = defaultEstimatedDuration?.trim()?.takeIf(String::isNotEmpty),
                 isActive = true,
                 isDeleted = false,
                 serverVersion = 0,
@@ -496,30 +506,60 @@ class LocalStore(
                 updatedAt = now,
             ),
             hlcMap = mapOf(
-                "template" to clock.next(),
-                "schedule" to clock.next(),
+                "template_title" to clock.next(),
+                "template_detail" to clock.next(),
+                "recurrence_rule" to clock.next(),
+                "default_start_not_before" to clock.next(),
+                "default_estimated_duration" to clock.next(),
                 "active" to clock.next(),
             ),
-            dirtyFields = listOf("template", "schedule", "active"),
+            dirtyFields = listOf(
+                "template_title",
+                "template_detail",
+                "recurrence_rule",
+                "default_start_not_before",
+                "default_estimated_duration",
+                "active",
+            ),
             isDirty = true,
         )
         routineId
     }
 
-    fun updateRoutine(routineId: String, templateTitle: String, cronSchedule: String, timezone: String) = database.transaction {
+    fun updateRoutine(
+        routineId: String,
+        templateTitle: String,
+        templateDetail: String?,
+        recurrenceRule: String,
+        defaultStartNotBefore: String?,
+        defaultEstimatedDuration: String?,
+    ) = database.transaction {
         val existing = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull() ?: return@transaction
         persistRoutine(
             routine = existing.entity.copy(
                 templateTitle = templateTitle.trim(),
-                cronSchedule = cronSchedule.trim(),
-                timezone = timezone.ifBlank { "SYSTEM" },
+                templateDetail = templateDetail?.trim()?.takeIf(String::isNotEmpty),
+                recurrenceRule = recurrenceRule.trim(),
+                defaultStartNotBefore = defaultStartNotBefore?.trim()?.takeIf(String::isNotEmpty),
+                defaultEstimatedDuration = defaultEstimatedDuration?.trim()?.takeIf(String::isNotEmpty),
                 updatedAt = timeProvider.nowEpochMillis(),
             ),
             hlcMap = existing.hlcMap + mapOf(
-                "template" to clock.next(existing.hlcMap["template"]),
-                "schedule" to clock.next(existing.hlcMap["schedule"]),
+                "template_title" to clock.next(existing.hlcMap["template_title"]),
+                "template_detail" to clock.next(existing.hlcMap["template_detail"]),
+                "recurrence_rule" to clock.next(existing.hlcMap["recurrence_rule"]),
+                "default_start_not_before" to clock.next(existing.hlcMap["default_start_not_before"]),
+                "default_estimated_duration" to clock.next(existing.hlcMap["default_estimated_duration"]),
             ),
-            dirtyFields = (existing.dirtyFields + listOf("template", "schedule")).distinct(),
+            dirtyFields = (
+                existing.dirtyFields + listOf(
+                    "template_title",
+                    "template_detail",
+                    "recurrence_rule",
+                    "default_start_not_before",
+                    "default_estimated_duration",
+                )
+            ).distinct(),
             isDirty = true,
         )
     }
@@ -617,25 +657,36 @@ class LocalStore(
         val taskId = idGenerator.deterministicId("routine-task", "$routineId:$journalDate")
         if (queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull() == null) {
             val now = timeProvider.nowEpochMillis()
-            val title = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull()?.entity?.templateTitle
-                ?: "Routine Task"
+            val routine = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull()?.entity
+            val title = routine?.templateTitle ?: "Routine Task"
             queries.upsertTask(
                 id = taskId,
                 parent_id = null,
                 routine_id = routineId,
                 title = title,
-                detail = null,
-                start_not_before = null,
+                detail = routine?.templateDetail,
+                start_not_before = routine?.defaultStartNotBefore,
                 end_not_after = null,
-                estimated_duration = null,
+                estimated_duration = routine?.defaultEstimatedDuration,
                 is_deleted = 0,
                 hlc_map = JsonCodecs.encodeMap(
                     mapOf(
                         "title" to clock.next(),
+                        "detail" to clock.next(),
+                        "start_not_before" to clock.next(),
+                        "estimated_duration" to clock.next(),
                         "routine" to clock.next(),
                     ),
                 ),
-                dirty_fields = JsonCodecs.encodeList(listOf("title", "routine")),
+                dirty_fields = JsonCodecs.encodeList(
+                    buildList {
+                        add("title")
+                        if (routine?.templateDetail != null) add("detail")
+                        if (routine?.defaultStartNotBefore != null) add("start_not_before")
+                        if (routine?.defaultEstimatedDuration != null) add("estimated_duration")
+                        add("routine")
+                    },
+                ),
                 is_dirty = 1,
                 server_version = 0,
                 created_at = now,
@@ -844,8 +895,11 @@ class LocalStore(
             val existingHlc = existing.hlcMap[field]
             if (!SyncConflictResolver.shouldAcceptIncoming(incomingHlc, existingHlc)) continue
             when (field) {
-                "template" -> merged = merged.copy(templateTitle = remote.templateTitle)
-                "schedule" -> merged = merged.copy(cronSchedule = remote.cronSchedule, timezone = remote.timezone)
+                "template_title" -> merged = merged.copy(templateTitle = remote.templateTitle)
+                "template_detail" -> merged = merged.copy(templateDetail = remote.templateDetail)
+                "recurrence_rule" -> merged = merged.copy(recurrenceRule = remote.recurrenceRule)
+                "default_start_not_before" -> merged = merged.copy(defaultStartNotBefore = remote.defaultStartNotBefore)
+                "default_estimated_duration" -> merged = merged.copy(defaultEstimatedDuration = remote.defaultEstimatedDuration)
                 "active" -> merged = merged.copy(isActive = remote.isActive)
                 "delete" -> merged = merged.copy(isDeleted = remote.isDeleted)
             }
@@ -941,7 +995,22 @@ class LocalStore(
     }
 
     private fun persistRoutine(routine: LocalRoutine, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean) {
-        queries.upsertRoutine(routine.id, routine.templateTitle, routine.cronSchedule, routine.timezone, routine.isActive.toLong(), routine.isDeleted.toLong(), JsonCodecs.encodeMap(hlcMap), JsonCodecs.encodeList(dirtyFields), isDirty.toLong(), routine.serverVersion, routine.createdAt, routine.updatedAt)
+        queries.upsertRoutine(
+            routine.id,
+            routine.templateTitle,
+            routine.templateDetail,
+            routine.recurrenceRule,
+            routine.defaultStartNotBefore,
+            routine.defaultEstimatedDuration,
+            routine.isActive.toLong(),
+            routine.isDeleted.toLong(),
+            JsonCodecs.encodeMap(hlcMap),
+            JsonCodecs.encodeList(dirtyFields),
+            isDirty.toLong(),
+            routine.serverVersion,
+            routine.createdAt,
+            routine.updatedAt,
+        )
     }
 
     private fun persistAlarm(alarm: LocalAlarm, hlcMap: Map<String, String>, dirtyFields: List<String>, isDirty: Boolean, createdAt: Long = alarm.createdAt, updatedAt: Long = alarm.updatedAt) {
@@ -1154,8 +1223,10 @@ internal data class LocalTask(
 internal data class LocalRoutine(
     val id: String,
     val templateTitle: String,
-    val cronSchedule: String,
-    val timezone: String,
+    val templateDetail: String?,
+    val recurrenceRule: String,
+    val defaultStartNotBefore: String?,
+    val defaultEstimatedDuration: String?,
     val isActive: Boolean,
     val isDeleted: Boolean,
     val serverVersion: Long,
@@ -1262,8 +1333,10 @@ private fun mapTaskRow(
 private fun mapRoutineRow(
     id: String,
     template_title: String,
-    cron_schedule: String,
-    timezone: String,
+    template_detail: String?,
+    recurrence_rule: String,
+    default_start_not_before: String?,
+    default_estimated_duration: String?,
     is_active: Long,
     is_deleted: Long,
     hlc_map: String,
@@ -1272,7 +1345,23 @@ private fun mapRoutineRow(
     server_version: Long,
     created_at: Long,
     updated_at: Long,
-): MutableSyncRow<LocalRoutine> = MutableSyncRow(LocalRoutine(id, template_title, cron_schedule, timezone, is_active != 0L, is_deleted != 0L, server_version, created_at, updated_at), JsonCodecs.decodeMap(hlc_map), if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList())
+): MutableSyncRow<LocalRoutine> = MutableSyncRow(
+    LocalRoutine(
+        id = id,
+        templateTitle = template_title,
+        templateDetail = template_detail,
+        recurrenceRule = recurrence_rule,
+        defaultStartNotBefore = default_start_not_before,
+        defaultEstimatedDuration = default_estimated_duration,
+        isActive = is_active != 0L,
+        isDeleted = is_deleted != 0L,
+        serverVersion = server_version,
+        createdAt = created_at,
+        updatedAt = updated_at,
+    ),
+    JsonCodecs.decodeMap(hlc_map),
+    if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
+)
 
 private fun mapAlarmRow(
     id: String,
@@ -1437,7 +1526,20 @@ private fun MutableSyncRow<LocalTask>.toSyncTask(): SyncTask = SyncTask(
     createdAt = epochMillisToIsoString(entity.createdAt),
 )
 
-private fun MutableSyncRow<LocalRoutine>.toSyncRoutine(): SyncRoutine = SyncRoutine(entity.id, entity.templateTitle, entity.cronSchedule, entity.timezone, entity.isActive, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
+private fun MutableSyncRow<LocalRoutine>.toSyncRoutine(): SyncRoutine = SyncRoutine(
+    id = entity.id,
+    templateTitle = entity.templateTitle,
+    templateDetail = entity.templateDetail,
+    recurrenceRule = entity.recurrenceRule,
+    defaultStartNotBefore = entity.defaultStartNotBefore,
+    defaultEstimatedDuration = entity.defaultEstimatedDuration,
+    isActive = entity.isActive,
+    isDeleted = entity.isDeleted,
+    hlcMap = hlcMap,
+    dirtyFields = dirtyFields,
+    serverVersion = entity.serverVersion,
+    createdAt = epochMillisToIsoString(entity.createdAt),
+)
 
 private fun MutableSyncRow<LocalAlarm>.toSyncAlarm(): SyncAlarm = SyncAlarm(entity.id, entity.taskId, epochMillisToIsoString(entity.triggerTime), entity.isActive, entity.isDeleted, hlcMap, dirtyFields, serverVersion = entity.serverVersion, createdAt = epochMillisToIsoString(entity.createdAt))
 
@@ -1542,7 +1644,19 @@ private fun SyncTask.toLocalTask(): LocalTask = LocalTask(
     updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
 )
 
-private fun SyncRoutine.toLocalRoutine(): LocalRoutine = LocalRoutine(id, templateTitle, cronSchedule, timezone, isActive, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
+private fun SyncRoutine.toLocalRoutine(): LocalRoutine = LocalRoutine(
+    id = id,
+    templateTitle = templateTitle,
+    templateDetail = templateDetail,
+    recurrenceRule = recurrenceRule,
+    defaultStartNotBefore = defaultStartNotBefore,
+    defaultEstimatedDuration = defaultEstimatedDuration,
+    isActive = isActive,
+    isDeleted = isDeleted,
+    serverVersion = serverVersion,
+    createdAt = createdAt?.let(::isoStringToEpochMillis) ?: 0L,
+    updatedAt = serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L,
+)
 
 private fun SyncAlarm.toLocalAlarm(): LocalAlarm = LocalAlarm(id, taskId, isoStringToEpochMillis(triggerTime), isActive, isDeleted, serverVersion, createdAt?.let(::isoStringToEpochMillis) ?: 0L, serverUpdatedAt?.let(::isoStringToEpochMillis) ?: 0L)
 

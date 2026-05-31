@@ -150,7 +150,7 @@ class AppScreenScreenshotTest {
 
     @Test
     fun createRoutineSheet() = captureScreenshot("sheets/create_routine") {
-        CreateRoutineSheet(onDismiss = {}, onCreate = { _: String, _: String, _: String -> })
+        CreateRoutineSheet(onDismiss = {}, onCreate = { _: String, _: String?, _: String, _: String?, _: String? -> })
     }
 
     @Test

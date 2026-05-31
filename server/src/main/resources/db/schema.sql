@@ -26,8 +26,11 @@ CREATE TABLE IF NOT EXISTS routine (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     template_title TEXT NOT NULL,
-    cron_schedule TEXT NOT NULL,
-    timezone TEXT NOT NULL,
+    cron_schedule TEXT,
+    template_detail TEXT,
+    recurrence_rule TEXT,
+    default_start_not_before VARCHAR(255),
+    default_estimated_duration VARCHAR(255),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     hlc_map TEXT NOT NULL,
@@ -35,6 +38,12 @@ CREATE TABLE IF NOT EXISTS routine (
     server_updated_at VARCHAR(255) NOT NULL,
     created_at VARCHAR(255) NOT NULL
 );
+
+ALTER TABLE routine ADD COLUMN IF NOT EXISTS template_detail TEXT;
+ALTER TABLE routine ADD COLUMN IF NOT EXISTS recurrence_rule TEXT;
+ALTER TABLE routine ADD COLUMN IF NOT EXISTS default_start_not_before VARCHAR(255);
+ALTER TABLE routine ADD COLUMN IF NOT EXISTS default_estimated_duration VARCHAR(255);
+UPDATE routine SET recurrence_rule = COALESCE(recurrence_rule, cron_schedule) WHERE recurrence_rule IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_routine_user_server_version ON routine(user_id, server_version);
 

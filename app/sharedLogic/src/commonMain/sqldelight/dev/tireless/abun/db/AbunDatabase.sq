@@ -1,8 +1,10 @@
 CREATE TABLE routine (
     id TEXT NOT NULL PRIMARY KEY,
     template_title TEXT NOT NULL,
-    cron_schedule TEXT NOT NULL,
-    timezone TEXT NOT NULL,
+    template_detail TEXT,
+    recurrence_rule TEXT NOT NULL,
+    default_start_not_before TEXT,
+    default_estimated_duration TEXT,
     is_active INTEGER NOT NULL DEFAULT 1,
     is_deleted INTEGER NOT NULL DEFAULT 0,
     hlc_map TEXT NOT NULL DEFAULT '{}',
@@ -140,8 +142,8 @@ SELECT * FROM routine WHERE is_dirty = 1 ORDER BY updated_at ASC, created_at ASC
 
 upsertRoutine:
 INSERT OR REPLACE INTO routine(
-    id, template_title, cron_schedule, timezone, is_active, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, template_title, template_detail, recurrence_rule, default_start_not_before, default_estimated_duration, is_active, is_deleted, hlc_map, dirty_fields, is_dirty, server_version, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectAlarmById:
 SELECT * FROM alarm WHERE id = ?;

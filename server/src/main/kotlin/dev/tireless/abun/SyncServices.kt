@@ -536,22 +536,24 @@ internal class RoutineSyncService(
         connection.prepareStatement(
             """
             INSERT INTO routine(
-                id, user_id, template_title, cron_schedule, timezone, is_active, is_deleted, hlc_map,
-                server_version, server_updated_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, user_id, template_title, template_detail, recurrence_rule, default_start_not_before,
+                default_estimated_duration, is_active, is_deleted, hlc_map, server_version, server_updated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
         ).use { statement ->
             statement.setString(1, canonical.id)
             statement.setString(2, userId)
             statement.setString(3, canonical.templateTitle)
-            statement.setString(4, canonical.cronSchedule)
-            statement.setString(5, canonical.timezone)
-            statement.setBoolean(6, canonical.isActive)
-            statement.setBoolean(7, canonical.isDeleted)
-            statement.setString(8, encodeMap(canonical.hlcMap))
-            statement.setLong(9, canonical.serverVersion)
-            statement.setString(10, canonical.serverUpdatedAt)
-            statement.setString(11, canonical.createdAt)
+            statement.setString(4, canonical.templateDetail)
+            statement.setString(5, canonical.recurrenceRule)
+            statement.setString(6, canonical.defaultStartNotBefore)
+            statement.setString(7, canonical.defaultEstimatedDuration)
+            statement.setBoolean(8, canonical.isActive)
+            statement.setBoolean(9, canonical.isDeleted)
+            statement.setString(10, encodeMap(canonical.hlcMap))
+            statement.setLong(11, canonical.serverVersion)
+            statement.setString(12, canonical.serverUpdatedAt)
+            statement.setString(13, canonical.createdAt)
             statement.executeUpdate()
         }
         return canonical
@@ -569,12 +571,24 @@ internal class RoutineSyncService(
                 continue
             }
             when (field) {
-                "template" -> {
+                "template_title" -> {
                     merged = merged.copy(templateTitle = incoming.templateTitle, hlcMap = merged.hlcMap + (field to incomingHlc!!))
                     accepted += field
                 }
-                "schedule" -> {
-                    merged = merged.copy(cronSchedule = incoming.cronSchedule, timezone = incoming.timezone, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                "template_detail" -> {
+                    merged = merged.copy(templateDetail = incoming.templateDetail, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "recurrence_rule" -> {
+                    merged = merged.copy(recurrenceRule = incoming.recurrenceRule, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "default_start_not_before" -> {
+                    merged = merged.copy(defaultStartNotBefore = incoming.defaultStartNotBefore, hlcMap = merged.hlcMap + (field to incomingHlc!!))
+                    accepted += field
+                }
+                "default_estimated_duration" -> {
+                    merged = merged.copy(defaultEstimatedDuration = incoming.defaultEstimatedDuration, hlcMap = merged.hlcMap + (field to incomingHlc!!))
                     accepted += field
                 }
                 "active" -> {
@@ -606,23 +620,34 @@ internal class RoutineSyncService(
 
     fun createFromBusinessApi(userId: String, request: RoutineUpsertRequest): SyncRoutine {
         val id = request.id ?: UUID.randomUUID().toString()
-        val templateHlc = serverClock.next()
-        val scheduleHlc = serverClock.next(templateHlc)
+        val titleHlc = serverClock.next()
         return push(
             userId,
             listOf(
                 SyncRoutine(
                     id = id,
                     templateTitle = request.templateTitle,
-                    cronSchedule = request.cronSchedule,
-                    timezone = request.timezone,
+                    templateDetail = request.templateDetail,
+                    recurrenceRule = request.recurrenceRule,
+                    defaultStartNotBefore = request.defaultStartNotBefore,
+                    defaultEstimatedDuration = request.defaultEstimatedDuration,
                     isActive = request.isActive,
                     hlcMap = mapOf(
-                        "template" to templateHlc,
-                        "schedule" to scheduleHlc,
-                        "active" to serverClock.next(scheduleHlc),
+                        "template_title" to titleHlc,
+                        "template_detail" to serverClock.next(titleHlc),
+                        "recurrence_rule" to serverClock.next(),
+                        "default_start_not_before" to serverClock.next(),
+                        "default_estimated_duration" to serverClock.next(),
+                        "active" to serverClock.next(),
                     ),
-                    dirtyFields = listOf("template", "schedule", "active"),
+                    dirtyFields = listOf(
+                        "template_title",
+                        "template_detail",
+                        "recurrence_rule",
+                        "default_start_not_before",
+                        "default_estimated_duration",
+                        "active",
+                    ),
                 ),
             ),
         ).single()
@@ -633,22 +658,42 @@ internal class RoutineSyncService(
         val dirty = mutableListOf<String>()
         val hlc = existing.hlcMap.toMutableMap()
         var templateTitle = existing.templateTitle
-        var cronSchedule = existing.cronSchedule
-        var timezone = existing.timezone
+        var templateDetail = existing.templateDetail
+        var recurrenceRule = existing.recurrenceRule
+        var defaultStartNotBefore = existing.defaultStartNotBefore
+        var defaultEstimatedDuration = existing.defaultEstimatedDuration
         var isActive = existing.isActive
         request.templateTitle?.let {
             templateTitle = it
-            hlc["template"] = serverClock.next(hlc["template"])
-            dirty += "template"
+            hlc["template_title"] = serverClock.next(hlc["template_title"])
+            dirty += "template_title"
         }
-        if (request.cronSchedule != null || request.timezone != null) {
-            val nextCron = request.cronSchedule ?: cronSchedule
-            val nextTimezone = request.timezone ?: timezone
-            if (nextCron != cronSchedule || nextTimezone != timezone) {
-                cronSchedule = nextCron
-                timezone = nextTimezone
-                hlc["schedule"] = serverClock.next(hlc["schedule"])
-                dirty += "schedule"
+        request.templateDetail?.let {
+            if (it != templateDetail) {
+                templateDetail = it
+                hlc["template_detail"] = serverClock.next(hlc["template_detail"])
+                dirty += "template_detail"
+            }
+        }
+        request.recurrenceRule?.let {
+            if (it != recurrenceRule) {
+                recurrenceRule = it
+                hlc["recurrence_rule"] = serverClock.next(hlc["recurrence_rule"])
+                dirty += "recurrence_rule"
+            }
+        }
+        request.defaultStartNotBefore?.let {
+            if (it != defaultStartNotBefore) {
+                defaultStartNotBefore = it
+                hlc["default_start_not_before"] = serverClock.next(hlc["default_start_not_before"])
+                dirty += "default_start_not_before"
+            }
+        }
+        request.defaultEstimatedDuration?.let {
+            if (it != defaultEstimatedDuration) {
+                defaultEstimatedDuration = it
+                hlc["default_estimated_duration"] = serverClock.next(hlc["default_estimated_duration"])
+                dirty += "default_estimated_duration"
             }
         }
         request.isActive?.let {
@@ -665,8 +710,10 @@ internal class RoutineSyncService(
             existing = existing,
             incoming = existing.copy(
                 templateTitle = templateTitle,
-                cronSchedule = cronSchedule,
-                timezone = timezone,
+                templateDetail = templateDetail,
+                recurrenceRule = recurrenceRule,
+                defaultStartNotBefore = defaultStartNotBefore,
+                defaultEstimatedDuration = defaultEstimatedDuration,
                 isActive = isActive,
                 hlcMap = hlc,
                 dirtyFields = dirty,
@@ -691,21 +738,24 @@ internal class RoutineSyncService(
     private fun updateRoutine(connection: Connection, userId: String, routine: SyncRoutine) {
         connection.prepareStatement(
             """
-            UPDATE routine SET template_title = ?, cron_schedule = ?, timezone = ?, is_active = ?, is_deleted = ?,
+            UPDATE routine SET template_title = ?, template_detail = ?, recurrence_rule = ?, default_start_not_before = ?,
+                default_estimated_duration = ?, is_active = ?, is_deleted = ?,
                 hlc_map = ?, server_version = ?, server_updated_at = ?
             WHERE user_id = ? AND id = ?
             """.trimIndent(),
         ).use { statement ->
             statement.setString(1, routine.templateTitle)
-            statement.setString(2, routine.cronSchedule)
-            statement.setString(3, routine.timezone)
-            statement.setBoolean(4, routine.isActive)
-            statement.setBoolean(5, routine.isDeleted)
-            statement.setString(6, encodeMap(routine.hlcMap))
-            statement.setLong(7, routine.serverVersion)
-            statement.setString(8, routine.serverUpdatedAt)
-            statement.setString(9, userId)
-            statement.setString(10, routine.id)
+            statement.setString(2, routine.templateDetail)
+            statement.setString(3, routine.recurrenceRule)
+            statement.setString(4, routine.defaultStartNotBefore)
+            statement.setString(5, routine.defaultEstimatedDuration)
+            statement.setBoolean(6, routine.isActive)
+            statement.setBoolean(7, routine.isDeleted)
+            statement.setString(8, encodeMap(routine.hlcMap))
+            statement.setLong(9, routine.serverVersion)
+            statement.setString(10, routine.serverUpdatedAt)
+            statement.setString(11, userId)
+            statement.setString(12, routine.id)
             statement.executeUpdate()
         }
     }
@@ -1685,8 +1735,10 @@ data class JournalEntry(
 private fun ResultSet.toSyncRoutine(): SyncRoutine = SyncRoutine(
     id = getString("id"),
     templateTitle = getString("template_title"),
-    cronSchedule = getString("cron_schedule"),
-    timezone = getString("timezone"),
+    templateDetail = getString("template_detail"),
+    recurrenceRule = getString("recurrence_rule") ?: getString("cron_schedule"),
+    defaultStartNotBefore = getString("default_start_not_before"),
+    defaultEstimatedDuration = getString("default_estimated_duration"),
     isActive = getBoolean("is_active"),
     isDeleted = getBoolean("is_deleted"),
     hlcMap = decodeMap(getString("hlc_map")),

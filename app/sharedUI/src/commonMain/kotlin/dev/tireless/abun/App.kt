@@ -167,8 +167,8 @@ fun App() {
             )
             OverlaySheet.CREATE_ROUTINE -> CreateRoutineSheet(
                 onDismiss = { currentSheet = null },
-                onCreate = { title, cron, timezone ->
-                    controller.createRoutine(title, cron, timezone)
+                onCreate = { title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration ->
+                    controller.createRoutine(title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration)
                     currentSheet = null
                 },
             )
@@ -643,7 +643,10 @@ private fun RoutineRow(routine: RoutineListItemView, onOpen: (RoutineListItemVie
         verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
     ) {
         AppText(routine.templateTitle, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
-        AppText("${routine.cronSchedule} • ${routine.timezone}", style = ThemeTokens.type.bodyMuted)
+        routine.templateDetail?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
+        AppText(routine.recurrenceRule, style = ThemeTokens.type.bodyMuted)
+        routine.defaultStartNotBefore?.let { AppText("Default start: $it", style = ThemeTokens.type.label) }
+        routine.defaultEstimatedDuration?.let { AppText("Default duration: $it", style = ThemeTokens.type.label) }
         AppText(if (routine.isActive) "Active" else "Paused", style = ThemeTokens.type.label)
         Button(label = "Manage", onClick = { onOpen(routine) })
     }
@@ -679,18 +682,37 @@ internal fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
 }
 
 @Composable
-internal fun CreateRoutineSheet(onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit) {
+internal fun CreateRoutineSheet(
+    onDismiss: () -> Unit,
+    onCreate: (String, String?, String, String?, String?) -> Unit,
+) {
     var title by remember { mutableStateOf("") }
-    var cron by remember { mutableStateOf("0 9 * * *") }
-    var timezone by remember { mutableStateOf("UTC") }
+    var detail by remember { mutableStateOf("") }
+    var recurrenceRule by remember { mutableStateOf("RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0") }
+    var defaultStartNotBefore by remember { mutableStateOf("") }
+    var defaultEstimatedDuration by remember { mutableStateOf("") }
     Sheet(onDismiss = onDismiss) {
         SectionTitle("Create routine")
         TextField(value = title, onValueChange = { title = it }, label = "Routine title")
-        TextField(value = cron, onValueChange = { cron = it }, label = "Cron schedule")
-        TextField(value = timezone, onValueChange = { timezone = it }, label = "Timezone")
+        TextField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
+        TextField(value = recurrenceRule, onValueChange = { recurrenceRule = it }, label = "Recurrence rule")
+        TextField(value = defaultStartNotBefore, onValueChange = { defaultStartNotBefore = it }, label = "Default start not before")
+        TextField(value = defaultEstimatedDuration, onValueChange = { defaultEstimatedDuration = it }, label = "Default estimated duration")
         ActionRow {
             Button(label = "Cancel", onClick = onDismiss)
-            Button(label = "Create", onClick = { onCreate(title, cron, timezone) }, enabled = title.isNotBlank() && cron.isNotBlank())
+            Button(
+                label = "Create",
+                onClick = {
+                    onCreate(
+                        title,
+                        detail.ifBlank { null },
+                        recurrenceRule,
+                        defaultStartNotBefore.ifBlank { null },
+                        defaultEstimatedDuration.ifBlank { null },
+                    )
+                },
+                enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
+            )
         }
     }
 }
@@ -800,7 +822,10 @@ internal fun RoutineActionsSheet(
     if (routine == null) return
     Sheet(onDismiss = onDismiss) {
         SectionTitle(routine.templateTitle)
-        AppText("${routine.cronSchedule} • ${routine.timezone}", style = ThemeTokens.type.bodyMuted)
+        routine.templateDetail?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
+        AppText(routine.recurrenceRule, style = ThemeTokens.type.bodyMuted)
+        routine.defaultStartNotBefore?.let { AppText("Default start: $it", style = ThemeTokens.type.label) }
+        routine.defaultEstimatedDuration?.let { AppText("Default duration: $it", style = ThemeTokens.type.label) }
         ActionRow {
             Button(label = if (routine.isActive) "Pause" else "Activate", onClick = onToggle)
             Button(label = "Delete", onClick = onDelete)

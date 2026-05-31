@@ -135,12 +135,18 @@ class ApplicationTest {
                 RoutineUpsertRequest(
                     id = "routine-1",
                     templateTitle = "Morning plan",
-                    cronSchedule = "0 9 * * *",
-                    timezone = "UTC",
+                    templateDetail = "Review backlog and choose the day target",
+                    recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+                    defaultStartNotBefore = "2026-05-25T09:00:00Z",
+                    defaultEstimatedDuration = "PT30M",
                 ),
             )
         }.body<RoutineResponse>()
         assertEquals("routine-1", routine.id)
+        assertEquals("Review backlog and choose the day target", routine.templateDetail)
+        assertEquals("RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0", routine.recurrenceRule)
+        assertEquals("2026-05-25T09:00:00Z", routine.defaultStartNotBefore)
+        assertEquals("PT30M", routine.defaultEstimatedDuration)
 
         val task = jsonClient.post("/api/tasks") {
             auth("user-1")
@@ -196,9 +202,21 @@ class ApplicationTest {
         val patchedRoutine = jsonClient.patch("/api/routines/routine-1") {
             auth("user-1")
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(RoutinePatchRequest(isActive = false))
+            setBody(
+                RoutinePatchRequest(
+                    templateDetail = "Start with the most important project",
+                    recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=10;BYMINUTE=30",
+                    defaultStartNotBefore = "2026-05-25T10:30:00Z",
+                    defaultEstimatedDuration = "PT45M",
+                    isActive = false,
+                ),
+            )
         }.body<RoutineResponse>()
         assertEquals(false, patchedRoutine.isActive)
+        assertEquals("Start with the most important project", patchedRoutine.templateDetail)
+        assertEquals("RRULE:FREQ=DAILY;BYHOUR=10;BYMINUTE=30", patchedRoutine.recurrenceRule)
+        assertEquals("2026-05-25T10:30:00Z", patchedRoutine.defaultStartNotBefore)
+        assertEquals("PT45M", patchedRoutine.defaultEstimatedDuration)
 
         val patchedTask = jsonClient.patch("/api/tasks/task-1") {
             auth("user-1")

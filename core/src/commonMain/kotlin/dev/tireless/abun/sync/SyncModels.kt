@@ -39,8 +39,10 @@ data class SyncTask(
 data class SyncRoutine(
     val id: String,
     @SerialName("template_title") val templateTitle: String,
-    @SerialName("cron_schedule") val cronSchedule: String,
-    val timezone: String,
+    @SerialName("template_detail") val templateDetail: String? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String,
+    @SerialName("default_start_not_before") val defaultStartNotBefore: String? = null,
+    @SerialName("default_estimated_duration") val defaultEstimatedDuration: String? = null,
     @SerialName("is_active") val isActive: Boolean = true,
     @SerialName("is_deleted") val isDeleted: Boolean = false,
     @SerialName("hlc_map") val hlcMap: Map<String, String> = emptyMap(),

@@ -196,16 +196,42 @@ class AbunAppController(
 
     fun taskHistory(taskId: String): List<JournalEntryView> = store.taskHistory(taskId, state.value.preferences)
 
-    fun createRoutine(templateTitle: String, cronSchedule: String, timezone: String) {
-        if (templateTitle.isBlank() || cronSchedule.isBlank()) return
-        store.createRoutine(templateTitle, cronSchedule, timezone)
+    fun createRoutine(
+        templateTitle: String,
+        templateDetail: String?,
+        recurrenceRule: String,
+        defaultStartNotBefore: String?,
+        defaultEstimatedDuration: String?,
+    ) {
+        if (templateTitle.isBlank() || recurrenceRule.isBlank()) return
+        store.createRoutine(
+            templateTitle = templateTitle,
+            templateDetail = templateDetail,
+            recurrenceRule = recurrenceRule,
+            defaultStartNotBefore = defaultStartNotBefore,
+            defaultEstimatedDuration = defaultEstimatedDuration,
+        )
         refresh()
         requestSync()
     }
 
-    fun updateRoutine(routineId: String, templateTitle: String, cronSchedule: String, timezone: String) {
-        if (templateTitle.isBlank() || cronSchedule.isBlank()) return
-        store.updateRoutine(routineId, templateTitle, cronSchedule, timezone)
+    fun updateRoutine(
+        routineId: String,
+        templateTitle: String,
+        templateDetail: String?,
+        recurrenceRule: String,
+        defaultStartNotBefore: String?,
+        defaultEstimatedDuration: String?,
+    ) {
+        if (templateTitle.isBlank() || recurrenceRule.isBlank()) return
+        store.updateRoutine(
+            routineId = routineId,
+            templateTitle = templateTitle,
+            templateDetail = templateDetail,
+            recurrenceRule = recurrenceRule,
+            defaultStartNotBefore = defaultStartNotBefore,
+            defaultEstimatedDuration = defaultEstimatedDuration,
+        )
         refresh()
         requestSync()
     }

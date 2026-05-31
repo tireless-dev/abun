@@ -24,16 +24,20 @@ data class PreferencePutRequest(
 data class RoutineUpsertRequest(
     val id: String? = null,
     @SerialName("template_title") val templateTitle: String,
-    @SerialName("cron_schedule") val cronSchedule: String,
-    val timezone: String,
+    @SerialName("template_detail") val templateDetail: String? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String,
+    @SerialName("default_start_not_before") val defaultStartNotBefore: String? = null,
+    @SerialName("default_estimated_duration") val defaultEstimatedDuration: String? = null,
     @SerialName("is_active") val isActive: Boolean = true,
 )
 
 @Serializable
 data class RoutinePatchRequest(
     @SerialName("template_title") val templateTitle: String? = null,
-    @SerialName("cron_schedule") val cronSchedule: String? = null,
-    val timezone: String? = null,
+    @SerialName("template_detail") val templateDetail: String? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String? = null,
+    @SerialName("default_start_not_before") val defaultStartNotBefore: String? = null,
+    @SerialName("default_estimated_duration") val defaultEstimatedDuration: String? = null,
     @SerialName("is_active") val isActive: Boolean? = null,
 )
 
@@ -98,8 +102,10 @@ data class TaskResponse(
 data class RoutineResponse(
     val id: String,
     @SerialName("template_title") val templateTitle: String,
-    @SerialName("cron_schedule") val cronSchedule: String,
-    val timezone: String,
+    @SerialName("template_detail") val templateDetail: String? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String,
+    @SerialName("default_start_not_before") val defaultStartNotBefore: String? = null,
+    @SerialName("default_estimated_duration") val defaultEstimatedDuration: String? = null,
     @SerialName("is_active") val isActive: Boolean,
     @SerialName("is_deleted") val isDeleted: Boolean,
     @SerialName("server_version") val serverVersion: Long,
@@ -181,8 +187,10 @@ internal fun SyncTask.toResponse(): TaskResponse = TaskResponse(
 internal fun SyncRoutine.toResponse(): RoutineResponse = RoutineResponse(
     id = id,
     templateTitle = templateTitle,
-    cronSchedule = cronSchedule,
-    timezone = timezone,
+    templateDetail = templateDetail,
+    recurrenceRule = recurrenceRule,
+    defaultStartNotBefore = defaultStartNotBefore,
+    defaultEstimatedDuration = defaultEstimatedDuration,
     isActive = isActive,
     isDeleted = isDeleted,
     serverVersion = serverVersion,

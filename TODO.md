@@ -89,7 +89,7 @@ Status legend:
   - [x] Detail lifecycle actions (`complete`, `delete`, progress cleanup)
   - [x] Postpone flow with planning-window update and history event
 
-- [ ] Routines: definition model, editor, and lifecycle
+- [-] Routines: definition model, editor, and lifecycle
   Goal:
   Implement routine definitions as a separate management surface with the new recurrence model.
   Scope:
@@ -108,6 +108,10 @@ Status legend:
   - `Routines` manages routine definitions only
   - routine deletion/deactivation affects future generation only
   - existing occurrences remain reviewable and executable as defined
+  Sub-work:
+  - [x] Shared schema/sync/business API support for routine detail and defaults
+  - [ ] Routine create/detail editor for title, detail, recurrence, and default planning fields
+  - [ ] Routine activate/deactivate and delete lifecycle in the new detail flow
 
 - [ ] Routine occurrences: execution, bounded postpone, skip, and miss
   Goal:

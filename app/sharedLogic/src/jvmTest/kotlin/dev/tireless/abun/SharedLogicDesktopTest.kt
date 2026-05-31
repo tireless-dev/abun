@@ -483,8 +483,21 @@ class SharedLogicDesktopTest {
         val date = "2026-05-25"
         val taskId = store.createTask("Prepare notes", date)
 
-        val routineId = store.createRoutine("Stretch", "0 9 * * *", "UTC")
-        store.updateRoutine(routineId, "Stretch break", "0 10 * * *", "Asia/Shanghai")
+        val routineId = store.createRoutine(
+            templateTitle = "Stretch",
+            templateDetail = "Loosen up after standup",
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T09:00:00Z",
+            defaultEstimatedDuration = "PT10M",
+        )
+        store.updateRoutine(
+            routineId = routineId,
+            templateTitle = "Stretch break",
+            templateDetail = "Reset posture before coding",
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=10;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T10:00:00Z",
+            defaultEstimatedDuration = "PT15M",
+        )
         store.toggleRoutineActive(routineId)
 
         val alarmId = store.createAlarm(taskId, "2026-05-25T10:00:00Z")
@@ -496,6 +509,10 @@ class SharedLogicDesktopTest {
 
         assertEquals(1, routines.size)
         assertEquals("Stretch break", routines.single().templateTitle)
+        assertEquals("Reset posture before coding", routines.single().templateDetail)
+        assertEquals("RRULE:FREQ=DAILY;BYHOUR=10;BYMINUTE=0", routines.single().recurrenceRule)
+        assertEquals("2026-05-25T10:00:00Z", routines.single().defaultStartNotBefore)
+        assertEquals("PT15M", routines.single().defaultEstimatedDuration)
         assertFalse(routines.single().isActive)
         assertEquals(1, alarms.size)
         assertEquals("2026-05-25T11:00:00Z", alarms.single().triggerTimeIso)

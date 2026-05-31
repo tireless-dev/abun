@@ -105,8 +105,10 @@ data class AuthViewState(
 data class RoutineListItemView(
     val id: String,
     val templateTitle: String,
-    val cronSchedule: String,
-    val timezone: String,
+    val templateDetail: String? = null,
+    val recurrenceRule: String,
+    val defaultStartNotBefore: String? = null,
+    val defaultEstimatedDuration: String? = null,
     val isActive: Boolean,
 )
 

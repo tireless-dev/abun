@@ -16,6 +16,16 @@ class JvmDatabaseDriverFactory(
 
     private fun migrateLegacyTaskSchema() {
         DriverManager.getConnection(jdbcUrl).use { connection ->
+            if (connection.tableExists("routine")) {
+                connection.ensureColumn("routine", "template_detail", "TEXT")
+                connection.ensureColumn("routine", "recurrence_rule", "TEXT")
+                connection.ensureColumn("routine", "default_start_not_before", "TEXT")
+                connection.ensureColumn("routine", "default_estimated_duration", "TEXT")
+                connection.copyRoutineColumnIfMissing(
+                    targetColumn = "recurrence_rule",
+                    sourceColumn = "cron_schedule",
+                )
+            }
             if (!connection.tableExists("task")) return
             connection.ensureColumn("task", "detail", "TEXT")
             connection.ensureColumn("task", "start_not_before", "TEXT")
@@ -25,6 +35,20 @@ class JvmDatabaseDriverFactory(
                 connection.ensureColumn("task_event", "postponed_json", "TEXT")
             }
         }
+    }
+}
+
+private fun Connection.copyRoutineColumnIfMissing(targetColumn: String, sourceColumn: String) {
+    val columns = columnNames("routine")
+    if (!columns.contains(targetColumn) || !columns.contains(sourceColumn)) return
+    createStatement().use { statement ->
+        statement.executeUpdate(
+            """
+            UPDATE routine
+            SET $targetColumn = COALESCE($targetColumn, $sourceColumn)
+            WHERE $targetColumn IS NULL AND $sourceColumn IS NOT NULL
+            """.trimIndent(),
+        )
     }
 }
 
