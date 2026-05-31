@@ -84,6 +84,7 @@ fun App() {
     var currentSheet by remember { mutableStateOf<OverlaySheet?>(null) }
     var selectedTask by remember { mutableStateOf<TaskListItemView?>(null) }
     var selectedRoutine by remember { mutableStateOf<RoutineListItemView?>(null) }
+    val selectedTaskHistory = selectedTask?.let { controller.taskHistory(it.id) }.orEmpty()
 
     LaunchedEffect(state.activePomodoroSession?.id, activeRemaining) {
         if (state.activePomodoroSession != null && activeRemaining <= 0) {
@@ -173,6 +174,7 @@ fun App() {
             )
             OverlaySheet.TASK_ACTIONS -> TaskActionsSheet(
                 task = selectedTask,
+                history = selectedTaskHistory,
                 availableParents = state.taskView.tasks.filter { candidate ->
                     candidate.id != selectedTask?.id && candidate.routineId == null
                 },
@@ -696,6 +698,7 @@ internal fun CreateRoutineSheet(onDismiss: () -> Unit, onCreate: (String, String
 @Composable
 internal fun TaskActionsSheet(
     task: TaskListItemView?,
+    history: List<JournalEntryView>,
     availableParents: List<TaskListItemView>,
     isPomodoroActive: Boolean,
     onDismiss: () -> Unit,
@@ -749,6 +752,8 @@ internal fun TaskActionsSheet(
             )
         }
         TextField(value = note, onValueChange = { note = it }, label = "Task note")
+        AppText("History", style = ThemeTokens.type.label)
+        JournalTimeline(history)
         if (isPomodoroActive) {
             InlineError("Pomodoro is active. Task edits are temporarily disabled.")
         } else {

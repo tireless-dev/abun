@@ -193,6 +193,23 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `task history returns visible business events across all days`() {
+        val store = testStore()
+        val taskId = store.createTask(title = "History task", journalDate = "2026-05-24")
+
+        store.progressTask(taskId, "2026-05-25", "Started")
+        store.completeTask(taskId, "2026-05-26", "Finished")
+
+        val history = store.taskHistory(taskId)
+
+        assertEquals(
+            listOf(TaskEventType.COMPLETED, TaskEventType.PROGRESSED, TaskEventType.CREATED),
+            history.map { it.eventType },
+        )
+        assertEquals(listOf("Finished", "Started", null), history.map { it.content })
+    }
+
+    @Test
     fun `journal only exposes business timeline events`() {
         val store = testStore()
         val taskId = store.createTask(

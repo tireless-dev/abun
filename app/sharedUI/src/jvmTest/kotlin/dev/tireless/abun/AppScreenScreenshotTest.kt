@@ -135,6 +135,7 @@ class AppScreenScreenshotTest {
     fun taskActionsSheet() = captureScreenshot("sheets/task_actions") {
         TaskActionsSheet(
             task = populatedTaskView().tasks.first(),
+            history = populatedTodayView().journalEntries,
             availableParents = populatedTaskView().tasks.drop(1),
             isPomodoroActive = false,
             onDismiss = {},

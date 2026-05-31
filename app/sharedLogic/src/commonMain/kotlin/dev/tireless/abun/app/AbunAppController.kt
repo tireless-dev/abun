@@ -182,6 +182,8 @@ class AbunAppController(
         requestSync()
     }
 
+    fun taskHistory(taskId: String): List<JournalEntryView> = store.taskHistory(taskId, state.value.preferences)
+
     fun createRoutine(templateTitle: String, cronSchedule: String, timezone: String) {
         if (templateTitle.isBlank() || cronSchedule.isBlank()) return
         store.createRoutine(templateTitle, cronSchedule, timezone)

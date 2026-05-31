@@ -89,17 +89,13 @@ class LocalStore(
     fun journal(date: String, preferences: PreferencesViewState = preferences()): List<JournalEntryView> = queries.selectJournalEntries(
         date,
         ::mapJournalRow,
-    ).executeAsList().mapNotNull {
-        val eventType = enumValueOf<TaskEventType>(it.eventType)
-        if (!eventType.isVisibleInDayTimeline()) return@mapNotNull null
-        JournalEntryView(
-            taskId = it.taskId,
-            title = it.title,
-            eventId = it.eventId,
-            eventType = eventType,
-            content = it.content,
-            eventTimeLabel = formatDateTimeLabel(it.eventTime, preferences.timezoneOverride, preferences.dateFormat),
-        )
+    ).executeAsList().mapNotNull { it.toJournalEntry(preferences) }
+
+    fun taskHistory(taskId: String, preferences: PreferencesViewState = preferences()): List<JournalEntryView> {
+        val task = queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull()?.entity ?: return emptyList()
+        return queries.selectTaskEventsForTask(taskId, ::mapTaskEventRow).executeAsList().mapNotNull { row ->
+            row.entity.toJournalEntry(task.id, task.title, preferences)
+        }
     }
 
     fun preferences(): PreferencesViewState =
@@ -1366,6 +1362,32 @@ private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
     serverVersion = serverVersion,
     createdAt = epochMillisToIsoString(createdAt),
 )
+
+private fun JournalRow.toJournalEntry(preferences: PreferencesViewState): JournalEntryView? =
+    LocalTaskEvent(
+        id = eventId,
+        taskId = taskId,
+        journalDate = "",
+        eventType = enumValueOf(eventType),
+        content = content,
+        eventTime = eventTime,
+        isDeleted = false,
+        serverVersion = 0,
+        isDirty = false,
+        createdAt = createdAt,
+    ).toJournalEntry(taskId, title, preferences)
+
+private fun LocalTaskEvent.toJournalEntry(taskId: String, title: String, preferences: PreferencesViewState): JournalEntryView? {
+    if (!eventType.isVisibleInDayTimeline()) return null
+    return JournalEntryView(
+        taskId = taskId,
+        title = title,
+        eventId = id,
+        eventType = eventType,
+        content = content,
+        eventTimeLabel = formatDateTimeLabel(eventTime, preferences.timezoneOverride, preferences.dateFormat),
+    )
+}
 
 private fun TaskEventType.isVisibleInDayTimeline(): Boolean = when (this) {
     TaskEventType.CREATED,
