@@ -9,6 +9,7 @@ import dev.tireless.abun.sync.PullResponse
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
 import dev.tireless.abun.sync.TaskEventType
+import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -332,6 +333,27 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.Created, progressed.status)
 
+        val postponed = jsonClient.post("/api/tasks/task-1/events") {
+            auth("user-1")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(
+                TaskEventCreateRequest(
+                    id = "event-postponed",
+                    taskId = "ignored-by-route",
+                    journalDate = "2026-05-24",
+                    eventType = TaskEventType.POSTPONED,
+                    postponed = TaskPostponedPayload(
+                        previousStartNotBefore = "2026-05-24T09:00:00Z",
+                        newStartNotBefore = "2026-05-25T09:00:00Z",
+                        previousEndNotAfter = "2026-05-24T17:00:00Z",
+                        newEndNotAfter = "2026-05-25T17:00:00Z",
+                    ),
+                    eventTime = "2026-05-24T09:05:00Z",
+                ),
+            )
+        }
+        assertEquals(HttpStatusCode.Created, postponed.status)
+
         val created = jsonClient.post("/api/tasks/task-1/events") {
             auth("user-1")
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
@@ -387,7 +409,11 @@ class ApplicationTest {
         val events = jsonClient.get("/api/tasks/task-1/events") {
             auth("user-1")
         }.body<List<TaskEventResponse>>()
-        assertEquals(4, events.size)
+        assertEquals(
+            "2026-05-25T09:00:00Z",
+            events.single { it.id == "event-postponed" }.postponed?.newStartNotBefore,
+        )
+        assertEquals(5, events.size)
 
         val status = jsonClient.get("/api/tasks/task-1/status") {
             auth("user-1")
@@ -397,8 +423,12 @@ class ApplicationTest {
         val journal = jsonClient.get("/api/journals/2026-05-24") {
             auth("user-1")
         }.body<List<JournalEntry>>()
-        assertEquals(3, journal.size)
-        assertEquals(listOf(TaskEventType.CREATED, TaskEventType.PROGRESSED, TaskEventType.CREATED), journal.map { it.eventType })
+        assertEquals(4, journal.size)
+        assertEquals(
+            listOf(TaskEventType.CREATED, TaskEventType.PROGRESSED, TaskEventType.POSTPONED, TaskEventType.CREATED),
+            journal.map { it.eventType },
+        )
+        assertEquals("2026-05-25T09:00:00Z", journal.single { it.eventType == TaskEventType.POSTPONED }.postponed?.newStartNotBefore)
     }
 
     @Test

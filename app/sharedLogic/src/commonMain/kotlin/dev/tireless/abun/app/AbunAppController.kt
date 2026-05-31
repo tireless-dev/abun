@@ -155,6 +155,18 @@ class AbunAppController(
         requestSync()
     }
 
+    fun postponeTask(
+        taskId: String,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+        note: String? = null,
+    ) {
+        store.postponeTask(taskId, state.value.selectedDate, startNotBefore, endNotAfter, estimatedDuration, note)
+        refresh()
+        requestSync()
+    }
+
     fun updateTask(
         taskId: String,
         title: String,

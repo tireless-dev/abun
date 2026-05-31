@@ -28,6 +28,7 @@ import dev.tireless.abun.sync.BatchRequest
 import dev.tireless.abun.sync.PullResponse
 import dev.tireless.abun.sync.SyncPreference
 import dev.tireless.abun.sync.TaskEventType
+import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -207,6 +208,46 @@ class SharedLogicDesktopTest {
             history.map { it.eventType },
         )
         assertEquals(listOf("Finished", "Started", null), history.map { it.content })
+    }
+
+    @Test
+    fun `postpone task updates planning window and records postponed payload`() {
+        val store = testStore()
+        val taskId = store.createTask(
+            title = "Postpone me",
+            journalDate = "2026-05-24",
+            startNotBefore = "2026-05-24T09:00:00Z",
+            endNotAfter = "2026-05-24T17:00:00Z",
+            estimatedDuration = "PT1H",
+        )
+
+        store.postponeTask(
+            taskId = taskId,
+            journalDate = "2026-05-24",
+            startNotBefore = "2026-05-25T10:00:00Z",
+            endNotAfter = "2026-05-25T18:00:00Z",
+            estimatedDuration = "PT2H",
+            note = "Move to tomorrow",
+        )
+
+        val task = store.allTasks().single { it.id == taskId }
+        val postponed = store.dirtyTaskEvents().single { it.eventType == TaskEventType.POSTPONED }
+        val history = store.taskHistory(taskId)
+
+        assertEquals("2026-05-25T10:00:00Z", task.startNotBefore)
+        assertEquals("2026-05-25T18:00:00Z", task.endNotAfter)
+        assertEquals("PT2H", task.estimatedDuration)
+        assertEquals(
+            TaskPostponedPayload(
+                previousStartNotBefore = "2026-05-24T09:00:00Z",
+                newStartNotBefore = "2026-05-25T10:00:00Z",
+                previousEndNotAfter = "2026-05-24T17:00:00Z",
+                newEndNotAfter = "2026-05-25T18:00:00Z",
+            ),
+            postponed.postponed,
+        )
+        assertTrue(history.first().content?.contains("2026-05-25T10:00:00Z") == true)
+        assertTrue(store.journal("2026-05-24").last().content?.contains("2026-05-25T18:00:00Z") == true)
     }
 
     @Test
@@ -395,8 +436,10 @@ class SharedLogicDesktopTest {
         )
 
         val tasks = store.allTasks()
+        val history = store.taskHistory("task-1")
 
         assertEquals(listOf("Legacy task"), tasks.map { it.title })
+        assertEquals(listOf(TaskEventType.CREATED), history.map { it.eventType })
     }
 
     @Test

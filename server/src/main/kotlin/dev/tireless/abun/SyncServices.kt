@@ -16,6 +16,7 @@ import dev.tireless.abun.sync.SyncRoutine
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
 import dev.tireless.abun.sync.TaskEventType
+import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.sync.TaskStatusDeriver
 import java.sql.Connection
@@ -1268,8 +1269,8 @@ internal class TaskEventSyncService(
                 connection.prepareStatement(
                     """
                     INSERT INTO task_event(
-                        id, user_id, task_id, journal_date, event_type, content, event_time, is_deleted, server_version, server_updated_at, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        id, user_id, task_id, journal_date, event_type, content, postponed_json, event_time, is_deleted, server_version, server_updated_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """.trimIndent(),
                 ).use { statement ->
                     statement.setString(1, canonical.id)
@@ -1278,11 +1279,12 @@ internal class TaskEventSyncService(
                     statement.setString(4, canonical.journalDate)
                     statement.setString(5, canonical.eventType.name)
                     statement.setNullableString(6, canonical.content)
-                    statement.setString(7, canonical.eventTime)
-                    statement.setBoolean(8, canonical.isDeleted)
-                    statement.setLong(9, canonical.serverVersion)
-                    statement.setString(10, canonical.serverUpdatedAt)
-                    statement.setString(11, canonical.createdAt)
+                    statement.setNullableString(7, canonical.postponed?.let(serverJson::encodeToString))
+                    statement.setString(8, canonical.eventTime)
+                    statement.setBoolean(9, canonical.isDeleted)
+                    statement.setLong(10, canonical.serverVersion)
+                    statement.setString(11, canonical.serverUpdatedAt)
+                    statement.setString(12, canonical.createdAt)
                     statement.executeUpdate()
                 }
                 canonical
@@ -1300,6 +1302,7 @@ internal class TaskEventSyncService(
                     journalDate = request.journalDate,
                     eventType = request.eventType,
                     content = request.content,
+                    postponed = request.postponed,
                     eventTime = request.eventTime,
                 ),
             ),
@@ -1326,7 +1329,7 @@ internal class TaskEventSyncService(
     fun journal(userId: String, date: String): List<JournalEntry> = database.read { connection ->
         connection.prepareStatement(
             """
-            SELECT task_id, id, event_type, content, event_time
+            SELECT task_id, id, event_type, content, postponed_json, event_time
             FROM task_event
             WHERE user_id = ? AND journal_date = ? AND is_deleted = FALSE
             ORDER BY event_time ASC, created_at ASC
@@ -1342,6 +1345,7 @@ internal class TaskEventSyncService(
                         eventId = rs.getString("id"),
                         eventType = TaskEventType.valueOf(rs.getString("event_type")),
                         content = rs.getString("content"),
+                        postponed = rs.getString("postponed_json")?.let { serverJson.decodeFromString<TaskPostponedPayload>(it) },
                         eventTime = rs.getString("event_time"),
                     )
                 }
@@ -1674,6 +1678,7 @@ data class JournalEntry(
     val eventId: String,
     val eventType: TaskEventType,
     val content: String?,
+    val postponed: TaskPostponedPayload? = null,
     val eventTime: String,
 )
 
@@ -1724,6 +1729,7 @@ private fun ResultSet.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
     journalDate = getString("journal_date"),
     eventType = TaskEventType.valueOf(getString("event_type")),
     content = getString("content"),
+    postponed = getString("postponed_json")?.let { serverJson.decodeFromString<TaskPostponedPayload>(it) },
     eventTime = getString("event_time"),
     isDeleted = getBoolean("is_deleted"),
     serverVersion = getLong("server_version"),

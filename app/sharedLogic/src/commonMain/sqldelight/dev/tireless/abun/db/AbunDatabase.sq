@@ -37,6 +37,7 @@ CREATE TABLE task_event (
     journal_date TEXT NOT NULL,
     event_type TEXT NOT NULL,
     content TEXT,
+    postponed_json TEXT,
     event_time INTEGER NOT NULL,
     is_deleted INTEGER NOT NULL DEFAULT 0,
     server_version INTEGER NOT NULL DEFAULT 0,
@@ -173,8 +174,8 @@ SELECT * FROM task_event ORDER BY event_time ASC, created_at ASC;
 
 upsertTaskEvent:
 INSERT OR REPLACE INTO task_event(
-    id, task_id, journal_date, event_type, content, event_time, is_deleted, server_version, is_dirty, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, task_id, journal_date, event_type, content, postponed_json, event_time, is_deleted, server_version, is_dirty, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectJournalEntries:
 SELECT
@@ -183,6 +184,7 @@ SELECT
     e.id AS event_id,
     e.event_type AS event_type,
     e.content AS content,
+    e.postponed_json AS postponed_json,
     e.event_time AS event_time,
     e.created_at AS created_at
 FROM task_event e

@@ -86,12 +86,15 @@ CREATE TABLE IF NOT EXISTS task_event (
     journal_date VARCHAR(32) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     content TEXT,
+    postponed_json TEXT,
     event_time VARCHAR(255) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     server_version BIGINT NOT NULL,
     server_updated_at VARCHAR(255) NOT NULL,
     created_at VARCHAR(255) NOT NULL
 );
+
+ALTER TABLE task_event ADD COLUMN IF NOT EXISTS postponed_json TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_task_event_user_server_version ON task_event(user_id, server_version);
 CREATE INDEX IF NOT EXISTS idx_task_event_user_journal_date ON task_event(user_id, journal_date);

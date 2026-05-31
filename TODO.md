@@ -62,7 +62,7 @@ Status legend:
 
 ## P1
 
-- [-] Tasks surface: unified tree, filters, and task detail
+- [x] Tasks surface: unified tree, filters, and task detail
   Goal:
   Implement the new `Tasks` surface and normal-task detail flow.
   Scope:
@@ -87,7 +87,7 @@ Status legend:
   - [x] Normal-task detail editor shell for mutable task fields
   - [x] Task-detail history section
   - [x] Detail lifecycle actions (`complete`, `delete`, progress cleanup)
-  - [ ] Postpone flow with planning-window update and history event
+  - [x] Postpone flow with planning-window update and history event
 
 - [ ] Routines: definition model, editor, and lifecycle
   Goal:

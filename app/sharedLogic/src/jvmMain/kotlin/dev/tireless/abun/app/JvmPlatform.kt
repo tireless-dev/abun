@@ -21,6 +21,9 @@ class JvmDatabaseDriverFactory(
             connection.ensureColumn("task", "start_not_before", "TEXT")
             connection.ensureColumn("task", "end_not_after", "TEXT")
             connection.ensureColumn("task", "estimated_duration", "TEXT")
+            if (connection.tableExists("task_event")) {
+                connection.ensureColumn("task_event", "postponed_json", "TEXT")
+            }
         }
     }
 }

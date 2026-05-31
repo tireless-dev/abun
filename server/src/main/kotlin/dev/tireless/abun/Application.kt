@@ -410,6 +410,7 @@ data class TaskEventCreateRequest(
     @SerialName("journal_date") val journalDate: String,
     @SerialName("event_type") val eventType: dev.tireless.abun.sync.TaskEventType,
     val content: String? = null,
+    val postponed: dev.tireless.abun.sync.TaskPostponedPayload? = null,
     @SerialName("event_time") val eventTime: String,
 )
 

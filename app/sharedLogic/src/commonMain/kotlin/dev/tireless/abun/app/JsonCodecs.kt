@@ -1,5 +1,6 @@
 package dev.tireless.abun.app
 
+import dev.tireless.abun.sync.TaskPostponedPayload
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -25,4 +26,10 @@ internal object JsonCodecs {
     fun decodeMap(value: String): Map<String, String> = runCatching {
         AppJson.decodeFromString(stringMap, value)
     }.getOrDefault(emptyMap())
+
+    fun encodePostponedPayload(value: TaskPostponedPayload): String = AppJson.encodeToString(value)
+
+    fun decodePostponedPayload(value: String?): TaskPostponedPayload? = value?.let {
+        runCatching { AppJson.decodeFromString<TaskPostponedPayload>(it) }.getOrNull()
+    }
 }

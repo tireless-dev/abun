@@ -12,7 +12,7 @@ class TaskDetailActionsTest {
             TaskListItemView(id = "task-1", title = "Open task", status = TaskStatus.IN_PROGRESS),
         )
 
-        assertEquals(listOf("Progress", "Complete", "Pomodoro", "Delete task"), labels)
+        assertEquals(listOf("Progress", "Complete", "Postpone", "Pomodoro", "Delete task"), labels)
     }
 
     @Test

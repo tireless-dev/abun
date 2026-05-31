@@ -12,6 +12,7 @@ import dev.tireless.abun.sync.SyncRoutine
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
 import dev.tireless.abun.sync.TaskEventType
+import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.sync.PreferenceValueType
 import kotlinx.datetime.LocalDate
@@ -296,6 +297,7 @@ class LocalStore(
                 journal_date = journalDate,
                 event_type = TaskEventType.CREATED.name,
                 content = null,
+                postponed_json = null,
                 event_time = now,
                 is_deleted = 0,
                 server_version = 0,
@@ -312,6 +314,74 @@ class LocalStore(
 
     fun completeTask(taskId: String, journalDate: String, note: String? = null) {
         appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
+    }
+
+    fun postponeTask(
+        taskId: String,
+        journalDate: String,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+        note: String? = null,
+    ) = database.transaction {
+        val existing = queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull() ?: return@transaction
+        val normalizedStart = startNotBefore?.trim().orEmpty().ifBlank { null }
+        val normalizedEnd = endNotAfter?.trim().orEmpty().ifBlank { null }
+        val normalizedDuration = estimatedDuration?.trim().orEmpty().ifBlank { null }
+        if (
+            existing.entity.startNotBefore == normalizedStart &&
+            existing.entity.endNotAfter == normalizedEnd &&
+            existing.entity.estimatedDuration == normalizedDuration
+        ) return@transaction
+
+        val updatedTask = existing.entity.copy(
+            startNotBefore = normalizedStart,
+            endNotAfter = normalizedEnd,
+            estimatedDuration = normalizedDuration,
+        )
+        val updatedHlc = existing.hlcMap.toMutableMap()
+        val dirty = existing.dirtyFields.toMutableSet()
+        if (existing.entity.startNotBefore != normalizedStart) {
+            updatedHlc["start_not_before"] = clock.next(existing.hlcMap["start_not_before"])
+            dirty += "start_not_before"
+        }
+        if (existing.entity.endNotAfter != normalizedEnd) {
+            updatedHlc["end_not_after"] = clock.next(existing.hlcMap["end_not_after"])
+            dirty += "end_not_after"
+        }
+        if (existing.entity.estimatedDuration != normalizedDuration) {
+            updatedHlc["estimated_duration"] = clock.next(existing.hlcMap["estimated_duration"])
+            dirty += "estimated_duration"
+        }
+        persistTask(
+            task = updatedTask,
+            hlcMap = updatedHlc,
+            dirtyFields = dirty.toList(),
+            isDirty = true,
+            createdAt = existing.entity.createdAt,
+            updatedAt = timeProvider.nowEpochMillis(),
+        )
+        val now = timeProvider.nowEpochMillis()
+        queries.upsertTaskEvent(
+            id = idGenerator.randomId(),
+            task_id = taskId,
+            journal_date = journalDate,
+            event_type = TaskEventType.POSTPONED.name,
+            content = note,
+            postponed_json = JsonCodecs.encodePostponedPayload(
+                TaskPostponedPayload(
+                    previousStartNotBefore = existing.entity.startNotBefore,
+                    newStartNotBefore = normalizedStart,
+                    previousEndNotAfter = existing.entity.endNotAfter,
+                    newEndNotAfter = normalizedEnd,
+                ),
+            ),
+            event_time = now,
+            is_deleted = 0,
+            server_version = 0,
+            is_dirty = 1,
+            created_at = now,
+        )
     }
 
     fun updateTask(
@@ -401,6 +471,7 @@ class LocalStore(
             journal_date = journalDate,
             event_type = TaskEventType.DELETED.name,
             content = null,
+            postponed_json = null,
             event_time = now,
             is_deleted = 0,
             server_version = 0,
@@ -580,6 +651,7 @@ class LocalStore(
                 journal_date = journalDate,
                 event_type = TaskEventType.CREATED.name,
                 content = null,
+                postponed_json = null,
                 event_time = now,
                 is_deleted = 0,
                 server_version = 0,
@@ -609,6 +681,7 @@ class LocalStore(
                 journal_date = triggerTimeIso.substringBefore('T'),
                 event_type = TaskEventType.ALARM_FIRED.name,
                 content = null,
+                postponed_json = null,
                 event_time = isoStringToEpochMillis(triggerTimeIso),
                 is_deleted = 0,
                 server_version = 0,
@@ -651,6 +724,7 @@ class LocalStore(
                 journal_date = remote.journalDate,
                 event_type = remote.eventType.name,
                 content = remote.content,
+                postponed_json = remote.postponed?.let(JsonCodecs::encodePostponedPayload),
                 event_time = isoStringToEpochMillis(remote.eventTime),
                 is_deleted = remote.isDeleted.toLong(),
                 server_version = remote.serverVersion,
@@ -670,7 +744,13 @@ class LocalStore(
         queries.upsertSyncState(scope.wireName, version)
     }
 
-    private fun appendTaskEvent(taskId: String, journalDate: String, type: TaskEventType, note: String?) = database.transaction {
+    private fun appendTaskEvent(
+        taskId: String,
+        journalDate: String,
+        type: TaskEventType,
+        note: String?,
+        postponed: TaskPostponedPayload? = null,
+    ) = database.transaction {
         val now = timeProvider.nowEpochMillis()
         queries.upsertTaskEvent(
             id = idGenerator.randomId(),
@@ -678,6 +758,7 @@ class LocalStore(
             journal_date = journalDate,
             event_type = type.name,
             content = note,
+            postponed_json = postponed?.let(JsonCodecs::encodePostponedPayload),
             event_time = now,
             is_deleted = 0,
             server_version = 0,
@@ -1099,6 +1180,7 @@ internal data class LocalTaskEvent(
     val journalDate: String,
     val eventType: TaskEventType,
     val content: String?,
+    val postponed: TaskPostponedPayload?,
     val eventTime: Long,
     val isDeleted: Boolean,
     val serverVersion: Long,
@@ -1150,6 +1232,7 @@ internal data class JournalRow(
     val eventId: String,
     val eventType: String,
     val content: String?,
+    val postponed: TaskPostponedPayload?,
     val eventTime: Long,
     val createdAt: Long,
 )
@@ -1211,12 +1294,29 @@ private fun mapTaskEventRow(
     journal_date: String,
     event_type: String,
     content: String?,
+    postponed_json: String?,
     event_time: Long,
     is_deleted: Long,
     server_version: Long,
     is_dirty: Long,
     created_at: Long,
-): MutableSyncRow<LocalTaskEvent> = MutableSyncRow(LocalTaskEvent(id, task_id, journal_date, enumValueOf(event_type), content, event_time, is_deleted != 0L, server_version, is_dirty != 0L, created_at), emptyMap(), emptyList())
+): MutableSyncRow<LocalTaskEvent> = MutableSyncRow(
+    LocalTaskEvent(
+        id,
+        task_id,
+        journal_date,
+        enumValueOf(event_type),
+        content,
+        JsonCodecs.decodePostponedPayload(postponed_json),
+        event_time,
+        is_deleted != 0L,
+        server_version,
+        is_dirty != 0L,
+        created_at,
+    ),
+    emptyMap(),
+    emptyList(),
+)
 
 private fun mapPomodoroSessionRow(
     id: String,
@@ -1242,8 +1342,17 @@ private fun mapPomodoroSessionRow(
     if (is_dirty != 0L) JsonCodecs.decodeList(dirty_fields) else emptyList(),
 )
 
-private fun mapJournalRow(task_id: String, title: String, event_id: String, event_type: String, content: String?, event_time: Long, created_at: Long): JournalRow =
-    JournalRow(task_id, title, event_id, event_type, content, event_time, created_at)
+private fun mapJournalRow(
+    task_id: String,
+    title: String,
+    event_id: String,
+    event_type: String,
+    content: String?,
+    postponed_json: String?,
+    event_time: Long,
+    created_at: Long,
+): JournalRow =
+    JournalRow(task_id, title, event_id, event_type, content, JsonCodecs.decodePostponedPayload(postponed_json), event_time, created_at)
 
 private fun mapAppPreferencesRow(
     id: Long,
@@ -1356,7 +1465,7 @@ private fun LocalTaskEvent.toSyncTaskEvent(): SyncTaskEvent = SyncTaskEvent(
     journalDate = journalDate,
     eventType = eventType,
     content = content,
-    postponed = null,
+    postponed = postponed,
     eventTime = epochMillisToIsoString(eventTime),
     isDeleted = isDeleted,
     serverVersion = serverVersion,
@@ -1370,6 +1479,7 @@ private fun JournalRow.toJournalEntry(preferences: PreferencesViewState): Journa
         journalDate = "",
         eventType = enumValueOf(eventType),
         content = content,
+        postponed = postponed,
         eventTime = eventTime,
         isDeleted = false,
         serverVersion = 0,
@@ -1384,9 +1494,24 @@ private fun LocalTaskEvent.toJournalEntry(taskId: String, title: String, prefere
         title = title,
         eventId = id,
         eventType = eventType,
-        content = content,
+        content = presentationContent(),
         eventTimeLabel = formatDateTimeLabel(eventTime, preferences.timezoneOverride, preferences.dateFormat),
     )
+}
+
+private fun LocalTaskEvent.presentationContent(): String? {
+    val note = content?.takeIf(String::isNotBlank)
+    val postponedSummary = postponed?.let { payload ->
+        buildList {
+            if (payload.previousStartNotBefore != payload.newStartNotBefore) {
+                add("Start: ${payload.previousStartNotBefore ?: "unset"} -> ${payload.newStartNotBefore ?: "unset"}")
+            }
+            if (payload.previousEndNotAfter != payload.newEndNotAfter) {
+                add("Deadline: ${payload.previousEndNotAfter ?: "unset"} -> ${payload.newEndNotAfter ?: "unset"}")
+            }
+        }.takeIf { it.isNotEmpty() }?.joinToString("\n")
+    }
+    return listOfNotNull(note, postponedSummary).takeIf { it.isNotEmpty() }?.joinToString("\n")
 }
 
 private fun TaskEventType.isVisibleInDayTimeline(): Boolean = when (this) {
