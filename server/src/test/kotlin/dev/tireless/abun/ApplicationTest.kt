@@ -243,6 +243,11 @@ class ApplicationTest {
         }.body<TaskResponse>()
         assertEquals(true, deletedTask.isDeleted)
 
+        val deletedTaskEvents = jsonClient.get("/api/tasks/task-1/events") {
+            auth("user-1")
+        }.body<List<TaskEventResponse>>()
+        assertTrue(deletedTaskEvents.any { it.eventType == TaskEventType.DELETED })
+
         val pulledTasks = jsonClient.get("/sync/tasks?cursor=0&limit=10") {
             auth("user-1")
         }.body<PullResponse<SyncTask>>()

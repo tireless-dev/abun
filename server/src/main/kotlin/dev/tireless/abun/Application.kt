@@ -237,7 +237,7 @@ private fun Route.apiRoutes(services: AppServices) {
             }
         }
         delete("/{id}") {
-            val task = services.tasks.softDeleteFromBusinessApi(call.userId(), call.requireId())
+            val task = services.deleteTaskFromBusinessApi(call.userId(), call.requireId())
             if (task == null) {
                 call.respond(io.ktor.http.HttpStatusCode.NotFound)
             } else {

@@ -70,6 +70,21 @@ class AppServices private constructor(
         return task
     }
 
+    fun deleteTaskFromBusinessApi(userId: String, taskId: String): SyncTask? {
+        val task = tasks.softDeleteFromBusinessApi(userId, taskId) ?: return null
+        val eventTime = Instant.now().toString()
+        taskEvents.createFromBusinessApi(
+            userId,
+            TaskEventCreateRequest(
+                taskId = task.id,
+                journalDate = eventTime.substringBefore('T'),
+                eventType = TaskEventType.DELETED,
+                eventTime = eventTime,
+            ),
+        )
+        return task
+    }
+
     override fun close() {
         database.close()
     }
