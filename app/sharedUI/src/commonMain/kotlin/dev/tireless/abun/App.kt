@@ -1077,6 +1077,18 @@ internal data class RoutineSaveDraft(
     val defaultEstimatedDuration: String?,
 )
 
+internal enum class RoutineRecurrencePreset {
+    DAILY,
+    WEEKDAYS,
+    CUSTOM,
+}
+
+internal data class RoutineRecurrenceEditorState(
+    val preset: RoutineRecurrencePreset,
+    val time: String,
+    val customRule: String,
+)
+
 internal fun normalizeRoutineSaveDraft(
     id: String,
     title: String,
@@ -1092,6 +1104,48 @@ internal fun normalizeRoutineSaveDraft(
     defaultStartNotBefore = defaultStartNotBefore.ifBlank { null },
     defaultEstimatedDuration = defaultEstimatedDuration.ifBlank { null },
 )
+
+internal fun recurrenceEditorStateFor(rule: String): RoutineRecurrenceEditorState {
+    val normalized = rule.removePrefix("RRULE:")
+    val parts = normalized.split(";")
+        .mapNotNull { entry ->
+            val separator = entry.indexOf('=')
+            if (separator <= 0) null else entry.substring(0, separator) to entry.substring(separator + 1)
+        }
+        .toMap()
+    val time = recurrenceTimeLabel(parts["BYHOUR"], parts["BYMINUTE"]).orEmpty()
+    return when {
+        parts["FREQ"] == "DAILY" && time.isNotBlank() -> RoutineRecurrenceEditorState(
+            preset = RoutineRecurrencePreset.DAILY,
+            time = time,
+            customRule = rule,
+        )
+        parts["FREQ"] == "WEEKLY" &&
+            parts["BYDAY"] == "MO,TU,WE,TH,FR" &&
+            time.isNotBlank() -> RoutineRecurrenceEditorState(
+            preset = RoutineRecurrencePreset.WEEKDAYS,
+            time = time,
+            customRule = rule,
+        )
+        else -> RoutineRecurrenceEditorState(
+            preset = RoutineRecurrencePreset.CUSTOM,
+            time = "",
+            customRule = rule,
+        )
+    }
+}
+
+internal fun buildRecurrenceRule(state: RoutineRecurrenceEditorState): String = when (state.preset) {
+    RoutineRecurrencePreset.DAILY -> buildPresetRecurrenceRule(
+        prefix = "FREQ=DAILY",
+        time = state.time,
+    )
+    RoutineRecurrencePreset.WEEKDAYS -> buildPresetRecurrenceRule(
+        prefix = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+        time = state.time,
+    )
+    RoutineRecurrencePreset.CUSTOM -> state.customRule
+}
 
 internal fun describeRecurrenceRule(rule: String): String {
     val normalized = rule.removePrefix("RRULE:")
@@ -1123,6 +1177,17 @@ private fun recurrenceTimeLabel(hour: String?, minute: String?): String? {
     val hh = if (parsedHour < 10) "0$parsedHour" else "$parsedHour"
     val mm = if (parsedMinute < 10) "0$parsedMinute" else "$parsedMinute"
     return "$hh:$mm"
+}
+
+private fun buildPresetRecurrenceRule(
+    prefix: String,
+    time: String,
+): String {
+    val parts = time.split(":")
+    if (parts.size != 2) return ""
+    val hour = parts[0].toIntOrNull()?.takeIf { it in 0..23 } ?: return ""
+    val minute = parts[1].toIntOrNull()?.takeIf { it in 0..59 } ?: return ""
+    return "RRULE:$prefix;BYHOUR=$hour;BYMINUTE=%02d".format(minute)
 }
 
 private fun weekdayLabel(code: String): String? = when (code) {
