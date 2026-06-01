@@ -200,6 +200,10 @@ fun App() {
                     selectedTask?.let { controller.completeTask(it.id, note.ifBlank { null }) }
                     currentSheet = null
                 },
+                onSkip = { note ->
+                    selectedTask?.let { controller.skipTask(it.id, note.ifBlank { null }) }
+                    currentSheet = null
+                },
                 onPostpone = { taskId, startNotBefore, endNotAfter, estimatedDuration, note ->
                     controller.postponeTask(taskId, startNotBefore, endNotAfter, estimatedDuration, note)
                     currentSheet = null
@@ -766,6 +770,7 @@ internal fun TaskActionsSheet(
     onSaveTask: (String, String, String?, String?, String?, String?, String?) -> Unit,
     onProgress: (String) -> Unit,
     onComplete: (String) -> Unit,
+    onSkip: (String) -> Unit,
     onPostpone: (String, String?, String?, String?, String?) -> Unit,
     onDelete: () -> Unit,
     onStartPomodoro: () -> Unit,
@@ -853,10 +858,11 @@ internal fun TaskActionsSheet(
             InlineError("Pomodoro is active. Task edits are temporarily disabled.")
         } else {
             val actions = taskDetailActionLabels(task)
-            if ("Progress" in actions || "Complete" in actions || "Postpone" in actions || "Pomodoro" in actions) {
+            if ("Progress" in actions || "Complete" in actions || "Skip" in actions || "Postpone" in actions || "Pomodoro" in actions) {
                 ActionRow {
                     if ("Progress" in actions) Button(label = "Progress", onClick = { onProgress(note) })
                     if ("Complete" in actions) Button(label = "Complete", onClick = { onComplete(note) })
+                    if ("Skip" in actions) Button(label = "Skip", onClick = { onSkip(note) })
                     if ("Postpone" in actions) {
                         Button(
                             label = "Postpone",
@@ -1062,7 +1068,9 @@ internal fun filterTasksForSurface(tasks: List<TaskListItemView>, filter: TaskLi
 }
 
 internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
-    if (task.status.isOpen()) {
+    if (task.status.isOpen() && task.routineId != null) {
+        listOf("Complete", "Postpone", "Skip", "Pomodoro")
+    } else if (task.status.isOpen()) {
         listOf("Progress", "Complete", "Postpone", "Pomodoro", "Delete task")
     } else {
         listOf("Delete task")

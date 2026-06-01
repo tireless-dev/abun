@@ -147,6 +147,7 @@ class AppScreenScreenshotTest {
             onSaveTask = { _, _, _, _, _, _, _ -> },
             onProgress = {},
             onComplete = {},
+            onSkip = {},
             onPostpone = { _, _, _, _, _ -> },
             onDelete = {},
             onStartPomodoro = {},

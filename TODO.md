@@ -115,7 +115,7 @@ Status legend:
   - [x] Human-readable recurrence rule presentation
   - [x] Structured recurrence rule editor
 
-- [ ] Routine occurrences: execution, bounded postpone, skip, and miss
+- [-] Routine occurrences: execution, bounded postpone, skip, and miss
   Goal:
   Implement routine-derived occurrence behavior so execution history stays consistent with the new model.
   Scope:
@@ -130,6 +130,11 @@ Status legend:
   - routine occurrences are not converted into normal tasks by postpone
   - postpone availability is explained by next-occurrence boundary
   - `Missed` and `Skipped` match `docs/tasks/functionality-design.md`
+  Sub-work:
+  - [x] Routine-derived detail action set distinguishes occurrences from normal tasks
+  - [ ] Occurrence execution identity and inherited routine defaults
+  - [ ] Bounded postpone availability against next-occurrence boundary
+  - [ ] Skip and missed lifecycle rules
 
 ## P2
 

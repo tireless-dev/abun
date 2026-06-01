@@ -23,4 +23,18 @@ class TaskDetailActionsTest {
 
         assertEquals(listOf("Delete task"), labels)
     }
+
+    @Test
+    fun `routine derived open task uses occurrence action set`() {
+        val labels = taskDetailActionLabels(
+            TaskListItemView(
+                id = "task-3",
+                title = "Routine occurrence",
+                routineId = "routine-1",
+                status = TaskStatus.PENDING,
+            ),
+        )
+
+        assertEquals(listOf("Complete", "Postpone", "Skip", "Pomodoro"), labels)
+    }
 }
