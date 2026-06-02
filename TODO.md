@@ -139,7 +139,7 @@ Status legend:
 
 ## P2
 
-- [-] Pomodoro integration
+- [x] Pomodoro integration
   Goal:
   Keep pomodoro aligned with the new task execution model without forcing it into task-event semantics.
   Scope:
@@ -151,6 +151,7 @@ Status legend:
   - invalid tasks cannot be started directly from pomodoro actions
   Sub-work:
   - [x] Pomodoro task selection uses current valid open tasks only
+  - [x] Focus-session start records `Progressed` for valid linked tasks
 
 ## References
 

@@ -718,6 +718,22 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `starting linked focus pomodoro records progress for a valid task`() {
+        val store = testStore()
+        val taskId = store.createTask(
+            title = "Focus task",
+            journalDate = "2026-05-25",
+            startNotBefore = "2026-05-25T09:00:00Z",
+        )
+
+        checkNotNull(store.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferences()))
+
+        val progressedEvents = store.taskHistory(taskId).map { it.eventType }
+
+        assertTrue(progressedEvents.contains(TaskEventType.PROGRESSED))
+    }
+
+    @Test
     fun `pomodoro cannot start from invalid task and does not update expired task`() {
         val zone = TimeZone.currentSystemDefault()
         val timeProvider = mutableTimeProvider(

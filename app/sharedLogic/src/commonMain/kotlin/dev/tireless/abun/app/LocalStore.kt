@@ -191,6 +191,9 @@ class LocalStore(
             dirtyFields = listOf("task", "timing", "state"),
         )
         persistPomodoroSession(row.entity, row.hlcMap, row.dirtyFields, isDirty = true)
+        if (taskId != null && phase == PomodoroPhase.FOCUS) {
+            appendTaskEvent(taskId, currentDate, TaskEventType.PROGRESSED, null)
+        }
         val tasksById = allTasks().associateBy(TaskListItemView::id)
         return toPomodoroSessionView(row, tasksById, now)
     }
