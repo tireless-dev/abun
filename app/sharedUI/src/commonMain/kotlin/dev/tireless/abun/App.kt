@@ -166,9 +166,10 @@ fun App() {
 
         when (currentSheet) {
             OverlaySheet.CREATE_TASK -> CreateTaskSheet(
+                availableParents = state.taskView.tasks.filter { it.routineId == null },
                 onDismiss = { currentSheet = null },
-                onCreate = {
-                    controller.createTask(it)
+                onCreate = { title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration ->
+                    controller.createTask(title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
                     currentSheet = null
                 },
             )
@@ -710,14 +711,56 @@ private fun PomodoroRow(session: PomodoroSessionView) {
 }
 
 @Composable
-internal fun CreateTaskSheet(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
-    var draftTask by remember { mutableStateOf("") }
+internal fun CreateTaskSheet(
+    availableParents: List<TaskListItemView>,
+    onDismiss: () -> Unit,
+    onCreate: (String, String?, String?, String?, String?, String?) -> Unit,
+) {
+    var title by remember { mutableStateOf("") }
+    var detail by remember { mutableStateOf("") }
+    var parentId by remember { mutableStateOf<String?>(null) }
+    var startNotBefore by remember { mutableStateOf("") }
+    var endNotAfter by remember { mutableStateOf("") }
+    var estimatedDuration by remember { mutableStateOf("") }
     Sheet(onDismiss = onDismiss) {
         SectionTitle("Create task")
-        TextField(value = draftTask, onValueChange = { draftTask = it }, label = "Task title")
+        TextField(value = title, onValueChange = { title = it }, label = "Task title")
+        TextField(value = detail, onValueChange = { detail = it }, label = "Detail")
+        AppText("Parent task", style = ThemeTokens.type.label)
+        SegmentedControl(
+            options = listOf("No parent") + availableParents.map { it.title },
+            selected = availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent",
+            onSelect = { label ->
+                parentId = availableParents.firstOrNull { it.title == label }?.id
+            },
+        )
+        TextField(value = startNotBefore, onValueChange = { startNotBefore = it }, label = "Start not before")
+        TextField(value = endNotAfter, onValueChange = { endNotAfter = it }, label = "End not after")
+        TextField(value = estimatedDuration, onValueChange = { estimatedDuration = it }, label = "Estimated duration")
         ActionRow {
             Button(label = "Cancel", onClick = onDismiss)
-            Button(label = "Create", onClick = { onCreate(draftTask) }, enabled = draftTask.isNotBlank())
+            Button(
+                label = "Create",
+                onClick = {
+                    val draft = normalizeTaskSaveDraft(
+                        title = title,
+                        detail = detail,
+                        parentId = parentId,
+                        startNotBefore = startNotBefore,
+                        endNotAfter = endNotAfter,
+                        estimatedDuration = estimatedDuration,
+                    )
+                    onCreate(
+                        draft.title,
+                        draft.detail,
+                        draft.parentId,
+                        draft.startNotBefore,
+                        draft.endNotAfter,
+                        draft.estimatedDuration,
+                    )
+                },
+                enabled = title.isNotBlank(),
+            )
         }
     }
 }
@@ -835,14 +878,22 @@ internal fun TaskActionsSheet(
                 Button(
                     label = "Save",
                     onClick = {
+                        val draft = normalizeTaskSaveDraft(
+                            title = title,
+                            detail = detail,
+                            parentId = parentId,
+                            startNotBefore = startNotBefore,
+                            endNotAfter = endNotAfter,
+                            estimatedDuration = estimatedDuration,
+                        )
                         onSaveTask(
                             task.id,
-                            title,
-                            detail.ifBlank { null },
-                            parentId,
-                            startNotBefore.ifBlank { null },
-                            endNotAfter.ifBlank { null },
-                            estimatedDuration.ifBlank { null },
+                            draft.title,
+                            draft.detail,
+                            draft.parentId,
+                            draft.startNotBefore,
+                            draft.endNotAfter,
+                            draft.estimatedDuration,
                         )
                     },
                     enabled = !isPomodoroActive && title.isNotBlank(),
@@ -1085,6 +1136,15 @@ internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
         listOf("Delete task")
     }
 
+internal data class TaskSaveDraft(
+    val title: String,
+    val detail: String?,
+    val parentId: String?,
+    val startNotBefore: String?,
+    val endNotAfter: String?,
+    val estimatedDuration: String?,
+)
+
 internal data class RoutineSaveDraft(
     val id: String,
     val title: String,
@@ -1104,6 +1164,22 @@ internal data class RoutineRecurrenceEditorState(
     val preset: RoutineRecurrencePreset,
     val time: String,
     val customRule: String,
+)
+
+internal fun normalizeTaskSaveDraft(
+    title: String,
+    detail: String,
+    parentId: String?,
+    startNotBefore: String,
+    endNotAfter: String,
+    estimatedDuration: String,
+): TaskSaveDraft = TaskSaveDraft(
+    title = title.trim(),
+    detail = detail.ifBlank { null },
+    parentId = parentId,
+    startNotBefore = startNotBefore.ifBlank { null },
+    endNotAfter = endNotAfter.ifBlank { null },
+    estimatedDuration = estimatedDuration.ifBlank { null },
 )
 
 internal fun normalizeRoutineSaveDraft(

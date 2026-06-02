@@ -84,6 +84,7 @@ Status legend:
   - delete is soft-delete backed and secondary/danger scoped
   Sub-work:
   - [x] Split `Tasks` / `Routines` management subtabs and add first-level task filters
+  - [x] Full normal-task create flow for `title`, `detail`, `parent`, and planning fields
   - [x] Normal-task detail editor shell for mutable task fields
   - [x] Task-detail history section
   - [x] Detail lifecycle actions (`complete`, `delete`, progress cleanup)

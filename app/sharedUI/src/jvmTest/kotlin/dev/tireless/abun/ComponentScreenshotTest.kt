@@ -62,14 +62,11 @@ class ComponentScreenshotTest {
 
     @Test
     fun sheet() = captureScreenshot("components/sheet") {
-        Sheet(onDismiss = {}) {
-            SectionTitle("Create task")
-            TextField(value = "Review visual baselines", onValueChange = {}, label = "Task title")
-            ActionRow {
-                Button(label = "Cancel", onClick = {})
-                Button(label = "Create", onClick = {})
-            }
-        }
+        CreateTaskSheet(
+            availableParents = listOf(),
+            onDismiss = {},
+            onCreate = { _, _, _, _, _, _ -> },
+        )
     }
 
     @Test

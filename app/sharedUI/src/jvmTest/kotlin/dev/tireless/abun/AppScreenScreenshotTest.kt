@@ -132,7 +132,11 @@ class AppScreenScreenshotTest {
 
     @Test
     fun createTaskSheet() = captureScreenshot("sheets/create_task") {
-        CreateTaskSheet(onDismiss = {}, onCreate = {})
+        CreateTaskSheet(
+            availableParents = populatedTaskView().tasks,
+            onDismiss = {},
+            onCreate = { _, _, _, _, _, _ -> },
+        )
     }
 
     @Test

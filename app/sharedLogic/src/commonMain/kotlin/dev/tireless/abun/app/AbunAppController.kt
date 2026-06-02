@@ -135,10 +135,25 @@ class AbunAppController(
         _state.value = _state.value.copy(isPomodoroDialogOpen = false)
     }
 
-    fun createTask(title: String) {
+    fun createTask(
+        title: String,
+        detail: String? = null,
+        parentId: String? = null,
+        startNotBefore: String? = null,
+        endNotAfter: String? = null,
+        estimatedDuration: String? = null,
+    ) {
         val preparedTitle = applyTaskDefaults(title)
         if (preparedTitle == null) return
-        store.createTask(preparedTitle, state.value.selectedDate)
+        store.createTask(
+            title = preparedTitle,
+            journalDate = state.value.selectedDate,
+            parentId = parentId,
+            detail = detail,
+            startNotBefore = startNotBefore,
+            endNotAfter = endNotAfter,
+            estimatedDuration = estimatedDuration,
+        )
         refresh()
         requestSync()
     }
