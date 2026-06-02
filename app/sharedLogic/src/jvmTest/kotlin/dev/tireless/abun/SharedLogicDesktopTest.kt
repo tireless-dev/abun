@@ -49,6 +49,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 class SharedLogicDesktopTest {
     @Test
@@ -593,6 +594,37 @@ class SharedLogicDesktopTest {
         assertEquals(LocalDate.parse("2026-05-26"), boundaryLocal.date)
         assertEquals(9, boundaryLocal.hour)
         assertEquals(0, boundaryLocal.minute)
+    }
+
+    @Test
+    fun `routine occurrence context hides postpone at next occurrence boundary`() {
+        val store = testStore()
+        val routineId = store.createRoutine(
+            templateTitle = "Morning plan",
+            templateDetail = null,
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T09:00:00Z",
+            defaultEstimatedDuration = null,
+        )
+
+        store.runRoutine(routineId, "2026-05-25")
+        val initial = store.allTasks("2026-05-25").single { it.routineId == routineId }
+        val boundaryMinusOne = kotlinx.datetime.Instant.parse(checkNotNull(initial.routineNextOccurrenceBoundary))
+            .minus(1.minutes)
+            .toString()
+
+        store.postponeTask(
+            taskId = initial.id,
+            journalDate = "2026-05-25",
+            startNotBefore = boundaryMinusOne,
+            endNotAfter = null,
+            estimatedDuration = null,
+            note = "Push to the edge",
+        )
+
+        val postponed = store.allTasks("2026-05-25").single { it.id == initial.id }
+
+        assertEquals(false, postponed.routineCanPostpone)
     }
 
     @Test

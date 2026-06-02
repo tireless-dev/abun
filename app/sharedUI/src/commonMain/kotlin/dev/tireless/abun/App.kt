@@ -1071,7 +1071,7 @@ internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
     if (task.status.isOpen() && task.routineId != null) {
         buildList {
             add("Complete")
-            add("Postpone")
+            if (task.routineCanPostpone != false) add("Postpone")
             if (task.routineCanSkip != false) add("Skip")
             add("Pomodoro")
         }

@@ -1192,6 +1192,7 @@ class LocalStore(
             estimatedDuration = row.entity.estimatedDuration,
             parentId = row.entity.parentId,
             routineId = row.entity.routineId,
+            routineCanPostpone = routineContext?.canPostpone,
             routineCanSkip = routineContext?.canSkip,
             routineNextOccurrenceBoundary = routineContext?.nextOccurrenceBoundary,
         )
@@ -1211,9 +1212,14 @@ class LocalStore(
             runCatching { Instant.parse(it).toLocalDateTime(TimeZone.currentSystemDefault()) }.getOrNull()
         } ?: Instant.fromEpochMilliseconds(task.createdAt).toLocalDateTime(TimeZone.currentSystemDefault())
         val nextOccurrence = structured.nextOccurrence(baseTime)
+        val nextOccurrenceInstant = nextOccurrence.toInstant(TimeZone.currentSystemDefault())
+        val currentAnchor = task.startNotBefore?.let {
+            runCatching { Instant.parse(it) }.getOrNull()
+        } ?: Instant.fromEpochMilliseconds(task.createdAt)
         return RoutineOccurrenceContext(
+            canPostpone = currentAnchor.plus(1, DateTimeUnit.MINUTE, TimeZone.currentSystemDefault()) < nextOccurrenceInstant,
             canSkip = Instant.fromEpochMilliseconds(timeProvider.nowEpochMillis()) <= rolloverInstant,
-            nextOccurrenceBoundary = nextOccurrence.toInstant(TimeZone.currentSystemDefault()).toString(),
+            nextOccurrenceBoundary = nextOccurrenceInstant.toString(),
         )
     }
 
@@ -1408,6 +1414,7 @@ internal data class JournalRow(
 )
 
 internal data class RoutineOccurrenceContext(
+    val canPostpone: Boolean,
     val canSkip: Boolean,
     val nextOccurrenceBoundary: String,
 )

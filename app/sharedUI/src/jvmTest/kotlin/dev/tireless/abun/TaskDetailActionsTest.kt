@@ -52,4 +52,19 @@ class TaskDetailActionsTest {
 
         assertEquals(listOf("Complete", "Postpone", "Pomodoro"), labels)
     }
+
+    @Test
+    fun `routine derived task hides postpone at next occurrence boundary`() {
+        val labels = taskDetailActionLabels(
+            TaskListItemView(
+                id = "task-5",
+                title = "Boundary occurrence",
+                routineId = "routine-1",
+                routineCanPostpone = false,
+                status = TaskStatus.PENDING,
+            ),
+        )
+
+        assertEquals(listOf("Complete", "Skip", "Pomodoro"), labels)
+    }
 }
