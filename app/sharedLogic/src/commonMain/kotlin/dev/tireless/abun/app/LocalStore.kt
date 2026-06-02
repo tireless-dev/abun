@@ -152,13 +152,18 @@ class LocalStore(
         }
     }
 
+    fun pomodoroStartableTasks(currentDate: String = timeProvider.today().toString()): List<TaskListItemView> =
+        openTasksForDate(currentDate)
+
     fun startPomodoroSession(
         taskId: String?,
         phase: PomodoroPhase,
         preferences: PreferencesViewState = preferences(),
-    ): PomodoroSessionView {
+    ): PomodoroSessionView? {
         val existing = activePomodoroSession(preferences, timeProvider.nowEpochMillis())
         if (existing != null) return existing
+        val currentDate = timeProvider.today().toString()
+        if (taskId != null && !isValidPomodoroTask(taskId, currentDate)) return null
         val now = timeProvider.nowEpochMillis()
         val durationMinutes = durationForPhase(phase, preferences)
         val row = MutableSyncRow(
@@ -213,11 +218,13 @@ class LocalStore(
         val dirty = (existing.dirtyFields + listOf("state", "note", "outcome")).distinct()
         persistPomodoroSession(updated, updatedHlc, dirty, isDirty = true)
         existing.entity.taskId?.let { taskId ->
-            when (taskUpdate) {
-                PomodoroTaskUpdate.NONE -> Unit
-                PomodoroTaskUpdate.PROGRESS -> appendTaskEvent(taskId, journalDate, TaskEventType.PROGRESSED, note)
-                PomodoroTaskUpdate.COMPLETE -> appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
-                PomodoroTaskUpdate.CANCEL -> appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
+            if (isValidPomodoroTask(taskId, timeProvider.today().toString())) {
+                when (taskUpdate) {
+                    PomodoroTaskUpdate.NONE -> Unit
+                    PomodoroTaskUpdate.PROGRESS -> appendTaskEvent(taskId, journalDate, TaskEventType.PROGRESSED, note)
+                    PomodoroTaskUpdate.COMPLETE -> appendTaskEvent(taskId, journalDate, TaskEventType.COMPLETED, note)
+                    PomodoroTaskUpdate.CANCEL -> appendTaskEvent(taskId, journalDate, TaskEventType.CANCELLED, note)
+                }
             }
         }
     }
@@ -1264,6 +1271,9 @@ class LocalStore(
         }
         return task.isVisibleOn(selectedDate)
     }
+
+    private fun isValidPomodoroTask(taskId: String, currentDate: String): Boolean =
+        openTasksForDate(currentDate).any { it.id == taskId }
 
     private fun routineOccurrenceLifecycle(taskId: String): RoutineOccurrenceLifecycle? {
         val createdEvent = queries.selectTaskEventsForTask(taskId, ::mapTaskEventRow)

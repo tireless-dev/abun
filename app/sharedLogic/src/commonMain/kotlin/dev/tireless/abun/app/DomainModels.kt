@@ -175,6 +175,7 @@ data class AppUiState(
     val taskView: TaskViewState = TaskViewState(),
     val activePomodoroSession: PomodoroSessionView? = null,
     val recentPomodoroSessions: List<PomodoroSessionView> = emptyList(),
+    val pomodoroStartTasks: List<AgendaTaskItemView> = emptyList(),
     val preferences: PreferencesViewState = PreferencesViewState(),
     val syncState: SyncStateView = SyncStateView(),
     val auth: AuthViewState = AuthViewState(),

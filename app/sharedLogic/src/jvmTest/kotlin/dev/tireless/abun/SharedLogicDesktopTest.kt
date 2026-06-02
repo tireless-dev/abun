@@ -672,7 +672,7 @@ class SharedLogicDesktopTest {
         )
 
         val preferences = store.preferences()
-        val session = store.startPomodoroSession(taskId = null, phase = PomodoroPhase.FOCUS, preferences = preferences)
+        val session = checkNotNull(store.startPomodoroSession(taskId = null, phase = PomodoroPhase.FOCUS, preferences = preferences))
 
         assertEquals("[focus]", preferences.titlePrefix)
         assertEquals(20, preferences.defaultAlarmLeadMinutes)
@@ -698,8 +698,12 @@ class SharedLogicDesktopTest {
     @Test
     fun `pomodoro completion stores note and task update`() {
         val store = testStore()
-        val taskId = store.createTask("Focus task", "2026-05-25")
-        val session = store.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferences())
+        val taskId = store.createTask(
+            title = "Focus task",
+            journalDate = "2026-05-25",
+            startNotBefore = "2026-05-25T09:00:00Z",
+        )
+        val session = checkNotNull(store.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferences()))
 
         store.completePomodoroSession(session.id, "Deep work finished", PomodoroTaskUpdate.PROGRESS, "2026-05-25")
 
@@ -711,6 +715,40 @@ class SharedLogicDesktopTest {
         assertEquals("Deep work finished", recent.single().note)
         assertEquals(PomodoroTaskUpdate.PROGRESS, recent.single().taskUpdate)
         assertTrue(journal.any { it.eventType == TaskEventType.PROGRESSED && it.content == "Deep work finished" })
+    }
+
+    @Test
+    fun `pomodoro cannot start from invalid task and does not update expired task`() {
+        val zone = TimeZone.currentSystemDefault()
+        val timeProvider = mutableTimeProvider(
+            LocalDateTime(2026, 5, 25, 22, 0).toInstant(zone).toString(),
+            "2026-05-25",
+        )
+        val store = testStore(timeProvider = timeProvider)
+        val futureTaskId = store.createTask(
+            title = "Future task",
+            journalDate = "2026-05-25",
+            startNotBefore = "2026-05-27T09:00:00Z",
+        )
+        val routineId = store.createRoutine(
+            templateTitle = "Late routine",
+            templateDetail = null,
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=21;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T21:00:00Z",
+            defaultEstimatedDuration = null,
+        )
+
+        store.runRoutine(routineId, "2026-05-25")
+        val expiredTaskId = store.allTasks("2026-05-25").single { it.routineId == routineId }.id
+        val invalidStart = store.startPomodoroSession(futureTaskId, PomodoroPhase.FOCUS, store.preferences())
+        val validSession = checkNotNull(store.startPomodoroSession(expiredTaskId, PomodoroPhase.FOCUS, store.preferences()))
+        timeProvider.set(LocalDateTime(2026, 5, 26, 3, 0).toInstant(zone).toString(), "2026-05-26")
+
+        store.completePomodoroSession(validSession.id, "Too late to count", PomodoroTaskUpdate.COMPLETE, "2026-05-26")
+
+        assertEquals(null, invalidStart)
+        assertEquals(emptyList(), store.pomodoroStartableTasks().map { it.id })
+        assertFalse(store.taskHistory(expiredTaskId).any { it.eventType == TaskEventType.COMPLETED })
     }
 
     @Test
@@ -834,11 +872,20 @@ class SharedLogicDesktopTest {
         override fun today(): LocalDate = LocalDate.parse("2026-05-25")
     }
 
-    private fun mutableTimeProvider(nowIso: String, today: String): TimeProvider = object : TimeProvider {
+    private fun mutableTimeProvider(nowIso: String, today: String): MutableTestTimeProvider =
+        MutableTestTimeProvider(nowIso = nowIso, today = today)
+
+    private class MutableTestTimeProvider(nowIso: String, today: String) : TimeProvider {
         private var now = isoStringToEpochMillis(nowIso)
+        private var currentDate = LocalDate.parse(today)
+
+        fun set(nowIso: String, today: String) {
+            now = isoStringToEpochMillis(nowIso)
+            currentDate = LocalDate.parse(today)
+        }
 
         override fun nowEpochMillis(): Long = now++
-        override fun today(): LocalDate = LocalDate.parse(today)
+        override fun today(): LocalDate = currentDate
     }
 
     private fun testIdGenerator(): IdGenerator = object : IdGenerator {

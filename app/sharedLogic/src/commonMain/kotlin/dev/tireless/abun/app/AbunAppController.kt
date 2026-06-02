@@ -292,7 +292,7 @@ class AbunAppController(
     }
 
     fun startPomodoro(taskId: String? = null, phase: PomodoroPhase = PomodoroPhase.FOCUS) {
-        store.startPomodoroSession(taskId, phase, state.value.preferences)
+        store.startPomodoroSession(taskId, phase, state.value.preferences) ?: return
         _state.value = _state.value.copy(isPomodoroDialogOpen = true)
         refresh()
         requestSync()
@@ -416,6 +416,9 @@ class AbunAppController(
             ),
             activePomodoroSession = store.activePomodoroSession(preferences, timeProvider.nowEpochMillis()),
             recentPomodoroSessions = store.recentPomodoroSessions(preferences = preferences, nowEpochMillis = timeProvider.nowEpochMillis()),
+            pomodoroStartTasks = store.pomodoroStartableTasks().map {
+                AgendaTaskItemView(taskId = it.id, title = it.title, status = it.status)
+            },
             preferences = preferences,
             syncState = _state.value.syncState.copy(isSyncing = false, lastSyncedAt = lastSyncedAt),
         )

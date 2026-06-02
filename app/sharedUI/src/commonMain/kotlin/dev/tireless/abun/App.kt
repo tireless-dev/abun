@@ -956,8 +956,8 @@ internal fun StartPomodoroSheet(
     onDismiss: () -> Unit,
     onStart: (String?, PomodoroPhase) -> Unit,
 ) {
-    val openTasks = state.taskView.tasks.filter { it.status.isOpen() }
-    var selectedTaskId by remember(openTasks) { mutableStateOf<String?>(openTasks.firstOrNull()?.id) }
+    val openTasks = state.pomodoroStartTasks
+    var selectedTaskId by remember(openTasks) { mutableStateOf<String?>(openTasks.firstOrNull()?.taskId) }
     var selectedPhase by remember { mutableStateOf(PomodoroPhase.FOCUS) }
 
     Sheet(onDismiss = onDismiss) {
@@ -970,8 +970,8 @@ internal fun StartPomodoroSheet(
         AppText("Task", style = ThemeTokens.type.label)
         SegmentedControl(
             options = listOf("No task") + openTasks.map { it.title },
-            selected = openTasks.firstOrNull { it.id == selectedTaskId }?.title ?: "No task",
-            onSelect = { label -> selectedTaskId = openTasks.firstOrNull { it.title == label }?.id },
+            selected = openTasks.firstOrNull { it.taskId == selectedTaskId }?.title ?: "No task",
+            onSelect = { label -> selectedTaskId = openTasks.firstOrNull { it.title == label }?.taskId },
         )
         AppText("Mode", style = ThemeTokens.type.label)
         SegmentedControl(
