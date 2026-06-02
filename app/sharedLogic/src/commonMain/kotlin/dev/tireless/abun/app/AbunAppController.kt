@@ -401,7 +401,7 @@ class AbunAppController(
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
         store.autoMarkMissedTasks()
         val preferences = store.preferences()
-        val tasks = store.allTasks()
+        val tasks = store.allTasks(_state.value.selectedDate)
         val openTasks = store.openTasksForDate(_state.value.selectedDate)
         val alarms = store.alarms(preferences)
         _state.value = _state.value.copy(

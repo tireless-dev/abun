@@ -40,6 +40,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.sql.DriverManager
@@ -523,6 +525,74 @@ class SharedLogicDesktopTest {
 
         assertTrue(store.routines().isEmpty())
         assertTrue(store.alarms().isEmpty())
+    }
+
+    @Test
+    fun `running routine creates one deterministic occurrence with inherited defaults`() {
+        val store = testStore()
+        val routineId = store.createRoutine(
+            templateTitle = "Morning plan",
+            templateDetail = "Review the top priority before inbox",
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T09:00:00Z",
+            defaultEstimatedDuration = "PT30M",
+        )
+
+        store.runRoutine(routineId, "2026-05-25")
+        store.runRoutine(routineId, "2026-05-25")
+
+        val taskId = "routine-task:$routineId:2026-05-25"
+        val createdEventId = "routine-created-event:$routineId:2026-05-25"
+        val tasks = store.allTasks().filter { it.routineId == routineId }
+        val events = store.dirtyTaskEvents().filter { it.taskId == taskId }
+
+        assertEquals(1, tasks.size)
+        assertEquals(taskId, tasks.single().id)
+        assertEquals("Morning plan", tasks.single().title)
+        assertEquals("Review the top priority before inbox", tasks.single().detail)
+        assertEquals("2026-05-25T09:00:00Z", tasks.single().startNotBefore)
+        assertEquals("PT30M", tasks.single().estimatedDuration)
+        assertEquals(null, tasks.single().parentId)
+        assertEquals(listOf(createdEventId), events.map { it.id })
+        assertEquals(listOf(TaskEventType.CREATED), events.map { it.eventType })
+    }
+
+    @Test
+    fun `routine occurrence context hides skip after rollover and exposes next boundary`() {
+        val store = testStore(
+            timeProvider = object : TimeProvider {
+                override fun nowEpochMillis(): Long = isoStringToEpochMillis("2026-05-26T03:00:00Z")
+                override fun today(): LocalDate = LocalDate.parse("2026-05-26")
+            },
+        )
+        store.updatePreferences(
+            titlePrefix = "",
+            defaultAlarmLeadMinutes = 15,
+            focusMinutes = 25,
+            shortBreakMinutes = 5,
+            longBreakMinutes = 15,
+            timezoneOverride = "UTC",
+            dateFormat = DateFormatPreference.ISO,
+            rolloverTime = "02:00",
+        )
+        val routineId = store.createRoutine(
+            templateTitle = "Morning plan",
+            templateDetail = null,
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T09:00:00Z",
+            defaultEstimatedDuration = null,
+        )
+
+        store.runRoutine(routineId, "2026-05-25")
+
+        val task = store.allTasks("2026-05-25").single { it.routineId == routineId }
+        val boundaryLocal = kotlinx.datetime.Instant.parse(checkNotNull(task.routineNextOccurrenceBoundary))
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+
+        assertEquals(false, task.routineCanSkip)
+        assertEquals(LocalDate.parse("2026-05-26"), boundaryLocal.date)
+        assertEquals(9, boundaryLocal.hour)
+        assertEquals(0, boundaryLocal.minute)
     }
 
     @Test

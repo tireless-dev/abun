@@ -132,6 +132,7 @@ Status legend:
   - `Missed` and `Skipped` match `docs/tasks/functionality-design.md`
   Sub-work:
   - [x] Routine-derived detail action set distinguishes occurrences from normal tasks
+  - [x] Occurrence context exposes rollover-aware skip availability
   - [ ] Occurrence execution identity and inherited routine defaults
   - [ ] Bounded postpone availability against next-occurrence boundary
   - [ ] Skip and missed lifecycle rules

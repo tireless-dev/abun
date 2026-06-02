@@ -37,4 +37,19 @@ class TaskDetailActionsTest {
 
         assertEquals(listOf("Complete", "Postpone", "Skip", "Pomodoro"), labels)
     }
+
+    @Test
+    fun `routine derived task hides skip after rollover`() {
+        val labels = taskDetailActionLabels(
+            TaskListItemView(
+                id = "task-4",
+                title = "Expired occurrence",
+                routineId = "routine-1",
+                routineCanSkip = false,
+                status = TaskStatus.PENDING,
+            ),
+        )
+
+        assertEquals(listOf("Complete", "Postpone", "Pomodoro"), labels)
+    }
 }

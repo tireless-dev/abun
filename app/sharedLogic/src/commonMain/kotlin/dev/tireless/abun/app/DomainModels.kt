@@ -62,6 +62,8 @@ data class TaskListItemView(
     val estimatedDuration: String? = null,
     val parentId: String? = null,
     val routineId: String? = null,
+    val routineCanSkip: Boolean? = null,
+    val routineNextOccurrenceBoundary: String? = null,
 )
 
 data class AgendaTaskItemView(

@@ -48,7 +48,8 @@ class LocalStore(
         }
     }
 
-    fun allTasks(): List<TaskListItemView> = queries.selectTasks(::mapTaskRow).executeAsList().map(::toTaskListItemView)
+    fun allTasks(selectedDate: String? = null): List<TaskListItemView> =
+        queries.selectTasks(::mapTaskRow).executeAsList().map { toTaskListItemView(it, selectedDate) }
 
     fun backlogTasks(): List<TaskListItemView> =
         queries.selectTasks(::mapTaskRow).executeAsList()
@@ -1161,6 +1162,13 @@ class LocalStore(
             .filter { selectedDate == null || it.journalDate <= selectedDate }
             .maxWithOrNull(compareBy<LocalTaskEvent>({ it.eventTime }, { it.createdAt }))
             ?.eventType
+        val routineContext = row.entity.routineId?.let { routineId ->
+            buildRoutineOccurrenceContext(
+                task = row.entity,
+                routineId = routineId,
+                selectedDate = selectedDate,
+            )
+        }
         return TaskListItemView(
             id = row.entity.id,
             title = row.entity.title,
@@ -1184,7 +1192,39 @@ class LocalStore(
             estimatedDuration = row.entity.estimatedDuration,
             parentId = row.entity.parentId,
             routineId = row.entity.routineId,
+            routineCanSkip = routineContext?.canSkip,
+            routineNextOccurrenceBoundary = routineContext?.nextOccurrenceBoundary,
         )
+    }
+
+    private fun buildRoutineOccurrenceContext(
+        task: LocalTask,
+        routineId: String,
+        selectedDate: String?,
+    ): RoutineOccurrenceContext? {
+        if (selectedDate == null) return null
+        val routine = queries.selectRoutineById(routineId, ::mapRoutineRow).executeAsOneOrNull()?.entity ?: return null
+        val structured = StructuredRecurrence.fromRRule(routine.recurrenceRule)
+        val selected = LocalDate.parse(selectedDate)
+        val rolloverInstant = rolloverInstantFor(selected)
+        val baseTime = task.startNotBefore?.let {
+            runCatching { Instant.parse(it).toLocalDateTime(TimeZone.currentSystemDefault()) }.getOrNull()
+        } ?: Instant.fromEpochMilliseconds(task.createdAt).toLocalDateTime(TimeZone.currentSystemDefault())
+        val nextOccurrence = structured.nextOccurrence(baseTime)
+        return RoutineOccurrenceContext(
+            canSkip = Instant.fromEpochMilliseconds(timeProvider.nowEpochMillis()) <= rolloverInstant,
+            nextOccurrenceBoundary = nextOccurrence.toInstant(TimeZone.currentSystemDefault()).toString(),
+        )
+    }
+
+    private fun rolloverInstantFor(date: LocalDate): Instant {
+        val rolloverDate = date.plus(1, DateTimeUnit.DAY)
+        val prefs = preferences()
+        val rolloverParts = prefs.rolloverTime.split(":")
+        val hour = rolloverParts.getOrNull(0)?.toIntOrNull() ?: 0
+        val minute = rolloverParts.getOrNull(1)?.toIntOrNull() ?: 0
+        val rolloverDateTime = LocalDateTime(rolloverDate.year, rolloverDate.month, rolloverDate.day, hour, minute)
+        return rolloverDateTime.toInstant(TimeZone.currentSystemDefault())
     }
 
     private fun toPomodoroSessionView(
@@ -1365,6 +1405,11 @@ internal data class JournalRow(
     val postponed: TaskPostponedPayload?,
     val eventTime: Long,
     val createdAt: Long,
+)
+
+internal data class RoutineOccurrenceContext(
+    val canSkip: Boolean,
+    val nextOccurrenceBoundary: String,
 )
 
 private fun mapTaskRow(
