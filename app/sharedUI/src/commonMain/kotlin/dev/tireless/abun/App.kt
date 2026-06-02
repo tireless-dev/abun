@@ -1069,11 +1069,15 @@ internal fun filterTasksForSurface(tasks: List<TaskListItemView>, filter: TaskLi
 
 internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
     if (task.status.isOpen() && task.routineId != null) {
-        buildList {
-            add("Complete")
-            if (task.routineCanPostpone != false) add("Postpone")
-            if (task.routineCanSkip != false) add("Skip")
-            add("Pomodoro")
+        if (task.routineCanExecute == false) {
+            emptyList()
+        } else {
+            buildList {
+                add("Complete")
+                if (task.routineCanPostpone != false) add("Postpone")
+                if (task.routineCanSkip != false) add("Skip")
+                add("Pomodoro")
+            }
         }
     } else if (task.status.isOpen()) {
         listOf("Progress", "Complete", "Postpone", "Pomodoro", "Delete task")

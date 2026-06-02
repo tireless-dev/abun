@@ -40,7 +40,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.test.runTest
 import java.io.File
@@ -560,12 +562,8 @@ class SharedLogicDesktopTest {
 
     @Test
     fun `routine occurrence context hides skip after rollover and exposes next boundary`() {
-        val store = testStore(
-            timeProvider = object : TimeProvider {
-                override fun nowEpochMillis(): Long = isoStringToEpochMillis("2026-05-26T03:00:00Z")
-                override fun today(): LocalDate = LocalDate.parse("2026-05-26")
-            },
-        )
+        val timeProvider = mutableTimeProvider("2026-05-26T03:00:00Z", "2026-05-26")
+        val store = testStore(timeProvider = timeProvider)
         store.updatePreferences(
             titlePrefix = "",
             defaultAlarmLeadMinutes = 15,
@@ -590,6 +588,8 @@ class SharedLogicDesktopTest {
         val boundaryLocal = kotlinx.datetime.Instant.parse(checkNotNull(task.routineNextOccurrenceBoundary))
             .toLocalDateTime(TimeZone.currentSystemDefault())
 
+        assertEquals(false, task.routineCanExecute)
+        assertEquals(false, task.routineCanPostpone)
         assertEquals(false, task.routineCanSkip)
         assertEquals(LocalDate.parse("2026-05-26"), boundaryLocal.date)
         assertEquals(9, boundaryLocal.hour)
@@ -625,6 +625,35 @@ class SharedLogicDesktopTest {
         val postponed = store.allTasks("2026-05-25").single { it.id == initial.id }
 
         assertEquals(false, postponed.routineCanPostpone)
+    }
+
+    @Test
+    fun `expired routine occurrence records missed on rollover day and stays reconstructible`() {
+        val zone = TimeZone.currentSystemDefault()
+        val afterRollover = LocalDateTime(2026, 5, 26, 3, 0).toInstant(zone).toString()
+        val timeProvider = mutableTimeProvider(afterRollover, "2026-05-26")
+        val store = testStore(timeProvider = timeProvider)
+        val routineId = store.createRoutine(
+            templateTitle = "Evening reset",
+            templateDetail = null,
+            recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=21;BYMINUTE=0",
+            defaultStartNotBefore = "2026-05-25T21:00:00Z",
+            defaultEstimatedDuration = null,
+        )
+
+        store.runRoutine(routineId, "2026-05-25")
+        val taskId = store.allTasks("2026-05-25").single { it.routineId == routineId }.id
+
+        store.completeTask(taskId, "2026-05-26", "Too late")
+        store.skipTask(taskId, "2026-05-26", "Also too late")
+        store.autoMarkMissedTasks()
+
+        assertEquals(listOf(taskId), store.openTasksForDate("2026-05-25").map { it.id })
+        assertTrue(store.openTasksForDate("2026-05-26").none { it.id == taskId })
+        assertEquals(listOf(TaskEventType.MISSED), store.journal("2026-05-26").map { it.eventType })
+        val historyEventTypes = store.taskHistory(taskId).map { it.eventType }
+        assertEquals(2, historyEventTypes.size)
+        assertEquals(setOf(TaskEventType.CREATED, TaskEventType.MISSED), historyEventTypes.toSet())
     }
 
     @Test
@@ -803,6 +832,13 @@ class SharedLogicDesktopTest {
 
         override fun nowEpochMillis(): Long = now++
         override fun today(): LocalDate = LocalDate.parse("2026-05-25")
+    }
+
+    private fun mutableTimeProvider(nowIso: String, today: String): TimeProvider = object : TimeProvider {
+        private var now = isoStringToEpochMillis(nowIso)
+
+        override fun nowEpochMillis(): Long = now++
+        override fun today(): LocalDate = LocalDate.parse(today)
     }
 
     private fun testIdGenerator(): IdGenerator = object : IdGenerator {

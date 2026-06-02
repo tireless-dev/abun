@@ -115,7 +115,7 @@ Status legend:
   - [x] Human-readable recurrence rule presentation
   - [x] Structured recurrence rule editor
 
-- [-] Routine occurrences: execution, bounded postpone, skip, and miss
+- [x] Routine occurrences: execution, bounded postpone, skip, and miss
   Goal:
   Implement routine-derived occurrence behavior so execution history stays consistent with the new model.
   Scope:
@@ -135,7 +135,7 @@ Status legend:
   - [x] Occurrence context exposes rollover-aware skip availability
   - [x] Occurrence execution identity and inherited routine defaults
   - [x] Bounded postpone availability against next-occurrence boundary
-  - [ ] Skip and missed lifecycle rules
+  - [x] Skip and missed lifecycle rules
 
 ## P2
 

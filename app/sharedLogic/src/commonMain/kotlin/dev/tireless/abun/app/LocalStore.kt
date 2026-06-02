@@ -61,7 +61,7 @@ class LocalStore(
             .map { row -> row to toTaskListItemView(row, selectedDate) }
             .filter { (_, task) -> task.status != TaskStatus.COMPLETED && task.status != TaskStatus.CANCELLED }
             .filterNot { (_, task) -> isBacklogTask(task) }
-            .filter { (row, task) -> row.isVisibleOn(LocalDate.parse(selectedDate), task) }
+            .filter { (row, task) -> isTaskVisibleOnSelectedDate(row, LocalDate.parse(selectedDate), task) }
             .map { (_, task) -> task }
 
     fun routines(): List<RoutineListItemView> = queries.selectActiveRoutines(::mapRoutineRow).executeAsList().map {
@@ -334,6 +334,9 @@ class LocalStore(
         val normalizedStart = startNotBefore?.trim().orEmpty().ifBlank { null }
         val normalizedEnd = endNotAfter?.trim().orEmpty().ifBlank { null }
         val normalizedDuration = estimatedDuration?.trim().orEmpty().ifBlank { null }
+        val now = timeProvider.nowEpochMillis()
+
+        if (!canApplyRoutineOccurrenceEvent(existing.entity, TaskEventType.POSTPONED, now)) return@transaction
 
         if (existing.entity.routineId != null) {
             val routine = queries.selectRoutineById(existing.entity.routineId, ::mapRoutineRow).executeAsOneOrNull()?.entity
@@ -386,9 +389,8 @@ class LocalStore(
             dirtyFields = dirty.toList(),
             isDirty = true,
             createdAt = existing.entity.createdAt,
-            updatedAt = timeProvider.nowEpochMillis(),
+            updatedAt = now,
         )
-        val now = timeProvider.nowEpochMillis()
         queries.upsertTaskEvent(
             id = idGenerator.randomId(),
             task_id = taskId,
@@ -776,6 +778,7 @@ class LocalStore(
         val now = timeProvider.nowEpochMillis()
         val zoneId = if (prefs.timezoneOverride == "SYSTEM") TimeZone.currentSystemDefault().id else prefs.timezoneOverride
         val tz = TimeZone.of(zoneId)
+        val currentJournalDate = Instant.fromEpochMilliseconds(now).toLocalDateTime(tz).date.toString()
 
         val allRoutineTasks = queries.selectTasks(::mapTaskRow).executeAsList()
             .filter { it.entity.routineId != null }
@@ -796,7 +799,7 @@ class LocalStore(
             val rolloverInstant = rolloverDateTime.toInstant(tz)
 
             if (Instant.fromEpochMilliseconds(now) > rolloverInstant) {
-                appendTaskEvent(task.id, journalDate, TaskEventType.MISSED, null)
+                appendTaskEvent(task.id, currentJournalDate, TaskEventType.MISSED, null)
             }
         }
     }
@@ -862,6 +865,8 @@ class LocalStore(
         postponed: TaskPostponedPayload? = null,
     ) = database.transaction {
         val now = timeProvider.nowEpochMillis()
+        val task = queries.selectTaskById(taskId, ::mapTaskRow).executeAsOneOrNull()?.entity ?: return@transaction
+        if (!canApplyRoutineOccurrenceEvent(task, type, now)) return@transaction
         queries.upsertTaskEvent(
             id = idGenerator.randomId(),
             task_id = taskId,
@@ -1192,6 +1197,7 @@ class LocalStore(
             estimatedDuration = row.entity.estimatedDuration,
             parentId = row.entity.parentId,
             routineId = row.entity.routineId,
+            routineCanExecute = routineContext?.canExecute,
             routineCanPostpone = routineContext?.canPostpone,
             routineCanSkip = routineContext?.canSkip,
             routineNextOccurrenceBoundary = routineContext?.nextOccurrenceBoundary,
@@ -1208,6 +1214,7 @@ class LocalStore(
         val structured = StructuredRecurrence.fromRRule(routine.recurrenceRule)
         val selected = LocalDate.parse(selectedDate)
         val rolloverInstant = rolloverInstantFor(selected)
+        val canExecute = Instant.fromEpochMilliseconds(timeProvider.nowEpochMillis()) <= rolloverInstant
         val baseTime = task.startNotBefore?.let {
             runCatching { Instant.parse(it).toLocalDateTime(TimeZone.currentSystemDefault()) }.getOrNull()
         } ?: Instant.fromEpochMilliseconds(task.createdAt).toLocalDateTime(TimeZone.currentSystemDefault())
@@ -1217,8 +1224,9 @@ class LocalStore(
             runCatching { Instant.parse(it) }.getOrNull()
         } ?: Instant.fromEpochMilliseconds(task.createdAt)
         return RoutineOccurrenceContext(
-            canPostpone = currentAnchor.plus(1, DateTimeUnit.MINUTE, TimeZone.currentSystemDefault()) < nextOccurrenceInstant,
-            canSkip = Instant.fromEpochMilliseconds(timeProvider.nowEpochMillis()) <= rolloverInstant,
+            canExecute = canExecute,
+            canPostpone = canExecute && currentAnchor.plus(1, DateTimeUnit.MINUTE, TimeZone.currentSystemDefault()) < nextOccurrenceInstant,
+            canSkip = canExecute,
             nextOccurrenceBoundary = nextOccurrenceInstant.toString(),
         )
     }
@@ -1231,6 +1239,45 @@ class LocalStore(
         val minute = rolloverParts.getOrNull(1)?.toIntOrNull() ?: 0
         val rolloverDateTime = LocalDateTime(rolloverDate.year, rolloverDate.month, rolloverDate.day, hour, minute)
         return rolloverDateTime.toInstant(TimeZone.currentSystemDefault())
+    }
+
+    private fun canApplyRoutineOccurrenceEvent(task: LocalTask, type: TaskEventType, nowEpochMillis: Long): Boolean {
+        if (task.routineId == null) return true
+        val lifecycle = routineOccurrenceLifecycle(task.id) ?: return true
+        if (type == TaskEventType.MISSED) return true
+        if (lifecycle.isExpired(nowEpochMillis)) return false
+        return true
+    }
+
+    private fun isTaskVisibleOnSelectedDate(
+        row: MutableSyncRow<LocalTask>,
+        selectedDate: LocalDate,
+        task: TaskListItemView,
+    ): Boolean {
+        if (row.entity.isDeleted) {
+            val deletionDate = epochMillisToIsoString(row.entity.updatedAt).let(::isoDatePart)
+            if (selectedDate >= deletionDate) return false
+        }
+        if (row.entity.routineId != null) {
+            val occurrenceDate = routineOccurrenceLifecycle(row.entity.id)?.occurrenceDate ?: return false
+            return selectedDate == occurrenceDate
+        }
+        return task.isVisibleOn(selectedDate)
+    }
+
+    private fun routineOccurrenceLifecycle(taskId: String): RoutineOccurrenceLifecycle? {
+        val createdEvent = queries.selectTaskEventsForTask(taskId, ::mapTaskEventRow)
+            .executeAsList()
+            .asSequence()
+            .map { it.entity }
+            .filter { it.eventType == TaskEventType.CREATED }
+            .minWithOrNull(compareBy<LocalTaskEvent>({ it.eventTime }, { it.createdAt }))
+            ?: return null
+        val occurrenceDate = LocalDate.parse(createdEvent.journalDate)
+        return RoutineOccurrenceLifecycle(
+            occurrenceDate = occurrenceDate,
+            rolloverInstant = rolloverInstantFor(occurrenceDate),
+        )
     }
 
     private fun toPomodoroSessionView(
@@ -1414,10 +1461,18 @@ internal data class JournalRow(
 )
 
 internal data class RoutineOccurrenceContext(
+    val canExecute: Boolean,
     val canPostpone: Boolean,
     val canSkip: Boolean,
     val nextOccurrenceBoundary: String,
 )
+
+internal data class RoutineOccurrenceLifecycle(
+    val occurrenceDate: LocalDate,
+    val rolloverInstant: Instant,
+) {
+    fun isExpired(nowEpochMillis: Long): Boolean = Instant.fromEpochMilliseconds(nowEpochMillis) > rolloverInstant
+}
 
 private fun mapTaskRow(
     id: String,
