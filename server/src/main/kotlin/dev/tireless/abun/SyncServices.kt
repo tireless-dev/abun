@@ -109,14 +109,20 @@ internal class AuthService(
         val normalized = email.trim().lowercase()
         require(normalized.isNotBlank()) { "email is required" }
         val now = Instant.now()
-        val code = (100000..999999).random().toString()
+        val code = if (normalized == TestSharedAccount.EMAIL) TestSharedAccount.OTP else (100000..999999).random().toString()
         database.tx { connection ->
             connection.prepareStatement(
-                """
-                INSERT INTO otp_code(email, code, expires_at, created_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (email) DO UPDATE SET code = excluded.code, expires_at = excluded.expires_at, created_at = excluded.created_at
-                """.trimIndent(),
+                "UPDATE otp_code SET code = ?, expires_at = ?, created_at = ? WHERE email = ?",
+            ).use { statement ->
+                statement.setString(1, code)
+                statement.setString(2, now.plusSeconds(600).toString())
+                statement.setString(3, now.toString())
+                statement.setString(4, normalized)
+                val updated = statement.executeUpdate()
+                if (updated > 0) return@tx
+            }
+            connection.prepareStatement(
+                "INSERT INTO otp_code(email, code, expires_at, created_at) VALUES (?, ?, ?, ?)",
             ).use { statement ->
                 statement.setString(1, normalized)
                 statement.setString(2, code)
@@ -169,7 +175,7 @@ internal class AuthService(
                 if (rs.next()) return@tx rs.getString("id")
             }
         }
-        val id = UUID.randomUUID().toString()
+        val id = if (email == TestSharedAccount.EMAIL) TestSharedAccount.USER_ID else UUID.randomUUID().toString()
         connection.prepareStatement("INSERT INTO user_account(id, email, created_at) VALUES (?, ?, ?)").use { statement ->
             statement.setString(1, id)
             statement.setString(2, email)

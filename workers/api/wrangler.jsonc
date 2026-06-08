@@ -1,0 +1,12 @@
+{
+  "name": "abun-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": {
+    "required": ["DB_URL"]
+  },
+  "vars": {
+    "ABUN_REQUIRE_AUTH": "true"
+  }
+}

@@ -27,10 +27,26 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.h2.jdbcx.JdbcDataSource
+import java.nio.file.Path
+import java.time.Instant
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ApplicationTest {
@@ -42,6 +58,71 @@ class ApplicationTest {
 
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals("abun sync server", response.bodyAsText())
+    }
+
+    @Test
+    fun `__any_long__ placeholder rejects quoted numbers`() {
+        assertFailsWith<AssertionError> {
+            assertJsonMatchesFixture(
+                JsonPrimitive("__any_long__"),
+                JsonPrimitive("123"),
+            )
+        }
+    }
+
+    @Test
+    fun `server routes stay aligned with frozen auth sync and business contracts`() = testApplication {
+        application { module(testServices()) }
+        val jsonClient = jsonClient()
+        val authFixture = readFixture<AuthContractFixture>("docs/contracts/server-fixtures/auth.json")
+        val syncFixture = readFixture<SyncTaskContractFixture>("docs/contracts/server-fixtures/sync-tasks.json")
+        val businessFixture = readFixture<BusinessApiContractFixture>("docs/contracts/server-fixtures/business-api.json")
+
+        val otpRequestResponse = jsonClient.post("/auth/otp/request") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(fixtureJson.encodeToString(JsonElement.serializer(), authFixture.otpRequest.request))
+        }
+        assertEquals(HttpStatusCode.fromValue(authFixture.otpRequest.status), otpRequestResponse.status)
+
+        val otpVerifyResponse = jsonClient.post("/auth/otp/verify") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(fixtureJson.encodeToString(JsonElement.serializer(), authFixture.otpVerify.request))
+        }
+        assertEquals(HttpStatusCode.fromValue(authFixture.otpVerify.status), otpVerifyResponse.status)
+        val otpVerifyJson = fixtureJson.parseToJsonElement(otpVerifyResponse.bodyAsText())
+        assertJsonMatchesFixture(authFixture.otpVerify.response, otpVerifyJson)
+
+        val accessToken = otpVerifyJson.jsonObject["access_token"]?.jsonPrimitive?.content
+        assertNotNull(accessToken)
+
+        val syncResponse = jsonClient.post("/sync/tasks") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(fixtureJson.encodeToString(JsonElement.serializer(), syncFixture.syncTasks.request))
+        }
+        assertEquals(HttpStatusCode.fromValue(syncFixture.syncTasks.status), syncResponse.status)
+        val syncJson = fixtureJson.parseToJsonElement(syncResponse.bodyAsText())
+        assertJsonMatchesFixture(syncFixture.syncTasks.response, syncJson)
+        assertEquals(
+            syncFixture.syncTasks.acceptedFields,
+            syncJson.jsonObject.getValue("items").jsonArray.single().jsonObject.getValue("accepted_fields").jsonArray.map { it.jsonPrimitive.content },
+        )
+
+        val createTaskResponse = jsonClient.post("/api/tasks") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(fixtureJson.encodeToString(JsonElement.serializer(), businessFixture.createTask.request))
+        }
+        assertEquals(HttpStatusCode.fromValue(businessFixture.createTask.status), createTaskResponse.status)
+
+        val getTaskResponse = jsonClient.get("/api/tasks/fixture-task") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+        }
+        assertEquals(HttpStatusCode.fromValue(businessFixture.getTask.status), getTaskResponse.status)
+        assertJsonMatchesFixture(
+            businessFixture.getTask.response,
+            fixtureJson.parseToJsonElement(getTaskResponse.bodyAsText()),
+        )
     }
 
     @Test
@@ -121,6 +202,60 @@ class ApplicationTest {
         }.body<PullResponse<dev.tireless.abun.sync.SyncPreference>>()
         assertEquals(1, pulled.items.size)
         assertEquals("20", pulled.items.single().value)
+    }
+
+    @Test
+    fun `shared test account request stores deterministic otp and verify returns shared user`() {
+        val dataSource = JdbcDataSource().apply {
+            setURL("jdbc:h2:mem:${System.nanoTime()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
+            user = "sa"
+            password = ""
+        }
+        val auth = AuthService(ServerDatabase(dataSource))
+
+        auth.requestOtp(TestSharedAccount.EMAIL)
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement("SELECT code FROM otp_code WHERE email = ?").use { statement ->
+                statement.setString(1, TestSharedAccount.EMAIL)
+                statement.executeQuery().use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals(TestSharedAccount.OTP, rs.getString("code"))
+                }
+            }
+        }
+
+        val (userId, token) = auth.verifyOtp(TestSharedAccount.EMAIL, TestSharedAccount.OTP)
+
+        assertEquals(TestSharedAccount.USER_ID, userId)
+        assertEquals("uid:${TestSharedAccount.USER_ID}", token)
+    }
+
+    @Test
+    fun `non shared account still creates user on successful verify`() {
+        val dataSource = JdbcDataSource().apply {
+            setURL("jdbc:h2:mem:${System.nanoTime()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
+            user = "sa"
+            password = ""
+        }
+        val auth = AuthService(ServerDatabase(dataSource))
+        val email = "person@example.com"
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement("INSERT INTO otp_code(email, code, expires_at, created_at) VALUES (?, ?, ?, ?)").use { statement ->
+                statement.setString(1, email)
+                statement.setString(2, "111111")
+                statement.setString(3, Instant.now().plusSeconds(600).toString())
+                statement.setString(4, Instant.now().toString())
+                statement.executeUpdate()
+            }
+        }
+
+        val (userId, token) = auth.verifyOtp(email, "111111")
+
+        assertTrue(userId.isNotBlank())
+        assertTrue(userId != TestSharedAccount.USER_ID)
+        assertEquals("uid:$userId", token)
     }
 
     @Test
@@ -500,6 +635,46 @@ class ApplicationTest {
         }
     }
 
+    private inline fun <reified T> readFixture(relativePath: String): T =
+        fixtureJson.decodeFromString(resolveFixturePath(relativePath).readText())
+
+    private fun resolveFixturePath(relativePath: String): Path =
+        sequenceOf(
+            Path.of(relativePath),
+            Path.of("..", relativePath),
+        ).firstOrNull(Path::exists)
+            ?: throw IllegalArgumentException("Missing fixture file: $relativePath")
+
+    private fun assertJsonMatchesFixture(expected: JsonElement, actual: JsonElement, path: String = "$") {
+        when {
+            expected is JsonObject && actual is JsonObject -> {
+                assertEquals(expected.keys, actual.keys, "JSON keys differ at $path")
+                expected.forEach { (key, expectedValue) ->
+                    val actualValue = actual[key]
+                    assertNotNull(actualValue, "Missing key $path.$key")
+                    assertJsonMatchesFixture(expectedValue, actualValue, "$path.$key")
+                }
+            }
+
+            expected is JsonArray && actual is JsonArray -> {
+                assertEquals(expected.size, actual.size, "JSON array size differs at $path")
+                expected.zip(actual).forEachIndexed { index, (expectedItem, actualItem) ->
+                    assertJsonMatchesFixture(expectedItem, actualItem, "$path[$index]")
+                }
+            }
+
+            expected is JsonPrimitive && actual is JsonPrimitive -> {
+                when (expected.content) {
+                    "__any_string__" -> assertTrue(actual.isString && actual.content.isNotBlank(), "Expected non-blank string at $path")
+                    "__any_long__" -> assertTrue(!actual.isString && actual.content.toLongOrNull() != null, "Expected numeric long at $path")
+                    else -> assertEquals(expected, actual, "JSON value differs at $path")
+                }
+            }
+
+            else -> assertEquals(expected, actual, "JSON shape differs at $path")
+        }
+    }
+
     private fun testServices(authRequired: Boolean = false): AppServices {
         val dataSource = JdbcDataSource().apply {
             setURL("jdbc:h2:mem:${System.nanoTime()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
@@ -507,6 +682,44 @@ class ApplicationTest {
             password = ""
         }
         return AppServices.forDataSource(dataSource, authRequired = authRequired)
+    }
+
+    @Serializable
+    private data class AuthContractFixture(
+        @SerialName("otp_request") val otpRequest: RequestContractFixture,
+        @SerialName("otp_verify") val otpVerify: ResponseContractFixture,
+    )
+
+    @Serializable
+    private data class SyncTaskContractFixture(
+        @SerialName("sync_tasks") val syncTasks: ResponseContractFixture,
+    )
+
+    @Serializable
+    private data class BusinessApiContractFixture(
+        @SerialName("create_task") val createTask: RequestContractFixture,
+        @SerialName("get_task") val getTask: ResponseContractFixture,
+    )
+
+    @Serializable
+    private data class RequestContractFixture(
+        val request: JsonElement,
+        val status: Int,
+    )
+
+    @Serializable
+    private data class ResponseContractFixture(
+        val request: JsonElement,
+        val status: Int,
+        val response: JsonElement = buildJsonObject { },
+        @SerialName("accepted_fields") val acceptedFields: List<String> = emptyList(),
+    )
+
+    private companion object {
+        val fixtureJson = Json {
+            ignoreUnknownKeys = false
+            explicitNulls = false
+        }
     }
 }
 
