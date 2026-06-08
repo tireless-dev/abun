@@ -1,11 +1,15 @@
 import type { DbClient } from "../db/transaction";
+import { withTransaction } from "../db/transaction";
 import type {
   MutableSyncService,
   PullResponse,
 } from "./sync-service-types";
 import {
   dedupe,
+  nextServerVersion,
+  parseStringMap,
   shouldAcceptIncoming,
+  stringOrUndefined,
 } from "./sync-utils";
 
 export interface SyncRoutine {
@@ -170,13 +174,52 @@ export class RoutineSyncService implements RoutineSyncServiceLike {
 
 let defaultRoutineSyncService: RoutineSyncServiceLike | null = null;
 
+class DatabaseRoutineSyncService implements RoutineSyncServiceLike {
+  constructor(private readonly db: DbClient) {}
+
+  async list(userId: string, cursor: number, limit: number): Promise<PullResponse<SyncRoutine>> {
+    const result = await this.db.query(
+      `
+        select * from routine
+        where user_id = $1 and server_version > $2
+        order by server_version asc
+        limit $3
+      `,
+      [userId, cursor, limit],
+    );
+    const items = result.rows.map(rowToSyncRoutine);
+    return {
+      items,
+      next_cursor: items.at(-1)?.server_version ?? cursor,
+      has_more: items.length === limit,
+    };
+  }
+
+  async push(userId: string, items: SyncRoutine[]): Promise<SyncRoutine[]> {
+    const results: SyncRoutine[] = [];
+    for (const incoming of items) {
+      const result = await withTransaction(this.db, async (tx) => {
+        const existing = await selectOneRoutine(tx, userId, incoming.id);
+        if (!existing) return insertNewRoutine(tx, userId, incoming);
+        return mergeExistingRoutine(tx, userId, existing, incoming);
+      });
+      results.push(result);
+    }
+    return results;
+  }
+}
+
 export function resolveRoutineSyncService(
   env: Record<string, unknown>,
-  _dbClient?: DbClient,
+  dbClient?: DbClient,
 ): RoutineSyncServiceLike {
   const injected = env.__routineSyncService;
   if (isRoutineSyncServiceLike(injected)) {
     return injected;
+  }
+
+  if (dbClient) {
+    return new DatabaseRoutineSyncService(dbClient);
   }
 
   defaultRoutineSyncService ??= new RoutineSyncService();
@@ -209,4 +252,148 @@ function cloneRoutine(routine: SyncRoutine): SyncRoutine {
     server_updated_at: routine.server_updated_at ?? undefined,
     created_at: routine.created_at ?? undefined,
   };
+}
+
+async function selectOneRoutine(db: DbClient, userId: string, id: string): Promise<SyncRoutine | null> {
+  const result = await db.query(
+    `select * from routine where user_id = $1 and id = $2`,
+    [userId, id],
+  );
+  const row = result.rows[0];
+  return row ? rowToSyncRoutine(row) : null;
+}
+
+async function insertNewRoutine(db: DbClient, userId: string, incoming: SyncRoutine): Promise<SyncRoutine> {
+  const now = new Date().toISOString();
+  const canonical: SyncRoutine = {
+    ...cloneRoutine(incoming),
+    is_active: incoming.is_active ?? true,
+    is_deleted: incoming.is_deleted ?? false,
+    accepted_fields: dedupe(incoming.dirty_fields ?? []),
+    rejected_fields: [],
+    server_version: await nextServerVersion(db),
+    server_updated_at: now,
+    created_at: incoming.created_at ?? now,
+  };
+  await db.query(
+    `
+      insert into routine(
+        id, user_id, template_title, template_detail, recurrence_rule, default_start_not_before,
+        default_estimated_duration, is_active, is_deleted, hlc_map, server_version, server_updated_at, created_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    `,
+    [
+      canonical.id,
+      userId,
+      canonical.template_title,
+      canonical.template_detail ?? null,
+      canonical.recurrence_rule,
+      canonical.default_start_not_before ?? null,
+      canonical.default_estimated_duration ?? null,
+      canonical.is_active ?? true,
+      canonical.is_deleted ?? false,
+      JSON.stringify(canonical.hlc_map ?? {}),
+      canonical.server_version ?? 0,
+      canonical.server_updated_at ?? now,
+      canonical.created_at ?? now,
+    ],
+  );
+  return canonical;
+}
+
+async function mergeExistingRoutine(
+  db: DbClient,
+  userId: string,
+  existing: SyncRoutine,
+  incoming: SyncRoutine,
+): Promise<SyncRoutine> {
+  let merged = cloneRoutine(existing);
+  const accepted: string[] = [];
+  const rejected: string[] = [];
+
+  for (const field of dedupe(incoming.dirty_fields ?? [])) {
+    const incomingHlc = incoming.hlc_map?.[field];
+    const existingHlc = existing.hlc_map?.[field];
+    if (!ROUTINE_FIELDS.has(field) || !shouldAcceptIncoming(incomingHlc, existingHlc)) {
+      rejected.push(field);
+      continue;
+    }
+    switch (field) {
+      case "template_title":
+        merged.template_title = incoming.template_title;
+        break;
+      case "template_detail":
+        merged.template_detail = incoming.template_detail ?? undefined;
+        break;
+      case "recurrence_rule":
+        merged.recurrence_rule = incoming.recurrence_rule;
+        break;
+      case "default_start_not_before":
+        merged.default_start_not_before = incoming.default_start_not_before ?? undefined;
+        break;
+      case "default_estimated_duration":
+        merged.default_estimated_duration = incoming.default_estimated_duration ?? undefined;
+        break;
+      case "active":
+        merged.is_active = incoming.is_active ?? true;
+        break;
+      case "delete":
+        merged.is_deleted = incoming.is_deleted ?? false;
+        break;
+    }
+    merged.hlc_map = { ...(merged.hlc_map ?? {}), [field]: incomingHlc! };
+    accepted.push(field);
+  }
+
+  if (accepted.length === 0) {
+    return { ...merged, accepted_fields: [], rejected_fields: rejected };
+  }
+  const updated: SyncRoutine = {
+    ...merged,
+    accepted_fields: accepted,
+    rejected_fields: rejected,
+    server_version: await nextServerVersion(db),
+    server_updated_at: new Date().toISOString(),
+    created_at: existing.created_at ?? new Date().toISOString(),
+  };
+  await db.query(
+    `
+      update routine
+      set template_title = $1, template_detail = $2, recurrence_rule = $3, default_start_not_before = $4,
+          default_estimated_duration = $5, is_active = $6, is_deleted = $7, hlc_map = $8, server_version = $9, server_updated_at = $10
+      where user_id = $11 and id = $12
+    `,
+    [
+      updated.template_title,
+      updated.template_detail ?? null,
+      updated.recurrence_rule,
+      updated.default_start_not_before ?? null,
+      updated.default_estimated_duration ?? null,
+      updated.is_active ?? true,
+      updated.is_deleted ?? false,
+      JSON.stringify(updated.hlc_map ?? {}),
+      updated.server_version ?? 0,
+      updated.server_updated_at ?? new Date().toISOString(),
+      userId,
+      updated.id,
+    ],
+  );
+  return updated;
+}
+
+function rowToSyncRoutine(row: Record<string, unknown>): SyncRoutine {
+  return cloneRoutine({
+    id: String(row.id),
+    template_title: String(row.template_title),
+    template_detail: stringOrUndefined(row.template_detail),
+    recurrence_rule: stringOrUndefined(row.recurrence_rule) ?? stringOrUndefined(row.cron_schedule) ?? "",
+    default_start_not_before: stringOrUndefined(row.default_start_not_before),
+    default_estimated_duration: stringOrUndefined(row.default_estimated_duration),
+    is_active: Boolean(row.is_active),
+    is_deleted: Boolean(row.is_deleted),
+    hlc_map: parseStringMap(row.hlc_map),
+    server_version: Number(row.server_version ?? 0),
+    server_updated_at: stringOrUndefined(row.server_updated_at),
+    created_at: stringOrUndefined(row.created_at),
+  });
 }
