@@ -1,4 +1,4 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
+This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop (JVM), backed by a Cloudflare Workers API.
 
 * [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
@@ -23,7 +23,7 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
   can add code to the platform-specific folders here too.
 
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
+* [/workers/api](./workers/api/src) is for the Cloudflare Workers backend that serves the `/auth`, `/sync`, and `/api` routes.
 
 ### Running the apps
 
@@ -33,7 +33,14 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Desktop app:
   - Hot reload: `./gradlew :app:desktopApp:hotRun --auto`
   - Standard run: `./gradlew :app:desktopApp:run`
-- Server: `./gradlew :server:run`
+- Workers API:
+  1. Install [Bun](https://bun.sh/)
+  2. Run the Worker locally:
+     ```shell
+     cd workers/api
+     bun install
+     bun run dev
+     ```
 - Web app:
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
   2. Build and run the web application:
@@ -49,7 +56,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :app:sharedUI:testAndroidHostTest :app:sharedLogic:testAndroidHostTest`
 - Desktop tests: `./gradlew :app:sharedUI:jvmTest :app:sharedLogic:jvmTest`
-- Server tests: `./gradlew :server:test`
+- Workers API tests: `cd workers/api && bun run test`
 - Web tests: `./gradlew :app:sharedLogic:jsTest`
 - iOS tests: `./gradlew :app:sharedUI:iosSimulatorArm64Test :app:sharedLogic:iosSimulatorArm64Test`
 

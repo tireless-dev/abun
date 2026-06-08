@@ -292,7 +292,9 @@ async function withOptionalDbClient(
   try {
     return await block(dbClient);
   } finally {
-    await dbClient.end?.();
+    if (!env.HYPERDRIVE) {
+      await dbClient.end?.();
+    }
   }
 }
 

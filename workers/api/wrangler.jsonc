@@ -1,11 +1,14 @@
 {
   "name": "abun-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-06-07",
+  "compatibility_date": "2026-06-08",
   "compatibility_flags": ["nodejs_compat"],
-  "secrets": {
-    "required": ["DB_URL"]
-  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0dfbae7d6fa04736b806ab15b721848c"
+    }
+  ],
   "vars": {
     "ABUN_REQUIRE_AUTH": "true"
   }

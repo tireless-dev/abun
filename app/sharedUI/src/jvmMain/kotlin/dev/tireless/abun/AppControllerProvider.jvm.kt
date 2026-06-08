@@ -8,6 +8,7 @@ import dev.tireless.abun.app.DefaultTimeProvider
 import dev.tireless.abun.app.DemoAuthProvider
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
 import dev.tireless.abun.app.JvmNodeIdProvider
+import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.StableStringIdGenerator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -26,7 +27,7 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = JvmNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            serverBaseUrl = "http://127.0.0.1:8080",
+            serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
 }

@@ -1,5 +1,10 @@
+export interface HyperdriveBinding {
+  connectionString: string;
+}
+
 export interface WorkerEnv {
-  DB_URL: string;
+  DB_URL?: string;
+  HYPERDRIVE?: HyperdriveBinding;
   ABUN_REQUIRE_AUTH?: string;
 }
 
@@ -17,9 +22,19 @@ export function requireEnvValue(
 }
 
 export function getDbUrl(env: Partial<WorkerEnv>): string {
-  return requireEnvValue(env, "DB_URL");
+  const hyperdriveConnectionString = env.HYPERDRIVE?.connectionString;
+  if (typeof hyperdriveConnectionString === "string" && hyperdriveConnectionString.length > 0) {
+    return hyperdriveConnectionString;
+  }
+  if (typeof env.DB_URL === "string" && env.DB_URL.length > 0) {
+    return env.DB_URL;
+  }
+  return requireEnvValue(env, "DB_URL" as keyof WorkerEnv);
 }
 
 export function hasDbUrl(env: Partial<WorkerEnv>): boolean {
-  return typeof env.DB_URL === "string" && env.DB_URL.length > 0;
+  return (
+    (typeof env.HYPERDRIVE?.connectionString === "string" && env.HYPERDRIVE.connectionString.length > 0) ||
+    (typeof env.DB_URL === "string" && env.DB_URL.length > 0)
+  );
 }

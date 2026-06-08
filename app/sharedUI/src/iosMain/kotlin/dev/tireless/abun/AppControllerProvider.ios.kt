@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AppDependencies
+import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
 import dev.tireless.abun.app.DemoAuthProvider
 import dev.tireless.abun.app.IosDatabaseDriverFactory
@@ -26,7 +27,7 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = IosNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            serverBaseUrl = "http://127.0.0.1:8080",
+            serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
 }
