@@ -130,7 +130,6 @@ fun App() {
                     .verticalScroll(rememberScrollState()),
                 applyVerticalSafeInsets = false,
             ) {
-                StatusStrip(state)
                 when (state.selectedTab) {
                     AppTab.TODAY -> TodayScreen(
                         state = state,
@@ -278,7 +277,7 @@ internal fun GuideScreenContent(
     onVerifyEmailOtp: (String) -> Unit,
     onSkipLogin: () -> Unit,
 ) {
-    var otpCode by remember { mutableStateOf("") }
+    var otpCode by remember { mutableStateOf(defaultGuideOtpCode()) }
     ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
         Panel {
             AppText("abun", style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold), color = ThemeTokens.colors.primary)
@@ -292,17 +291,6 @@ internal fun GuideScreenContent(
             }
             Button(label = "Skip for now", onClick = onSkipLogin, enabled = !state.auth.isSubmitting)
             state.auth.errorMessage?.let { InlineError(it) }
-        }
-    }
-}
-
-@Composable
-private fun StatusStrip(state: AppUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
-        state.syncState.lastSyncedAt?.let { AppText("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
-        state.syncState.errorMessage?.let { InlineError(it) }
-        if (state.auth.mode == AuthMode.GUEST) {
-            AppText("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
         }
     }
 }
@@ -497,6 +485,10 @@ internal fun SettingsScreenContent(
     var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
     var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
+    Panel {
+        SectionHeader("Cloud", "Sync status")
+        SyncStatusPanel(state)
+    }
     Panel {
         SectionHeader("Defaults", "Task")
         TextField(value = titlePrefix, onValueChange = { titlePrefix = it }, label = "Title prefix")
