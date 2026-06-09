@@ -19,6 +19,7 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop 
 * [/app/webApp](./app/webApp) contains a React web application. In production it is served from `/app` by the same Worker,
   and it talks to the server through the direct `/api/*` business API family rather than using the local-first sync layer as
   its primary data path.
+  The Worker serves these assets from `app/webApp/dist`, so web changes must be rebuilt before Worker verification or deployment.
 
 * [/core](./core/src) is for the code that will be shared between all targets in the project.
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
@@ -46,6 +47,12 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
      bun install
      bun run dev
      ```
+  3. Before shipping API changes, verify and deploy:
+     ```shell
+     bun run test
+     bun run typecheck
+     bun run deploy
+     ```
 - Web app:
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
   2. Build the static assets consumed by the Worker:
@@ -53,6 +60,11 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
      cd app/webApp
      npm install
      npm run build
+     ```
+  3. If you need to ship web changes, deploy the Worker after the build so the updated `/app` assets are published:
+     ```shell
+     cd workers/api
+     bun run deploy
      ```
 - iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
 

@@ -13,7 +13,33 @@ describe("api worker smoke test", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain("Abun");
+    const body = await response.text();
+    expect(body).toContain("Plan tasks, routines, and focused work in one place");
+    expect(body).toContain("Open web app");
+    expect(body).toContain("Download apps");
+    expect(body).toContain("Cross-platform flow");
+    expect(body).toContain("Focus sessions");
+    expect(body).toContain("Event history");
+    expect(body).toContain("hero hero--stacked");
+    expect(body).toContain("feature-rail");
+  });
+
+  it("returns an under-construction mobile downloads page", async () => {
+    const handler = worker as ExportedHandler;
+    const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
+    const request = new Request("http://example.com/mobile");
+    const response = await fetchHandler(
+      request as never,
+      {} as never,
+      {} as ExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Mobile apps are under construction");
+    expect(body).toContain("App Store");
+    expect(body).toContain("Google Play");
+    expect(body).toContain("href=\"/app\"");
   });
 
   it("rewrites /app requests into the static asset bundle", async () => {

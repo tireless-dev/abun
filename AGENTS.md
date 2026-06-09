@@ -29,6 +29,21 @@ Use the Kotlin Multiplatform desktop app for routine UI and logic verification.
 ./gradlew :core:commonTest
 ```
 
+### Web App / Worker Follow-Through
+```bash
+# Rebuild the web assets served by the Worker at /app
+npm run build -w webApp
+
+# Verify Worker changes
+npm run api:test
+npm run api:typecheck
+```
+
+- `workers/api/wrangler.jsonc` serves `abun.tireless.dev/app` from `app/webApp/dist`.
+- After any `app/webApp` change, run `npm run build -w webApp` before local Worker verification or deployment.
+- After any `workers/api` change, run `npm run api:test` and `npm run api:typecheck`.
+- If either `app/webApp` or `workers/api` changed and the task includes shipping to production, deploy from `workers/api` with `bun run deploy` after rebuilding the web assets.
+
 ## Notes
 - Do not start the Vite dev server or capture web screenshots.
 - Prefer the desktop app and shared Compose UI tests as the source of truth for UI validation.

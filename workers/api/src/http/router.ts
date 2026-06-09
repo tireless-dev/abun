@@ -10,6 +10,8 @@ import {
 } from "./auth";
 import { HttpError } from "./errors";
 import { json } from "./json";
+import { renderLandingPage } from "./landing-page";
+import { renderMobilePage } from "./mobile-page";
 import {
   resolvePreferenceSyncService,
   type SyncPreference,
@@ -58,42 +60,11 @@ export async function routeRequest(
   const isSiteRead = method === "GET" || method === "HEAD";
 
   if (isSiteRead && url.pathname === "/") {
-    return html(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Abun</title>
-  </head>
-  <body>
-    <main>
-      <h1>Abun</h1>
-      <p>Local-first planning, sync, and focus.</p>
-      <nav>
-        <a href="/app">Open app</a>
-        <a href="/mobile">Mobile downloads</a>
-      </nav>
-    </main>
-  </body>
-</html>`);
+    return html(renderLandingPage());
   }
 
   if (isSiteRead && (url.pathname === "/mobile" || url.pathname === "/mobile/")) {
-    return html(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Abun mobile</title>
-  </head>
-  <body>
-    <main>
-      <h1>Abun mobile</h1>
-      <p>Android and iOS download links will be published here.</p>
-      <a href="/app">Open the web app</a>
-    </main>
-  </body>
-</html>`);
+    return html(renderMobilePage());
   }
 
   if (isSiteRead && (url.pathname === "/app" || url.pathname.startsWith("/app/"))) {
