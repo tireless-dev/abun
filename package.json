@@ -9,6 +9,13 @@
   "scripts": {
     "build": "npm run build -w webApp",
     "start": "npm run start -w webApp",
+    "dev:web": "npm run start -w webApp -- --host 127.0.0.1 --port 4173 --strictPort",
+    "dev:web:build": "npm run build -w webApp",
+    "dev:api": "npm run dev -w workers/api -- --port 8080",
+    "dev:supabase": "supabase start && supabase db reset",
+    "supabase:status": "supabase status",
+    "test:web": "npm run test:run -w webApp",
+    "local:verify": "npm run test:web && npm run api:test && npm run api:typecheck",
     "api:dev": "npm run dev -w workers/api",
     "api:test": "npm run test -w workers/api",
     "api:typecheck": "npm run typecheck -w workers/api",

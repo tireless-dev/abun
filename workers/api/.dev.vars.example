@@ -1,2 +1,2 @@
-DB_URL=postgresql://postgres:<password>@aws-<region>.pooler.supabase.com:6543/postgres
+DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 ABUN_REQUIRE_AUTH=true
