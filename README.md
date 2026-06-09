@@ -1,4 +1,4 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop (JVM), backed by a Cloudflare Workers API.
+This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop (JVM), backed by a Cloudflare Worker on `https://abun.tireless.dev`.
 
 * [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
@@ -16,14 +16,19 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop 
     Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./app/sharedUI/src/jvmMain/kotlin)
     folder is the appropriate location.
 
-* [/app/webApp](./app/webApp) contains a React web application. It talks to the server through the direct
-  `/api/*` business API family and does not use the local-first sync layer as its primary data path.
+* [/app/webApp](./app/webApp) contains a React web application. In production it is served from `/app` by the same Worker,
+  and it talks to the server through the direct `/api/*` business API family rather than using the local-first sync layer as
+  its primary data path.
 
 * [/core](./core/src) is for the code that will be shared between all targets in the project.
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
   can add code to the platform-specific folders here too.
 
-* [/workers/api](./workers/api/src) is for the Cloudflare Worker that serves the site and the `/api/auth`, `/api/sync`, and `/api` routes.
+* [/workers/api](./workers/api/src) is for the Cloudflare Worker that serves:
+  - the landing page at `/`
+  - the web app at `/app`
+  - the mobile placeholder/download page at `/mobile`
+  - the API families at `/api/auth/*`, `/api/sync/*`, and `/api/*`
 
 ### Running the apps
 
@@ -43,10 +48,11 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
      ```
 - Web app:
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
-  2. Build and run the web application:
+  2. Build the static assets consumed by the Worker:
      ```shell
+     cd app/webApp
      npm install
-     npm run start
+     npm run build
      ```
 - iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
 

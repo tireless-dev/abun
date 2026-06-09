@@ -1,6 +1,6 @@
 # Server Route Contract
 
-This document freezes the current Ktor server route groups used by the migration plan.
+This document freezes the current HTTP contract served by the Cloudflare Worker backend on `abun.tireless.dev`.
 
 ## Auth routes
 

@@ -9,7 +9,7 @@ This document defines the shared technical shape used by all modules.
 - Kotlin Multiplatform app
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
-- API server with PostgreSQL persistence
+- Cloudflare Worker with PostgreSQL persistence through Hyperdrive-compatible access
 - local-first sync engine shared across synced resources
 
 ## Layering
@@ -24,15 +24,24 @@ The client is responsible for:
 - tracking dirty state for synced resources
 - running pull-then-push sync cycles
 
-### Server
+### Backend
 
-The server is responsible for:
+The Worker backend is responsible for:
 
 - authenticating the user
 - enforcing ownership boundaries
 - validating incoming mutations
 - storing canonical synced records
 - assigning server-side sync metadata
+
+The current production shape serves both site and API concerns from the same origin:
+
+- `/` landing page
+- `/app` web application shell
+- `/mobile` mobile/download page
+- `/api/auth/*` OTP authentication
+- `/api/sync/*` local-first sync APIs
+- `/api/*` direct business APIs
 
 ## Resource Categories
 
@@ -68,7 +77,7 @@ Current example:
 
 ### Ownership strategy
 
-- The server must bind synced data to the authenticated user.
+- The backend must bind synced data to the authenticated user.
 - Client-provided ownership metadata is never authoritative.
 
 ### Deletion strategy
