@@ -179,7 +179,7 @@ describe("business api routes", () => {
     );
 
     const syncedTasks = await fetchHandler(
-      new Request("http://example.com/sync/tasks?cursor=0&limit=10", {
+      new Request("http://example.com/api/sync/tasks?cursor=0&limit=10", {
         headers: { authorization: "Bearer user-1" },
       }) as never,
       env,
@@ -291,7 +291,7 @@ describe("business api routes", () => {
     expect(extraCreated.status).toBe(201);
 
     const syncCompleted = await fetchHandler(
-      jsonRequest("http://example.com/sync/task-events", "user-1", {
+      jsonRequest("http://example.com/api/sync/task-events", "user-1", {
         items: [
           {
             id: "event-2",
@@ -308,7 +308,7 @@ describe("business api routes", () => {
     expect(syncCompleted.status).toBe(200);
 
     const duplicate = await fetchHandler(
-      jsonRequest("http://example.com/sync/task-events", "user-1", {
+      jsonRequest("http://example.com/api/sync/task-events", "user-1", {
         items: [
           {
             id: "event-1",

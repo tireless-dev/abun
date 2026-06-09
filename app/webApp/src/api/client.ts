@@ -221,9 +221,9 @@ export function createAbunApiClient(options: ApiClientOptions = {}) {
   }
 
   return {
-    requestOtp: (email: string) => request<void>('/auth/otp/request', { method: 'POST', body: JSON.stringify({ email }) }),
+    requestOtp: (email: string) => request<void>('/api/auth/otp/request', { method: 'POST', body: JSON.stringify({ email }) }),
     verifyOtp: (email: string, otp: string) =>
-      request<OtpVerifyResponse>('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+      request<OtpVerifyResponse>('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
 
     listPreferences: () => request<PreferenceResponse[]>('/api/preferences'),
     getPreference: (key: string) => request<PreferenceResponse>(`/api/preferences/${encodeURIComponent(key)}`),

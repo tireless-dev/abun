@@ -7,7 +7,7 @@ describe("additional sync resource routes", () => {
     const env = { ABUN_REQUIRE_AUTH: "true" } as never;
 
     const pushResponse = await fetchHandler(
-      new Request("http://example.com/sync/preferences", {
+      new Request("http://example.com/api/sync/preferences", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -42,7 +42,7 @@ describe("additional sync resource routes", () => {
     });
 
     const pullResponse = await fetchHandler(
-      new Request("http://example.com/sync/preferences?cursor=0&limit=10", {
+      new Request("http://example.com/api/sync/preferences?cursor=0&limit=10", {
         method: "GET",
         headers: {
           authorization: "Bearer user-1",
@@ -66,7 +66,7 @@ describe("additional sync resource routes", () => {
     });
 
     const otherUserPullResponse = await fetchHandler(
-      new Request("http://example.com/sync/preferences?cursor=0&limit=10", {
+      new Request("http://example.com/api/sync/preferences?cursor=0&limit=10", {
         method: "GET",
         headers: {
           authorization: "Bearer user-2",
@@ -91,7 +91,7 @@ describe("additional sync resource routes", () => {
     await pushTask(fetchHandler, env, "user-1", "task-1");
 
     const routineResponse = await fetchHandler(
-      new Request("http://example.com/sync/routines", {
+      new Request("http://example.com/api/sync/routines", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -133,7 +133,7 @@ describe("additional sync resource routes", () => {
     });
 
     const alarmResponse = await fetchHandler(
-      new Request("http://example.com/sync/alarms", {
+      new Request("http://example.com/api/sync/alarms", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -179,7 +179,7 @@ describe("additional sync resource routes", () => {
     await pushTask(fetchHandler, env, "user-1", "task-events-1");
 
     const firstResponse = await fetchHandler(
-      new Request("http://example.com/sync/task-events", {
+      new Request("http://example.com/api/sync/task-events", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -212,7 +212,7 @@ describe("additional sync resource routes", () => {
     });
 
     const duplicateResponse = await fetchHandler(
-      new Request("http://example.com/sync/task-events", {
+      new Request("http://example.com/api/sync/task-events", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -245,7 +245,7 @@ describe("additional sync resource routes", () => {
     });
 
     const pullResponse = await fetchHandler(
-      new Request("http://example.com/sync/task-events?cursor=0&limit=10", {
+      new Request("http://example.com/api/sync/task-events?cursor=0&limit=10", {
         method: "GET",
         headers: {
           authorization: "Bearer user-1",
@@ -276,7 +276,7 @@ describe("additional sync resource routes", () => {
     await pushTask(fetchHandler, env, "user-1", "task-session-1");
 
     const firstResponse = await fetchHandler(
-      new Request("http://example.com/sync/pomodoro-sessions", {
+      new Request("http://example.com/api/sync/pomodoro-sessions", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -320,7 +320,7 @@ describe("additional sync resource routes", () => {
     });
 
     const secondResponse = await fetchHandler(
-      new Request("http://example.com/sync/pomodoro-sessions", {
+      new Request("http://example.com/api/sync/pomodoro-sessions", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -381,7 +381,7 @@ async function pushTask(
   taskId: string,
 ): Promise<void> {
   const response = await fetchHandler(
-    new Request("http://example.com/sync/tasks", {
+    new Request("http://example.com/api/sync/tasks", {
       method: "POST",
       headers: {
         authorization: `Bearer ${userId}`,

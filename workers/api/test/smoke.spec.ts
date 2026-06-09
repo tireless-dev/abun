@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 
 describe("api worker smoke test", () => {
-  it("returns the sync server banner at the root route", async () => {
+  it("returns a landing page at the root route", async () => {
     const handler = worker as ExportedHandler;
     const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
     const request = new Request("http://example.com/");
@@ -13,6 +13,43 @@ describe("api worker smoke test", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe("abun sync server");
+    expect(await response.text()).toContain("Abun");
+  });
+
+  it("rewrites /app requests into the static asset bundle", async () => {
+    const handler = worker as ExportedHandler;
+    const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
+    let seenPath = "";
+    const request = new Request("http://example.com/app");
+    const response = await fetchHandler(
+      request as never,
+      {
+        ASSETS: {
+          fetch(assetRequest: Request) {
+            seenPath = new URL(assetRequest.url).pathname;
+            return Promise.resolve(new Response("<!doctype html><title>app</title>", {
+              headers: { "content-type": "text/html" },
+            }));
+          },
+        },
+      } as never,
+      {} as ExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    expect(seenPath).toBe("/");
+  });
+
+  it("serves the landing page on HEAD requests", async () => {
+    const handler = worker as ExportedHandler;
+    const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
+    const response = await fetchHandler(
+      new Request("http://example.com/", { method: "HEAD" }) as never,
+      {} as never,
+      {} as ExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
   });
 });

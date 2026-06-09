@@ -8,7 +8,7 @@ describe("api worker otp auth", () => {
     const env = {} as never;
 
     const otpRequestResponse = await fetchHandler(
-      new Request("http://example.com/auth/otp/request", {
+      new Request("http://example.com/api/auth/otp/request", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -24,7 +24,7 @@ describe("api worker otp auth", () => {
     expect(otpRequestResponse.status).toBe(204);
 
     const otpVerifyResponse = await fetchHandler(
-      new Request("http://example.com/auth/otp/verify", {
+      new Request("http://example.com/api/auth/otp/verify", {
         method: "POST",
         headers: {
           "content-type": "application/json",

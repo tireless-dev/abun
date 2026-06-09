@@ -8,7 +8,7 @@ describe("task sync routes", () => {
     const env = { ABUN_REQUIRE_AUTH: "true" } as never;
 
     const firstResponse = await fetchHandler(
-      new Request("http://example.com/sync/tasks", {
+      new Request("http://example.com/api/sync/tasks", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -42,7 +42,7 @@ describe("task sync routes", () => {
     });
 
     const secondResponse = await fetchHandler(
-      new Request("http://example.com/sync/tasks", {
+      new Request("http://example.com/api/sync/tasks", {
         method: "POST",
         headers: {
           authorization: "Bearer user-1",
@@ -82,7 +82,7 @@ describe("task sync routes", () => {
     const env = { ABUN_REQUIRE_AUTH: "true" } as never;
 
     await fetchHandler(
-      new Request("http://example.com/sync/tasks", {
+      new Request("http://example.com/api/sync/tasks", {
         method: "POST",
         headers: {
           authorization: "Bearer user-2",
@@ -104,7 +104,7 @@ describe("task sync routes", () => {
     );
 
     const response = await fetchHandler(
-      new Request("http://example.com/sync/tasks?cursor=0&limit=10", {
+      new Request("http://example.com/api/sync/tasks?cursor=0&limit=10", {
         method: "GET",
         headers: {
           authorization: "Bearer user-2",

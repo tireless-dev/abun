@@ -4,10 +4,10 @@ This document freezes the current Ktor server route groups used by the migration
 
 ## Auth routes
 
-- `POST /auth/otp/request`
+- `POST /api/auth/otp/request`
   - Accepts an email payload.
   - Returns `204 No Content` after storing or refreshing the OTP.
-- `POST /auth/otp/verify`
+- `POST /api/auth/otp/verify`
   - Accepts email and OTP.
   - Returns `200 OK` with an access token and user id.
 
@@ -15,18 +15,18 @@ Fixture source: `docs/contracts/server-fixtures/auth.json`
 
 ## Sync routes
 
-- `GET /sync/preferences`
-- `POST /sync/preferences`
-- `GET /sync/routines`
-- `POST /sync/routines`
-- `GET /sync/tasks`
-- `POST /sync/tasks`
-- `GET /sync/alarms`
-- `POST /sync/alarms`
-- `GET /sync/task-events`
-- `POST /sync/task-events`
-- `GET /sync/pomodoro-sessions`
-- `POST /sync/pomodoro-sessions`
+- `GET /api/sync/preferences`
+- `POST /api/sync/preferences`
+- `GET /api/sync/routines`
+- `POST /api/sync/routines`
+- `GET /api/sync/tasks`
+- `POST /api/sync/tasks`
+- `GET /api/sync/alarms`
+- `POST /api/sync/alarms`
+- `GET /api/sync/task-events`
+- `POST /api/sync/task-events`
+- `GET /api/sync/pomodoro-sessions`
+- `POST /api/sync/pomodoro-sessions`
 
 The frozen contract test covers the task sync push route and asserts the returned `accepted_fields`.
 

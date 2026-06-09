@@ -2,10 +2,15 @@ export interface HyperdriveBinding {
   connectionString: string;
 }
 
+export interface AssetsBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
 export interface WorkerEnv {
   DB_URL?: string;
   HYPERDRIVE?: HyperdriveBinding;
   ABUN_REQUIRE_AUTH?: string;
+  ASSETS?: AssetsBinding;
 }
 
 export function requireEnvValue(

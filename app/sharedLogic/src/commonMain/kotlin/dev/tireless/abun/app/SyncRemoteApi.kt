@@ -38,14 +38,14 @@ class SyncRemoteApi(
     private val authProvider: AuthProvider,
 ) {
     suspend fun requestOtp(email: String) {
-        client.post("$baseUrl/auth/otp/request") {
+        client.post("$baseUrl/api/auth/otp/request") {
             contentType(ContentType.Application.Json)
             setBody(OtpRequest(email.trim()))
         }
     }
 
     suspend fun verifyOtp(email: String, otp: String): OtpVerifyResponse =
-        client.post("$baseUrl/auth/otp/verify") {
+        client.post("$baseUrl/api/auth/otp/verify") {
             contentType(ContentType.Application.Json)
             setBody(OtpVerifyRequest(email.trim(), otp.trim()))
         }.body()
@@ -65,12 +65,12 @@ class SyncRemoteApi(
     suspend fun pushPomodoroSessions(items: List<SyncPomodoroSession>): List<SyncPomodoroSession> = push("pomodoro-sessions", items)
 
     private suspend inline fun <reified T> pull(resource: String, cursor: Long, limit: Int): PullResponse<T> =
-        client.get("$baseUrl/sync/$resource?cursor=$cursor&limit=$limit") {
+        client.get("$baseUrl/api/sync/$resource?cursor=$cursor&limit=$limit") {
             authorize()
         }.body()
 
     private suspend inline fun <reified T> push(resource: String, items: List<T>): List<T> =
-        client.post("$baseUrl/sync/$resource") {
+        client.post("$baseUrl/api/sync/$resource") {
             authorize()
             contentType(ContentType.Application.Json)
             setBody(BatchRequest(items))

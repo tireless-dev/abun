@@ -55,12 +55,52 @@ export async function routeRequest(
 ): Promise<Response> {
   const { method } = request;
   const url = new URL(request.url);
+  const isSiteRead = method === "GET" || method === "HEAD";
 
-  if (method === "GET" && url.pathname === "/") {
-    return new Response("abun sync server");
+  if (isSiteRead && url.pathname === "/") {
+    return html(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Abun</title>
+  </head>
+  <body>
+    <main>
+      <h1>Abun</h1>
+      <p>Local-first planning, sync, and focus.</p>
+      <nav>
+        <a href="/app">Open app</a>
+        <a href="/mobile">Mobile downloads</a>
+      </nav>
+    </main>
+  </body>
+</html>`);
   }
 
-  if (method === "POST" && url.pathname === "/auth/otp/request") {
+  if (isSiteRead && (url.pathname === "/mobile" || url.pathname === "/mobile/")) {
+    return html(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Abun mobile</title>
+  </head>
+  <body>
+    <main>
+      <h1>Abun mobile</h1>
+      <p>Android and iOS download links will be published here.</p>
+      <a href="/app">Open the web app</a>
+    </main>
+  </body>
+</html>`);
+  }
+
+  if (isSiteRead && (url.pathname === "/app" || url.pathname.startsWith("/app/"))) {
+    return serveAppAsset(request, env);
+  }
+
+  if (method === "POST" && url.pathname === "/api/auth/otp/request") {
     const body = await readJsonBody(request);
     const email = readRequiredString(body, "email");
     return withOptionalDbClient(env, async (dbClient) => {
@@ -70,7 +110,7 @@ export async function routeRequest(
     });
   }
 
-  if (method === "POST" && url.pathname === "/auth/otp/verify") {
+  if (method === "POST" && url.pathname === "/api/auth/otp/verify") {
     const body = await readJsonBody(request);
     const email = readRequiredString(body, "email");
     const otp = readRequiredString(body, "otp");
@@ -85,7 +125,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/tasks") {
+  if (url.pathname === "/api/sync/tasks") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -108,7 +148,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/preferences") {
+  if (url.pathname === "/api/sync/preferences") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const preferences = resolvePreferenceSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -130,7 +170,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/routines") {
+  if (url.pathname === "/api/sync/routines") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const routines = resolveRoutineSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -152,7 +192,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/alarms") {
+  if (url.pathname === "/api/sync/alarms") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -175,7 +215,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/task-events") {
+  if (url.pathname === "/api/sync/task-events") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -198,7 +238,7 @@ export async function routeRequest(
     });
   }
 
-  if (url.pathname === "/sync/pomodoro-sessions") {
+  if (url.pathname === "/api/sync/pomodoro-sessions") {
     const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -238,6 +278,19 @@ export async function routeRequest(
   throw new HttpError(404, "Not found");
 }
 
+function serveAppAsset(request: Request, env: Partial<WorkerEnv>): Promise<Response> {
+  if (!env.ASSETS) {
+    throw new HttpError(500, "Missing static asset binding");
+  }
+
+  const assetUrl = new URL(request.url);
+  assetUrl.pathname = assetUrl.pathname === "/app" || assetUrl.pathname === "/app/"
+    ? "/"
+    : assetUrl.pathname.slice("/app".length) || "/";
+
+  return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+}
+
 async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
   let body: unknown;
 
@@ -265,6 +318,14 @@ function readRequiredString(
   }
 
   return value;
+}
+
+function html(body: string): Response {
+  return new Response(body, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  });
 }
 
 function readBatchItems<T>(body: Record<string, unknown>): T[] {

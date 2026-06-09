@@ -23,7 +23,7 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop 
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
   can add code to the platform-specific folders here too.
 
-* [/workers/api](./workers/api/src) is for the Cloudflare Workers backend that serves the `/auth`, `/sync`, and `/api` routes.
+* [/workers/api](./workers/api/src) is for the Cloudflare Worker that serves the site and the `/api/auth`, `/api/sync`, and `/api` routes.
 
 ### Running the apps
 
