@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DefaultTimeProvider
+import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DemoAuthProvider
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
 import dev.tireless.abun.app.JvmNodeIdProvider
@@ -27,6 +28,18 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
             serverBaseUrl = "http://127.0.0.1:8080",
+            debugAuthPreset = debugAuthPreset(enabled = System.getProperty("abun.debug") == "true"),
         ),
     )
+}
+
+private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = if (enabled) {
+    DebugAuthPreset(
+        email = "abun@tireless.dev",
+        otp = "424242",
+        accessToken = "debug-access-token",
+        userId = "debug-user",
+    )
+} else {
+    null
 }

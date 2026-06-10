@@ -38,4 +38,12 @@ data class AppDependencies(
     val idGenerator: IdGenerator,
     val timeProvider: TimeProvider,
     val serverBaseUrl: String,
+    val debugAuthPreset: DebugAuthPreset? = null,
+)
+
+data class DebugAuthPreset(
+    val email: String,
+    val otp: String,
+    val accessToken: String,
+    val userId: String,
 )

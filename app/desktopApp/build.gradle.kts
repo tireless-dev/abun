@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.JavaExec
 
 plugins {
     alias(libs.plugins.kotlinJvm)
@@ -24,5 +25,11 @@ compose.desktop {
             packageName = "dev.tireless.abun"
             packageVersion = "1.0.0"
         }
+    }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    if (name == "run") {
+        jvmArgs("-Dabun.debug=true")
     }
 }

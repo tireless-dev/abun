@@ -102,6 +102,8 @@ data class AuthViewState(
     val mode: AuthMode = AuthMode.GUEST,
     val email: String = "",
     val otpRequested: Boolean = false,
+    val prefilledOtp: String = "",
+    val debugOtpHint: String? = null,
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
 )

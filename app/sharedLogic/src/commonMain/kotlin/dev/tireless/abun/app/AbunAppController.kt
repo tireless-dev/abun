@@ -13,6 +13,7 @@ class AbunAppController(
     dependencies: AppDependencies,
 ) {
     private val timeProvider = dependencies.timeProvider
+    private val debugAuthPreset = dependencies.debugAuthPreset
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authProvider = dependencies.authProvider as? MutableAuthProvider
         ?: error("App requires MutableAuthProvider for onboarding/auth flow")
@@ -33,7 +34,18 @@ class AbunAppController(
     )
 
     private val _state = MutableStateFlow(
-        AppUiState(selectedDate = dependencies.timeProvider.today().toString()),
+        AppUiState(
+            selectedDate = dependencies.timeProvider.today().toString(),
+            syncState = SyncStateView(syncReady = false),
+            auth = debugAuthPreset?.let {
+                AuthViewState(
+                    email = it.email,
+                    otpRequested = true,
+                    prefilledOtp = it.otp,
+                    debugOtpHint = "Debug OTP: ${it.otp}",
+                )
+            } ?: AuthViewState(),
+        ),
     )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     private var scheduledSyncJob: Job? = null
@@ -66,6 +78,19 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email is required"))
             return
         }
+        debugAuthPreset
+            ?.takeIf { email == it.email.trim() }
+            ?.let {
+                _state.value = _state.value.copy(
+                    auth = _state.value.auth.copy(
+                        otpRequested = true,
+                        prefilledOtp = it.otp,
+                        debugOtpHint = "Debug OTP: ${it.otp}",
+                        errorMessage = null,
+                    ),
+                )
+                return
+            }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
             runCatching { remoteApi.requestOtp(email) }
@@ -84,23 +109,16 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email and OTP are required"))
             return
         }
+        debugAuthPreset
+            ?.takeIf { email == it.email.trim() && code.trim() == it.otp.trim() }
+            ?.let {
+                completeLogin(it.accessToken)
+                return
+            }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
             runCatching { remoteApi.verifyOtp(email, code) }
-                .onSuccess { response ->
-                    authProvider.updateToken(response.accessToken)
-                    _state.value = _state.value.copy(
-                        auth = _state.value.auth.copy(
-                            showGuide = false,
-                            mode = AuthMode.AUTHENTICATED,
-                            isSubmitting = false,
-                            otpRequested = false,
-                            errorMessage = null,
-                        ),
-                        syncState = _state.value.syncState.copy(syncReady = true),
-                    )
-                    requestSync(immediate = true)
-                }
+                .onSuccess { response -> completeLogin(response.accessToken) }
                 .onFailure {
                     _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, errorMessage = it.message ?: "OTP verification failed"))
                 }
@@ -443,6 +461,21 @@ class AbunAppController(
         private const val AUTO_SYNC_DEBOUNCE_MS = 750L
 
         fun create(dependencies: AppDependencies): AbunAppController = AbunAppController(dependencies)
+    }
+
+    private fun completeLogin(accessToken: String) {
+        authProvider.updateToken(accessToken)
+        _state.value = _state.value.copy(
+            auth = _state.value.auth.copy(
+                showGuide = false,
+                mode = AuthMode.AUTHENTICATED,
+                isSubmitting = false,
+                otpRequested = false,
+                errorMessage = null,
+            ),
+            syncState = _state.value.syncState.copy(syncReady = true),
+        )
+        requestSync(immediate = true)
     }
 }
 

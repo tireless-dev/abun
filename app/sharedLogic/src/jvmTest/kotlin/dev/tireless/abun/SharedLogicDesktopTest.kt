@@ -2,9 +2,13 @@ package dev.tireless.abun
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AlarmListItemView
+import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.AppJson
 import dev.tireless.abun.app.AuthProvider
+import dev.tireless.abun.app.AuthMode
+import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DatabaseDriverFactory
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.DeviceNodeIdProvider
@@ -44,6 +48,7 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.sql.DriverManager
@@ -54,6 +59,30 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 class SharedLogicDesktopTest {
+    @Test
+    fun `debug preset prefills login and enables sync after fixed otp verification`() = runTest {
+        val controller = testController(
+            debugAuthPreset = DebugAuthPreset(
+                email = "abun@tireless.dev",
+                otp = "424242",
+                accessToken = "debug-token",
+                userId = "debug-user",
+            ),
+        )
+
+        assertEquals("abun@tireless.dev", controller.state.value.auth.email)
+        assertEquals("424242", controller.state.value.auth.prefilledOtp)
+        assertFalse(controller.state.value.syncState.syncReady)
+
+        controller.verifyEmailOtp("424242")
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+
+        assertFalse(controller.state.value.auth.showGuide)
+        assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
+        assertEquals(false, controller.state.value.auth.otpRequested)
+        assertTrue(controller.state.value.syncState.syncReady)
+    }
+
     @Test
     fun `create and complete task keeps append-only journal`() {
         val store = testStore()
@@ -879,6 +908,61 @@ class SharedLogicDesktopTest {
                 override fun nodeId(): String = "test-device"
             }, timeProvider),
         )
+    }
+
+    private fun testController(
+        timeProvider: TimeProvider = testTimeProvider(),
+        idGenerator: IdGenerator = testIdGenerator(),
+        debugAuthPreset: DebugAuthPreset? = null,
+    ) = AbunAppController.create(
+        AppDependencies(
+            databaseDriverFactory = object : DatabaseDriverFactory {
+                override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
+                    AbunDatabase.Schema.create(it)
+                }
+            },
+            httpClient = HttpClient(
+                MockEngine { request ->
+                    val body = when (request.url.encodedPath) {
+                        "/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                        "/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                        "/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                        "/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                        "/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                        "/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                        else -> error("Unexpected path ${request.url.encodedPath}")
+                    }
+                    respond(
+                        content = body,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                },
+            ) {
+                install(ContentNegotiation) { json(AppJson) }
+            },
+            authProvider = dev.tireless.abun.app.DemoAuthProvider(),
+            nodeIdProvider = object : DeviceNodeIdProvider {
+                override fun nodeId(): String = "test-device"
+            },
+            idGenerator = idGenerator,
+            timeProvider = timeProvider,
+            serverBaseUrl = "http://localhost:8080",
+            debugAuthPreset = debugAuthPreset,
+        ),
+    )
+
+    private suspend fun waitFor(
+        timeoutMillis: Long = 2_000,
+        condition: () -> Boolean,
+    ) {
+        val start = System.currentTimeMillis()
+        while (!condition()) {
+            if (System.currentTimeMillis() - start > timeoutMillis) {
+                error("Timed out waiting for condition")
+            }
+            delay(10)
+        }
     }
 
     private fun testTimeProvider(): TimeProvider = object : TimeProvider {

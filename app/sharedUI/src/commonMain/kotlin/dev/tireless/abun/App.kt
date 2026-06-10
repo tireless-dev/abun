@@ -278,7 +278,7 @@ internal fun GuideScreenContent(
     onVerifyEmailOtp: (String) -> Unit,
     onSkipLogin: () -> Unit,
 ) {
-    var otpCode by remember { mutableStateOf("") }
+    var otpCode by remember(state.auth.prefilledOtp) { mutableStateOf(state.auth.prefilledOtp) }
     ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
         Panel {
             AppText("abun", style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold), color = ThemeTokens.colors.primary)
@@ -288,6 +288,7 @@ internal fun GuideScreenContent(
             Button(label = if (state.auth.otpRequested) "Resend OTP" else "Send OTP", onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting)
             if (state.auth.otpRequested) {
                 TextField(value = otpCode, onValueChange = { otpCode = it }, label = "OTP code")
+                state.auth.debugOtpHint?.let { AppText(it, style = ThemeTokens.type.bodyMuted) }
                 Button(label = "Verify and login", onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting)
             }
             Button(label = "Skip for now", onClick = onSkipLogin, enabled = !state.auth.isSubmitting)
@@ -1280,7 +1281,8 @@ private fun buildPresetRecurrenceRule(
     if (parts.size != 2) return ""
     val hour = parts[0].toIntOrNull()?.takeIf { it in 0..23 } ?: return ""
     val minute = parts[1].toIntOrNull()?.takeIf { it in 0..59 } ?: return ""
-    return "RRULE:$prefix;BYHOUR=$hour;BYMINUTE=%02d".format(minute)
+    val paddedMinute = minute.toString().padStart(2, '0')
+    return "RRULE:$prefix;BYHOUR=$hour;BYMINUTE=$paddedMinute"
 }
 
 private fun weekdayLabel(code: String): String? = when (code) {
