@@ -23,7 +23,11 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
   can add code to the platform-specific folders here too.
 
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
+* [/server](./server/src/main/kotlin) contains the currently checked-in Ktor server application.
+
+* [/workers/api](./workers/api) is reserved for the Cloudflare Workers replacement backend. At the moment,
+  only generated Wrangler/cache artifacts may exist there locally; committed Worker source and configuration
+  should be added before treating it as the active server implementation.
 
 ### Running the apps
 
@@ -34,6 +38,7 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
   - Hot reload: `./gradlew :app:desktopApp:hotRun --auto`
   - Standard run: `./gradlew :app:desktopApp:run`
 - Server: `./gradlew :server:run`
+- Cloudflare Workers API: not currently committed as a buildable source tree
 - Web app:
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
   2. Build and run the web application:
@@ -50,6 +55,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 - Android tests: `./gradlew :app:sharedUI:testAndroidHostTest :app:sharedLogic:testAndroidHostTest`
 - Desktop tests: `./gradlew :app:sharedUI:jvmTest :app:sharedLogic:jvmTest`
 - Server tests: `./gradlew :server:test`
+- Cloudflare Workers API tests: not currently available until the Worker source tree is committed
 - Web tests: `./gradlew :app:sharedLogic:jsTest`
 - iOS tests: `./gradlew :app:sharedUI:iosSimulatorArm64Test :app:sharedLogic:iosSimulatorArm64Test`
 

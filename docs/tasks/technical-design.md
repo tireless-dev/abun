@@ -204,7 +204,8 @@ The current codebase already contains:
 
 - task-oriented view models in [DomainModels.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/DomainModels.kt)
 - local persistence and merge behavior in shared logic
-- server APIs and database schema for synced task resources
+- Ktor/PostgreSQL server APIs and database schema for synced task resources
+- Cloudflare Workers migration artifacts, but no committed Worker source tree yet
 
 ## Settled Technical Decisions
 

@@ -64,6 +64,17 @@ Used by the local-first client:
 - dirty-resource push
 - include sync metadata required for merge
 
+Current Kotlin clients call these routes through [SyncRemoteApi.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/SyncRemoteApi.kt):
+
+- `POST /auth/otp/request`
+- `POST /auth/otp/verify`
+- `GET|POST /sync/preferences`
+- `GET|POST /sync/routines`
+- `GET|POST /sync/tasks`
+- `GET|POST /sync/alarms`
+- `GET|POST /sync/task-events`
+- `GET|POST /sync/pomodoro-sessions`
+
 ### Business APIs
 
 Used by direct-access or non-local-first clients:
@@ -85,6 +96,7 @@ The current codebase already includes:
 - shared sync models and HLC support in `core`
 - client sync orchestration in [SyncEngine.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/SyncEngine.kt)
 - local schema and sync cursors in [AbunDatabase.sq](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/sqldelight/dev/tireless/abun/db/AbunDatabase.sq)
-- server sync and business APIs for multiple resources
+- Ktor/PostgreSQL sync and business APIs for multiple resources in the checked-in `:server` module
+- Cloudflare Workers migration docs and generated Wrangler artifacts, but no committed Worker source tree yet
 
 This document is intentionally shorter than the retired sync spec. Module-specific sync details should live in the relevant module technical design when they carry domain meaning.

@@ -32,7 +32,7 @@ Each domain record has a stable identifier that survives local edits, sync cycle
 
 ### Ownership
 
-All synced records are owned by an authenticated user on the server. The client may operate offline, but server persistence and sync acceptance are always scoped by user ownership.
+All synced records are owned by an authenticated user on the server-side API. The client may operate offline, but remote persistence and sync acceptance are always scoped by user ownership.
 
 ### Local-first behavior
 

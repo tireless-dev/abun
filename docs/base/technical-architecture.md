@@ -9,8 +9,20 @@ This document defines the shared technical shape used by all modules.
 - Kotlin Multiplatform app
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
-- API server with PostgreSQL persistence
+- server-side HTTP API with PostgreSQL persistence
 - local-first sync engine shared across synced resources
+
+## Server Runtime Status
+
+The buildable server implementation currently checked into the repo is the JVM `:server` module:
+
+- Ktor/Netty routing in [Application.kt](/Users/jerry/Workspace/_tools/abun/server/src/main/kotlin/dev/tireless/abun/Application.kt)
+- JDBC/Hikari/PostgreSQL persistence in [SyncServices.kt](/Users/jerry/Workspace/_tools/abun/server/src/main/kotlin/dev/tireless/abun/SyncServices.kt)
+- schema bootstrap in [schema.sql](/Users/jerry/Workspace/_tools/abun/server/src/main/resources/db/schema.sql)
+
+The Cloudflare Workers migration is the intended replacement path for the JVM server, but Worker source is not currently present as a committed, buildable implementation under `workers/api`. Generated Wrangler cache files under `workers/api/.wrangler` are not architectural source of truth.
+
+Until the Worker source, tests, and deployment configuration are committed, architecture docs should describe Cloudflare Workers as a migration target rather than the active implementation.
 
 ## Layering
 
@@ -26,7 +38,7 @@ The client is responsible for:
 
 ### Server
 
-The server is responsible for:
+The server-side API is responsible for:
 
 - authenticating the user
 - enforcing ownership boundaries
@@ -68,7 +80,7 @@ Current example:
 
 ### Ownership strategy
 
-- The server must bind synced data to the authenticated user.
+- The server-side API must bind synced data to the authenticated user.
 - Client-provided ownership metadata is never authoritative.
 
 ### Deletion strategy
