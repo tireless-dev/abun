@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -67,6 +68,7 @@ import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.StructuredRecurrence
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
+import dev.tireless.abun.app.ThemePreference
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
@@ -123,7 +125,7 @@ fun App() {
         }
     }
 
-    AppTheme {
+    AppTheme(themePreference = state.preferences.themePreference) {
         if (state.auth.showGuide) {
             GuideScreenContent(
                 state = state,
@@ -597,12 +599,17 @@ internal fun PomodoroScreen(state: AppUiState, liveNow: Long, onOpenStart: () ->
 
 @Composable
 private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
-    SettingsScreenContent(state = state, onUpdatePreferences = controller::updatePreferences)
+    SettingsScreenContent(
+        state = state,
+        onUpdateThemePreference = controller::updateThemePreference,
+        onUpdatePreferences = controller::updatePreferences,
+    )
 }
 
 @Composable
 internal fun SettingsScreenContent(
     state: AppUiState,
+    onUpdateThemePreference: (ThemePreference) -> Unit,
     onUpdatePreferences: (
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,
@@ -611,6 +618,7 @@ internal fun SettingsScreenContent(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        themePreference: ThemePreference,
         rolloverTime: String,
     ) -> Unit,
 ) {
@@ -620,6 +628,7 @@ internal fun SettingsScreenContent(
     var longBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.longBreakMinutes.toString()) }
     var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
     var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
+    var selectedThemePreference by remember(state.preferences) { mutableStateOf(state.preferences.themePreference) }
     var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
     Panel {
@@ -659,6 +668,27 @@ internal fun SettingsScreenContent(
             textStyle = ThemeTokens.type.body,
             singleLine = true,
         )
+    }
+    Panel {
+        SectionHeader("Appearance", "Theme")
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            ThemePreference.entries.forEachIndexed { index, themePreference ->
+                val option = themePreference.label()
+                SegmentedButton(
+                    modifier = Modifier.testTag("theme-option-${themePreference.name.lowercase()}"),
+                    selected = option == selectedThemePreference.label(),
+                    onClick = {
+                        selectedThemePreference = themePreferenceFromLabel(option)
+                        onUpdateThemePreference(selectedThemePreference)
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
+                ) {
+                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
+                }
+            }
+        }
     }
     Panel {
         SectionHeader("App", "Preferences")
@@ -702,6 +732,7 @@ internal fun SettingsScreenContent(
                     longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
                     timezoneOverride,
                     selectedDateFormat,
+                    selectedThemePreference,
                     rolloverTime,
                 )
             },
@@ -1954,6 +1985,19 @@ private fun dateFormatFromLabel(label: String): DateFormatPreference = when (lab
     "Month day" -> DateFormatPreference.MONTH_DAY
     "Weekday" -> DateFormatPreference.WEEKDAY_MONTH_DAY
     else -> DateFormatPreference.ISO
+}
+
+private fun ThemePreference.label(): String = when (this) {
+    ThemePreference.SYSTEM -> "System"
+    ThemePreference.LIGHT -> "Light"
+    ThemePreference.DARK -> "Dark"
+}
+
+private fun themePreferenceFromLabel(label: String): ThemePreference = when (label) {
+    "System" -> ThemePreference.SYSTEM
+    "Light" -> ThemePreference.LIGHT
+    "Dark" -> ThemePreference.DARK
+    else -> ThemePreference.SYSTEM
 }
 
 private fun formatRemaining(remainingMillis: Long): String {

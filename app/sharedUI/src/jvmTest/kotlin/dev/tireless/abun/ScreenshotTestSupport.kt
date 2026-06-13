@@ -27,6 +27,7 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RoborazziOptions
 import dev.tireless.abun.app.AppTab
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -45,7 +46,7 @@ internal fun captureScreenshot(
     content: @Composable () -> Unit,
 ) = runDesktopComposeUiTest {
     setContent {
-        AppTheme(darkTheme = false) {
+        AppTheme(themePreference = ThemePreference.LIGHT) {
             Box(
                 modifier = Modifier
                     .size(width.dp, height.dp)

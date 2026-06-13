@@ -29,6 +29,12 @@ enum class DateFormatPreference {
     WEEKDAY_MONTH_DAY,
 }
 
+enum class ThemePreference {
+    SYSTEM,
+    LIGHT,
+    DARK,
+}
+
 enum class BlankTitlePolicy {
     REJECT_BLANK,
 }
@@ -150,6 +156,7 @@ data class PreferencesViewState(
     val longBreakMinutes: Int = 15,
     val timezoneOverride: String = "SYSTEM",
     val dateFormat: DateFormatPreference = DateFormatPreference.ISO,
+    val themePreference: ThemePreference = ThemePreference.SYSTEM,
     val blankTitlePolicy: BlankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
     val rolloverTime: String = "02:00",
 )

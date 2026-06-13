@@ -13,6 +13,7 @@ import dev.tireless.abun.app.PreferencesViewState
 import dev.tireless.abun.app.SyncStateView
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TaskSubTab
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.app.TodayViewState
 import dev.tireless.abun.sync.TaskStatus
@@ -43,6 +44,7 @@ internal fun screenshotState(
         longBreakMinutes = 18,
         timezoneOverride = "Asia/Shanghai",
         dateFormat = DateFormatPreference.WEEKDAY_MONTH_DAY,
+        themePreference = ThemePreference.SYSTEM,
     ),
     syncState = SyncStateView(lastSyncedAt = "2026-05-30 14:20"),
     auth = auth,

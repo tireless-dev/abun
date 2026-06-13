@@ -31,6 +31,7 @@ private const val PREF_POMODORO_SHORT_BREAK_MINUTES = "pomodoro.short_break_minu
 private const val PREF_POMODORO_LONG_BREAK_MINUTES = "pomodoro.long_break_minutes"
 private const val PREF_APP_TIMEZONE_OVERRIDE = "app.timezone_override"
 private const val PREF_APP_DATE_FORMAT = "app.date_format"
+private const val PREF_APP_THEME_PREFERENCE = "app.theme_preference"
 val PREF_APP_ROLLOVER_TIME = "app.rollover_time"
 
 class LocalStore(
@@ -114,6 +115,7 @@ class LocalStore(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        themePreference: ThemePreference,
         rolloverTime: String,
     ) {
         persistPreferences(
@@ -125,9 +127,24 @@ class LocalStore(
                 longBreakMinutes = longBreakMinutes.coerceIn(1, 120),
                 timezoneOverride = timezoneOverride.ifBlank { "SYSTEM" },
                 dateFormat = dateFormat,
+                themePreference = themePreference,
                 blankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
                 rolloverTime = rolloverTime,
             ),
+        )
+    }
+
+    fun updateThemePreference(themePreference: ThemePreference) {
+        updatePreferences(
+            titlePrefix = preferences().titlePrefix,
+            defaultAlarmLeadMinutes = preferences().defaultAlarmLeadMinutes,
+            focusMinutes = preferences().focusMinutes,
+            shortBreakMinutes = preferences().shortBreakMinutes,
+            longBreakMinutes = preferences().longBreakMinutes,
+            timezoneOverride = preferences().timezoneOverride,
+            dateFormat = preferences().dateFormat,
+            themePreference = themePreference,
+            rolloverTime = preferences().rolloverTime,
         )
     }
 
@@ -1121,6 +1138,7 @@ class LocalStore(
         persistPreferenceEntry(PREF_POMODORO_LONG_BREAK_MINUTES, preferences.longBreakMinutes.toString(), PreferenceValueType.INT)
         persistPreferenceEntry(PREF_APP_TIMEZONE_OVERRIDE, preferences.timezoneOverride, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_APP_DATE_FORMAT, preferences.dateFormat.name, PreferenceValueType.ENUM)
+        persistPreferenceEntry(PREF_APP_THEME_PREFERENCE, preferences.themePreference.name, PreferenceValueType.ENUM)
         persistPreferenceEntry(PREF_APP_ROLLOVER_TIME, preferences.rolloverTime, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_TASK_BLANK_TITLE_POLICY, preferences.blankTitlePolicy.name, PreferenceValueType.ENUM)
     }
@@ -1672,6 +1690,7 @@ private fun List<MutableSyncRow<LocalPreference>>.toPreferencesViewState(): Pref
         longBreakMinutes = byKey[PREF_POMODORO_LONG_BREAK_MINUTES]?.entity?.value?.toIntOrNull() ?: 15,
         timezoneOverride = byKey[PREF_APP_TIMEZONE_OVERRIDE]?.entity?.value ?: "SYSTEM",
         dateFormat = byKey[PREF_APP_DATE_FORMAT]?.entity?.value?.let(DateFormatPreference::valueOf) ?: DateFormatPreference.ISO,
+        themePreference = byKey[PREF_APP_THEME_PREFERENCE]?.entity?.value?.let(ThemePreference::valueOf) ?: ThemePreference.SYSTEM,
         blankTitlePolicy = byKey[PREF_TASK_BLANK_TITLE_POLICY]?.entity?.value?.let(BlankTitlePolicy::valueOf) ?: BlankTitlePolicy.REJECT_BLANK,
         rolloverTime = byKey[PREF_APP_ROLLOVER_TIME]?.entity?.value ?: "02:00",
     )

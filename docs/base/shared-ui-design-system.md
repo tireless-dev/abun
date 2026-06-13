@@ -16,6 +16,13 @@ The goal is to keep the UI professional, breathable, and information-focused rat
 
 ## Token Rules
 
+### Theme Mode Support
+
+- the app must support `System`, `Light`, and `Dark` theme modes through shared preferences
+- `System` follows the platform setting
+- `Light` and `Dark` force the shared color scheme across Desktop and Android
+- new settings or onboarding UI must refer to these exact modes rather than inventing one-off theme toggles
+
 ### Color
 
 - light theme anchors:

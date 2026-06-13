@@ -11,6 +11,7 @@ import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DatabaseDriverFactory
 import dev.tireless.abun.app.DateFormatPreference
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.JournalEntryView
@@ -601,6 +602,7 @@ class SharedLogicDesktopTest {
             longBreakMinutes = 15,
             timezoneOverride = "UTC",
             dateFormat = DateFormatPreference.ISO,
+            themePreference = ThemePreference.SYSTEM,
             rolloverTime = "02:00",
         )
         val routineId = store.createRoutine(
@@ -697,6 +699,7 @@ class SharedLogicDesktopTest {
             longBreakMinutes = 18,
             timezoneOverride = "UTC",
             dateFormat = DateFormatPreference.MONTH_DAY,
+            themePreference = ThemePreference.DARK,
             rolloverTime = "04:00",
         )
 
@@ -706,6 +709,7 @@ class SharedLogicDesktopTest {
         assertEquals("[focus]", preferences.titlePrefix)
         assertEquals(20, preferences.defaultAlarmLeadMinutes)
         assertEquals(DateFormatPreference.MONTH_DAY, preferences.dateFormat)
+        assertEquals(ThemePreference.DARK, preferences.themePreference)
         assertEquals(30, session.durationMinutes)
         assertTrue(store.activePomodoroSession(preferences) != null)
         assertEquals(
@@ -717,11 +721,24 @@ class SharedLogicDesktopTest {
                 "pomodoro.long_break_minutes",
                 "app.timezone_override",
                 "app.date_format",
+                "app.theme_preference",
                 "app.rollover_time",
                 "task.blank_title_policy",
             ),
             store.dirtyPreferences().map { it.key }.toSet(),
         )
+    }
+
+    @Test
+    fun `theme preference updates independently for immediate app theme changes`() {
+        val store = testStore()
+
+        store.updateThemePreference(ThemePreference.DARK)
+
+        val preferences = store.preferences()
+
+        assertEquals(ThemePreference.DARK, preferences.themePreference)
+        assertEquals(listOf("app.theme_preference"), store.dirtyPreferences().map { it.key }.filter { it == "app.theme_preference" })
     }
 
     @Test

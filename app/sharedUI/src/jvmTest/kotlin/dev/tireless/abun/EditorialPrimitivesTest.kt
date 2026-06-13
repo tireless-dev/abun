@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialSection
@@ -22,7 +23,7 @@ class EditorialPrimitivesTest {
     @Test
     fun `editorial screen and card render provided content`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
                 EditorialScreen {
                     EditorialSection(
                         eyebrow = "Review",
@@ -49,7 +50,7 @@ class EditorialPrimitivesTest {
         var completedLabel = Color.Unspecified
 
         setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
                 pendingContainer = editorialStatusColors(TaskStatus.PENDING, ThemeTokens.colors).container
                 completedLabel = editorialStatusColors(TaskStatus.COMPLETED, ThemeTokens.colors).content
             }

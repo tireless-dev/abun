@@ -353,6 +353,7 @@ class AbunAppController(
         longBreakMinutes: Int,
         timezoneOverride: String,
         dateFormat: DateFormatPreference,
+        themePreference: ThemePreference,
         rolloverTime: String,
     ) {
         store.updatePreferences(
@@ -363,8 +364,15 @@ class AbunAppController(
             longBreakMinutes = longBreakMinutes,
             timezoneOverride = timezoneOverride,
             dateFormat = dateFormat,
+            themePreference = themePreference,
             rolloverTime = rolloverTime,
         )
+        refresh()
+        requestSync()
+    }
+
+    fun updateThemePreference(themePreference: ThemePreference) {
+        store.updateThemePreference(themePreference)
         refresh()
         requestSync()
     }

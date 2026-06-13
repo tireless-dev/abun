@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.theme.AppTypography
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.LightColorScheme
@@ -22,7 +23,7 @@ class Material3MigrationTest {
         var background = Color.Unspecified
 
         setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
                 primary = MaterialTheme.colorScheme.primary
                 surface = MaterialTheme.colorScheme.surface
                 background = MaterialTheme.colorScheme.background
@@ -53,7 +54,7 @@ class Material3MigrationTest {
         var largeRadius = -1
 
         setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
                 sectionTitleSize = ThemeTokens.type.sectionTitle.fontSize.value
                 bodySize = ThemeTokens.type.body.fontSize.value
                 captionSize = ThemeTokens.type.label.fontSize.value

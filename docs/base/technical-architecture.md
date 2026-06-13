@@ -112,3 +112,4 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 - `app/sharedUI` is the cross-platform source of truth for the app’s visual system across Desktop and Android.
 - New shared UI work should prefer shared theme tokens plus the minimal editorial primitives before introducing feature-local spacing, surface, or chip styling.
 - The shared layer should stay intentionally small: it exists to enforce consistent layout and surface language, not to wrap every Material 3 control.
+- Shared appearance mode is preference-driven and must support `System`, `Light`, and `Dark` from the shared settings flow rather than through platform-specific toggles.

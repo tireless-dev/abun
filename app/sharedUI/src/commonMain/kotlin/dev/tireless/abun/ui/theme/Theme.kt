@@ -8,6 +8,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.tireless.abun.app.ThemePreference
 
 private val LocalAppSpacing = staticCompositionLocalOf { DefaultSpacing }
 private val LocalAppRadii = staticCompositionLocalOf { DefaultRadii }
@@ -37,9 +38,10 @@ object ThemeTokens {
 
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themePreference: ThemePreference = ThemePreference.SYSTEM,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = resolveDarkTheme(themePreference, isSystemInDarkTheme())
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val shapes = Shapes(
         small = RoundedCornerShape(DefaultRadii.smallDp),
@@ -58,4 +60,10 @@ fun AppTheme(
             content = content,
         )
     }
+}
+
+fun resolveDarkTheme(themePreference: ThemePreference, isSystemDarkTheme: Boolean): Boolean = when (themePreference) {
+    ThemePreference.SYSTEM -> isSystemDarkTheme
+    ThemePreference.LIGHT -> false
+    ThemePreference.DARK -> true
 }

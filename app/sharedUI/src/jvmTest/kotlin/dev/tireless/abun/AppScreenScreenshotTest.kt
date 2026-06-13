@@ -17,6 +17,7 @@ import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -138,7 +139,8 @@ class AppScreenScreenshotTest {
         ScreenshotScreenFrame("Settings", AppTab.SETTINGS) {
             SettingsScreenContent(
                 state = state,
-                onUpdatePreferences = { _, _, _, _, _, _, _, _ -> },
+                onUpdateThemePreference = {},
+                onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
             )
         }
     }
@@ -190,7 +192,7 @@ class AppScreenScreenshotTest {
     @Test
     fun createTaskSheetNodeCapture() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
                 Column(
                     modifier = Modifier
                         .testTag("create-task-sheet-content")
