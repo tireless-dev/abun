@@ -101,3 +101,4 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 
 - The Desktop target is the primary fast validation surface for shared mobile UI behavior.
 - The Desktop app should launch in a portrait phone-like window by default and apply a desktop-specific minimum size guardrail so responsive mobile layouts can be checked without starting the Android target.
+- The Desktop runtime should include an SLF4J backend so JVM dependencies such as Ktor/CIO emit normal logs instead of falling back to the no-op logger.
