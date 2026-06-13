@@ -96,3 +96,8 @@ When a design concept is planned but incomplete, mark it with `[TBI]` in the rel
 ## Module Boundary Rule
 
 Base docs define shared mechanisms. Module docs define domain meaning. If a statement answers "what does this concept mean to the user?", it usually belongs in the module doc. If it answers "how do all modules persist, sync, identify, or scope records?", it belongs in `base/`.
+
+## Desktop Validation Runtime
+
+- The Desktop target is the primary fast validation surface for shared mobile UI behavior.
+- The Desktop app should launch in a portrait phone-like window by default and apply a desktop-specific minimum size guardrail so responsive mobile layouts can be checked without starting the Android target.

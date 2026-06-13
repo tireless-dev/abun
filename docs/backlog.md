@@ -12,6 +12,7 @@ This backlog is global and temporary. Once the documentation set is reviewed, th
 ## P1
 
 1. Document which task workflows are already implemented end to end in the desktop app and which remain partial.
+2. Add a dedicated desktop-native window size preset or toggle so the app can switch cleanly between portrait mobile-validation framing and a wider desktop-oriented layout.
 2. Clarify how routine execution is triggered and how deterministic IDs are enforced across devices.
 
 ## P2

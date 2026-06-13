@@ -218,6 +218,7 @@ The current codebase already contains:
 ## Settled Technical Decisions
 
 - Parent-task rollup status is currently derived on demand. There is no materialized view yet.
+- Android Studio shared project setup includes a checked-in `.run/Run Desktop.run.xml` Gradle configuration that runs `:app:desktopApp:run`, so contributors can launch the desktop target from the IDE without recreating a local-only run configuration.
 - Historical event editing is allowed, but it should use a dedicated editing path instead of ordinary append-only event sync.
 - Routine generation may be initiated by both client and server-side paths.
 - Routine recurrence is stored in iCalendar format and edited through a higher-level human-readable UI.
