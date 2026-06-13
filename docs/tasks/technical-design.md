@@ -212,6 +212,7 @@ The current codebase already contains:
 
 - task-oriented view models in [DomainModels.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/DomainModels.kt)
 - local persistence and merge behavior in shared logic
+- shared task UI built directly from Material 3 primitives in [App.kt](/Users/jerry/Workspace/_tools/abun/app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/App.kt) rather than through reusable shared wrapper components
 - Ktor/PostgreSQL server APIs and database schema for synced task resources
 - Cloudflare Workers migration artifacts, but no committed Worker source tree yet
 

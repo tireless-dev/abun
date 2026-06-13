@@ -4,6 +4,10 @@
 
 This document describes the user-facing behavior of the tasks module. It is the PRD-level reference for how task planning, daily execution, and historical review should work from a user perspective.
 
+UI implementation note:
+- current shared task surfaces use direct Material 3 components for sheets, forms, segmented selectors, buttons, and app chrome
+- this is an implementation detail only; the user-facing workflows below are unchanged by the Material 3 wrapper removal
+
 ## Primary User Jobs
 
 1. Capture a task quickly.

@@ -17,6 +17,14 @@ class Material3WrapperRemovalTest {
             "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/SegmentedControl.kt",
             "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/Text.kt",
             "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/TextField.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/ActionRow.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/Feedback.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/Section.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/Sheet.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/components/RecurrenceRuleEditor.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/layout/Scaffold.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/layout/ScreenContainer.kt",
+            "app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/theme/Buttons.kt",
         )
 
         redundantWrappers.forEach { relativePath ->

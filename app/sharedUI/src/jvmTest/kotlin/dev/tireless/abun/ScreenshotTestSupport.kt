@@ -3,8 +3,18 @@ package dev.tireless.abun
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -13,8 +23,6 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RoborazziOptions
 import dev.tireless.abun.app.AppTab
-import dev.tireless.abun.ui.layout.Scaffold
-import dev.tireless.abun.ui.layout.ScreenContainer
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -56,19 +64,46 @@ internal fun ScreenshotScreenFrame(
     selectedTab: AppTab,
     content: @Composable () -> Unit,
 ) {
-    Scaffold(
-        title = title,
-        selectedTab = selectedTab.tabLabelForScreenshot(),
-        tabs = AppTab.entries.map { it.tabLabelForScreenshot() },
-        onSelectTab = {},
-        floatingActionLabel = if (selectedTab == AppTab.TODAY || selectedTab == AppTab.TASKS) "Task" else null,
-        onFloatingAction = {},
+    MaterialScaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = title,
+                        style = ThemeTokens.type.title,
+                    )
+                },
+            )
+        },
+        bottomBar = {
+            TabRow(selectedTabIndex = AppTab.entries.indexOf(selectedTab).coerceAtLeast(0)) {
+                AppTab.entries.forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = {},
+                        text = { Text(tab.tabLabelForScreenshot()) },
+                    )
+                }
+            }
+        },
+        floatingActionButton = {
+            if (selectedTab == AppTab.TODAY || selectedTab == AppTab.TASKS) {
+                ExtendedFloatingActionButton(
+                    onClick = {},
+                    icon = { Text("+") },
+                    text = { Text("Task") },
+                )
+            }
+        },
     ) { padding: PaddingValues ->
-        ScreenContainer(
+        Column(
             modifier = Modifier
+                .fillMaxSize()
                 .background(ThemeTokens.colors.background)
-                .padding(padding),
-            applyVerticalSafeInsets = false,
+                .padding(padding)
+                .padding(ThemeTokens.spacing.screenPaddingDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
         ) {
             content()
         }

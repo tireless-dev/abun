@@ -6,21 +6,34 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
@@ -60,18 +72,8 @@ import kotlinx.datetime.toLocalDateTime
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
-import dev.tireless.abun.ui.components.ActionRow
-import dev.tireless.abun.ui.components.EmptyState
-import dev.tireless.abun.ui.components.RecurrenceRuleEditor
-import dev.tireless.abun.ui.components.InlineError
-import dev.tireless.abun.ui.components.Section
-import dev.tireless.abun.ui.components.SectionTitle
-import dev.tireless.abun.ui.components.Sheet
-import dev.tireless.abun.ui.layout.Scaffold
-import dev.tireless.abun.ui.layout.ScreenContainer
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
-import dev.tireless.abun.ui.theme.primaryActionButtonStyle
 import kotlinx.coroutines.delay
 
 private enum class OverlaySheet {
@@ -127,23 +129,50 @@ fun App() {
             AppTab.TODAY, AppTab.TASKS -> "Task"
             else -> null
         }
-        Scaffold(
-            title = state.selectedTab.tabLabel(),
-            selectedTab = state.selectedTab.tabLabel(),
-            tabs = AppTab.entries.map { it.tabLabel() },
-            onSelectTab = { tabLabel -> controller.selectTab(appTabFromLabel(tabLabel)) },
-            floatingActionLabel = if (fabLabel != null && !isPomodoroActive) fabLabel else null,
-            onFloatingAction = {
-                createTaskContext = taskCreateContextFor(state.selectedTab, state.selectedDate)
-                currentSheet = OverlaySheet.CREATE_TASK
+        MaterialScaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = state.selectedTab.tabLabel(),
+                            style = ThemeTokens.type.title,
+                        )
+                    },
+                )
             },
-        ) { padding ->
-            ScreenContainer(
+            bottomBar = {
+                TabRow(selectedTabIndex = AppTab.entries.indexOf(state.selectedTab).coerceAtLeast(0)) {
+                    AppTab.entries.forEach { tab ->
+                        Tab(
+                            selected = state.selectedTab == tab,
+                            onClick = { controller.selectTab(tab) },
+                            text = { Text(tab.tabLabel()) },
+                        )
+                    }
+                }
+            },
+            floatingActionButton = {
+                if (fabLabel != null && !isPomodoroActive) {
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            createTaskContext = taskCreateContextFor(state.selectedTab, state.selectedDate)
+                            currentSheet = OverlaySheet.CREATE_TASK
+                        },
+                        icon = { Text("+") },
+                        text = { Text(fabLabel) },
+                    )
+                }
+            },
+        ) { padding: PaddingValues ->
+            Column(
                 modifier = Modifier
+                    .fillMaxSize()
                     .background(ThemeTokens.colors.background)
                     .padding(padding)
+                    .padding(ThemeTokens.spacing.screenPaddingDp)
                     .verticalScroll(rememberScrollState()),
-                applyVerticalSafeInsets = false,
+                verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
             ) {
                 StatusStrip(state)
                 when (state.selectedTab) {
@@ -301,20 +330,49 @@ internal fun GuideScreenContent(
     onSkipLogin: () -> Unit,
 ) {
     var otpCode by remember(state.auth.prefilledOtp) { mutableStateOf(state.auth.prefilledOtp) }
-    ScreenContainer(modifier = Modifier.background(ThemeTokens.colors.background)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ThemeTokens.colors.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
+            .padding(ThemeTokens.spacing.screenPaddingDp),
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+    ) {
         Panel {
             Text("abun", style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold), color = ThemeTokens.colors.primary)
             Text("Sign in", style = ThemeTokens.type.display)
             Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.bodyMuted)
-            SingleLineField(value = state.auth.email, onValueChange = onUpdateLoginEmail, label = "Email")
-            ActionButton(label = if (state.auth.otpRequested) "Resend OTP" else "Send OTP", onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting)
-            if (state.auth.otpRequested) {
-                SingleLineField(value = otpCode, onValueChange = { otpCode = it }, label = "OTP code")
-                state.auth.debugOtpHint?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
-                ActionButton(label = "Verify and login", onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting)
+            OutlinedTextField(
+                value = state.auth.email,
+                onValueChange = onUpdateLoginEmail,
+                label = { Text("Email", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+            Button(onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting) {
+                Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP", style = ThemeTokens.type.body)
             }
-            ActionButton(label = "Skip for now", onClick = onSkipLogin, enabled = !state.auth.isSubmitting)
-            state.auth.errorMessage?.let { InlineError(it) }
+            if (state.auth.otpRequested) {
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { otpCode = it },
+                    label = { Text("OTP code", style = ThemeTokens.type.label) },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = ThemeTokens.type.body,
+                    singleLine = true,
+                )
+                state.auth.debugOtpHint?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
+                Button(onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting) {
+                    Text("Verify and login", style = ThemeTokens.type.body)
+                }
+            }
+            Button(onClick = onSkipLogin, enabled = !state.auth.isSubmitting) {
+                Text("Skip for now", style = ThemeTokens.type.body)
+            }
+            state.auth.errorMessage?.let {
+                Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
+            }
         }
     }
 }
@@ -323,7 +381,7 @@ internal fun GuideScreenContent(
 private fun StatusStrip(state: AppUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
         state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
-        state.syncState.errorMessage?.let { InlineError(it) }
+        state.syncState.errorMessage?.let { Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body) }
         if (state.auth.mode == AuthMode.GUEST) {
             Text("Local-only mode. Login anytime to sync.", style = ThemeTokens.type.bodyMuted)
         }
@@ -353,7 +411,9 @@ internal fun TodayScreen(
                 Text("Day", style = ThemeTokens.type.title)
                 Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
             }
-            ActionButton(label = if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), onClick = onStartPomodoro)
+            Button(onClick = onStartPomodoro) {
+                Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body)
+            }
         }
         MetricRow(
             listOf(
@@ -393,11 +453,20 @@ internal fun TasksScreen(
     onOpenRoutine: (RoutineListItemView) -> Unit,
     onRunRoutine: (RoutineListItemView) -> Unit,
 ) {
-    SingleSelectSegments(
-        options = TaskSubTab.entries.map { it.label() },
-        selected = state.selectedTaskSubTab.label(),
-        onSelect = { onSelectPanel(taskSubTabFromLabel(it)) },
-    )
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        TaskSubTab.entries.forEachIndexed { index, taskSubTab ->
+            val option = taskSubTab.label()
+            SegmentedButton(
+                selected = option == state.selectedTaskSubTab.label(),
+                onClick = { onSelectPanel(taskSubTabFromLabel(option)) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskSubTab.entries.size),
+            ) {
+                Text(option, style = ThemeTokens.type.body)
+            }
+        }
+    }
 
     when (state.selectedTaskSubTab) {
         TaskSubTab.TASKS -> TaskListScreen(
@@ -426,11 +495,20 @@ private fun TaskListScreen(
     val filteredTasks = filterTasksForSurface(state.taskView.tasks, state.selectedTaskFilter)
     Panel {
         SectionHeader("Task list", taskListFilterTitle(state.selectedTaskFilter))
-        SingleSelectSegments(
-            options = TaskListFilter.entries.map { it.label() },
-            selected = state.selectedTaskFilter.label(),
-            onSelect = { onSelectTaskFilter(taskListFilterFromLabel(it)) },
-        )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            TaskListFilter.entries.forEachIndexed { index, filter ->
+                val option = filter.label()
+                SegmentedButton(
+                    selected = option == state.selectedTaskFilter.label(),
+                    onClick = { onSelectTaskFilter(taskListFilterFromLabel(option)) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskListFilter.entries.size),
+                ) {
+                    Text(option, style = ThemeTokens.type.body)
+                }
+            }
+        }
         TaskStack(
             tasks = filteredTasks,
             empty = taskListFilterEmptyState(state.selectedTaskFilter),
@@ -454,10 +532,12 @@ private fun RoutineListScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SectionHeader("Routine support", "Routines")
-            ActionButton(label = "Create", onClick = onCreateRoutine)
+            Button(onClick = onCreateRoutine) {
+                Text("Create", style = ThemeTokens.type.body)
+            }
         }
         if (state.taskView.routines.isEmpty()) {
-            EmptyState("No routines.")
+            Text("No routines.", style = ThemeTokens.type.body)
         } else {
             state.taskView.routines.forEach { routine ->
                 RoutineRow(routine, onOpenRoutine, onRunRoutine)
@@ -474,17 +554,17 @@ internal fun PomodoroScreen(state: AppUiState, liveNow: Long, onOpenStart: () ->
         Text(active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "00:00", style = ThemeTokens.type.display)
         Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
         if (active == null) {
-            ActionButton(label = "Start", onClick = onOpenStart)
+            Button(onClick = onOpenStart) { Text("Start", style = ThemeTokens.type.body) }
         } else {
             Text("${active.phase.label()} • ${active.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
-            ActionButton(label = "Complete or stop", onClick = onOpenStart)
+            Button(onClick = onOpenStart) { Text("Complete or stop", style = ThemeTokens.type.body) }
         }
     }
 
     Panel {
         SectionHeader("History", "Recent sessions")
         if (state.recentPomodoroSessions.isEmpty()) {
-            EmptyState("No sessions.")
+            Text("No sessions.", style = ThemeTokens.type.body)
         } else {
             state.recentPomodoroSessions.forEach { session ->
                 PomodoroRow(session)
@@ -522,25 +602,75 @@ internal fun SettingsScreenContent(
 
     Panel {
         SectionHeader("Defaults", "Task")
-        SingleLineField(value = titlePrefix, onValueChange = { titlePrefix = it }, label = "Title prefix")
+        OutlinedTextField(
+            value = titlePrefix,
+            onValueChange = { titlePrefix = it },
+            label = { Text("Title prefix", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
     }
     Panel {
         SectionHeader("Defaults", "Pomodoro")
-        SingleLineField(value = focusMinutes, onValueChange = { focusMinutes = it }, label = "Pomodoro minutes")
-        SingleLineField(value = shortBreakMinutes, onValueChange = { shortBreakMinutes = it }, label = "Short break minutes")
-        SingleLineField(value = longBreakMinutes, onValueChange = { longBreakMinutes = it }, label = "Long break minutes")
+        OutlinedTextField(
+            value = focusMinutes,
+            onValueChange = { focusMinutes = it },
+            label = { Text("Pomodoro minutes", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = shortBreakMinutes,
+            onValueChange = { shortBreakMinutes = it },
+            label = { Text("Short break minutes", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = longBreakMinutes,
+            onValueChange = { longBreakMinutes = it },
+            label = { Text("Long break minutes", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
     }
     Panel {
         SectionHeader("App", "Preferences")
-        SingleLineField(value = timezoneOverride, onValueChange = { timezoneOverride = it }, label = "Timezone override")
-        SingleLineField(value = rolloverTime, onValueChange = { rolloverTime = it }, label = "Rollover time (HH:MM)")
-        SingleSelectSegments(
-            options = DateFormatPreference.entries.map { it.label() },
-            selected = selectedDateFormat.label(),
-            onSelect = { label -> selectedDateFormat = dateFormatFromLabel(label) },
+        OutlinedTextField(
+            value = timezoneOverride,
+            onValueChange = { timezoneOverride = it },
+            label = { Text("Timezone override", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
         )
-        ActionButton(
-            label = "Save",
+        OutlinedTextField(
+            value = rolloverTime,
+            onValueChange = { rolloverTime = it },
+            label = { Text("Rollover time (HH:MM)", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            DateFormatPreference.entries.forEachIndexed { index, dateFormatPreference ->
+                val option = dateFormatPreference.label()
+                SegmentedButton(
+                    selected = option == selectedDateFormat.label(),
+                    onClick = { selectedDateFormat = dateFormatFromLabel(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
+                ) {
+                    Text(option, style = ThemeTokens.type.body)
+                }
+            }
+        }
+        Button(
             onClick = {
                 onUpdatePreferences(
                     titlePrefix,
@@ -553,7 +683,9 @@ internal fun SettingsScreenContent(
                     rolloverTime,
                 )
             },
-        )
+        ) {
+            Text("Save", style = ThemeTokens.type.body)
+        }
     }
 }
 
@@ -603,7 +735,7 @@ private fun TaskStack(
     compact: Boolean = false,
 ) {
     if (tasks.isEmpty()) {
-        EmptyState(empty)
+        Text(empty, style = ThemeTokens.type.body)
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
@@ -616,7 +748,7 @@ private fun TaskStack(
 @Composable
 private fun JournalTimeline(entries: List<JournalEntryView>) {
     if (entries.isEmpty()) {
-        EmptyState("No history for this date.")
+        Text("No history for this date.", style = ThemeTokens.type.body)
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
@@ -659,9 +791,13 @@ private fun TaskRow(
             task.routineId?.let { Text("Routine", style = ThemeTokens.type.bodyMuted) }
         }
         if (!compact) {
-            ActionButton(label = if (disabled) "Pomodoro active" else "Manage", onClick = { onOpenTask(task) }, enabled = !disabled)
+            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
+                Text(if (disabled) "Pomodoro active" else "Manage", style = ThemeTokens.type.body)
+            }
         } else {
-            ActionButton(label = "Open", onClick = { onOpenTask(task) }, enabled = !disabled)
+            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
+                Text("Open", style = ThemeTokens.type.body)
+            }
         }
     }
 }
@@ -710,9 +846,16 @@ private fun RoutineRow(
         routine.defaultStartNotBefore?.let { Text("Default start: $it", style = ThemeTokens.type.label) }
         routine.defaultEstimatedDuration?.let { Text("Default duration: $it", style = ThemeTokens.type.label) }
         Text(if (routine.isActive) "Active" else "Paused", style = ThemeTokens.type.label)
-        ActionRow {
-            ActionButton(label = "Run today", onClick = { onRun(routine) }, enabled = routine.isActive)
-            ActionButton(label = "Manage", onClick = { onOpen(routine) })
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+            Button(onClick = { onRun(routine) }, enabled = routine.isActive) {
+                Text("Run today", style = ThemeTokens.type.body)
+            }
+            Button(onClick = { onOpen(routine) }) {
+                Text("Manage", style = ThemeTokens.type.body)
+            }
         }
     }
 }
@@ -734,17 +877,25 @@ private fun PomodoroRow(session: PomodoroSessionView) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun CreateTaskSheet(
     context: TaskCreateContext,
     onDismiss: () -> Unit,
     onCreate: (TaskSaveDraft) -> Unit,
 ) {
-    Sheet(onDismiss = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
         CreateTaskSheetContent(
             context = context,
             onCreate = onCreate,
             onDismiss = onDismiss,
         )
+        }
     }
 }
 
@@ -760,69 +911,100 @@ internal fun CreateTaskSheetContent(
     val createEnabled = draft.title.isNotBlank() &&
         (!draft.hasSchedule || !draft.startDate.isNullOrBlank()) &&
         (draft.durationPreset != DurationPreset.CUSTOM || draft.customDurationMinutes.trim().toIntOrNull()?.let { it > 0 } == true)
-    SectionTitle("Create task")
-    SingleLineField(value = draft.title, onValueChange = { draft = draft.copy(title = it) }, label = "Task title")
-    SingleLineField(value = draft.detail, onValueChange = { draft = draft.copy(detail = it) }, label = "Detail")
+    Text("Create task", style = ThemeTokens.type.sectionTitle)
+    OutlinedTextField(
+        value = draft.title,
+        onValueChange = { draft = draft.copy(title = it) },
+        label = { Text("Task title", style = ThemeTokens.type.label) },
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = ThemeTokens.type.body,
+        singleLine = true,
+    )
+    OutlinedTextField(
+        value = draft.detail,
+        onValueChange = { draft = draft.copy(detail = it) },
+        label = { Text("Detail", style = ThemeTokens.type.label) },
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = ThemeTokens.type.body,
+        singleLine = true,
+    )
     if (draft.hasSchedule) {
         Text("Starts on", style = ThemeTokens.type.label)
-        SingleSelectSegments(
-            options = dateOptions.map { it.label },
-            selected = selectedDateLabel,
-            onSelect = { label ->
-                draft = draft.copy(startDate = dateOptions.firstOrNull { it.label == label }?.date)
-            },
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            dateOptions.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = option.label == selectedDateLabel,
+                    onClick = { draft = draft.copy(startDate = option.date) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = dateOptions.size),
+                ) {
+                    Text(option.label, style = ThemeTokens.type.body)
+                }
+            }
+        }
         Text(draft.startDate.orEmpty(), style = ThemeTokens.type.bodyMuted)
         Text("Estimated duration", style = ThemeTokens.type.label)
-        SingleSelectSegments(
-            options = DurationPreset.entries.map { it.label },
-            selected = draft.durationPreset.label,
-            onSelect = { label ->
-                val preset = DurationPreset.entries.first { it.label == label }
-                draft = draft.copy(
-                    durationPreset = preset,
-                    customDurationMinutes = if (preset == DurationPreset.CUSTOM) draft.customDurationMinutes else "",
-                )
-            },
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            DurationPreset.entries.forEachIndexed { index, preset ->
+                SegmentedButton(
+                    selected = preset.label == draft.durationPreset.label,
+                    onClick = {
+                        draft = draft.copy(
+                            durationPreset = preset,
+                            customDurationMinutes = if (preset == DurationPreset.CUSTOM) draft.customDurationMinutes else "",
+                        )
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DurationPreset.entries.size),
+                ) {
+                    Text(preset.label, style = ThemeTokens.type.body)
+                }
+            }
+        }
         if (draft.durationPreset == DurationPreset.CUSTOM) {
-            SingleLineField(
+            OutlinedTextField(
                 value = draft.customDurationMinutes,
                 onValueChange = { draft = draft.copy(customDurationMinutes = it) },
-                label = "Custom minutes",
+                label = { Text("Custom minutes", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
             )
         }
-        ActionButton(
-            label = "Clear schedule",
+        OutlinedButton(
             onClick = { draft = draft.copy(hasSchedule = false, startDate = null, durationPreset = DurationPreset.NONE, customDurationMinutes = "") },
-            variant = ButtonVariant.SECONDARY,
-        )
+        ) {
+            Text("Clear schedule", style = ThemeTokens.type.body)
+        }
     } else {
         Text("This task will go to backlog.", style = ThemeTokens.type.bodyMuted)
-        ActionButton(
-            label = "Add schedule",
+        OutlinedButton(
             onClick = {
                 draft = draft.copy(
                     hasSchedule = true,
                     startDate = draft.startDate ?: context.selectedDate,
                 )
             },
-            variant = ButtonVariant.SECONDARY,
-        )
+        ) {
+            Text("Add schedule", style = ThemeTokens.type.body)
+        }
     }
-    ActionRow {
-        ActionButton(label = "Cancel", onClick = onDismiss, variant = ButtonVariant.SECONDARY)
-        ActionButton(
-            label = "Create",
-            onClick = {
-                onCreate(normalizeTaskCreateDraft(draft))
-            },
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+    ) {
+        OutlinedButton(onClick = onDismiss) {
+            Text("Cancel", style = ThemeTokens.type.body)
+        }
+        Button(
+            onClick = { onCreate(normalizeTaskCreateDraft(draft)) },
             enabled = createEnabled,
-        )
+        ) {
+            Text("Create", style = ThemeTokens.type.body)
+        }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun CreateRoutineSheet(
     onDismiss: () -> Unit,
     onCreate: (String, String?, String, String?, String?) -> Unit,
@@ -832,18 +1014,56 @@ internal fun CreateRoutineSheet(
     var recurrenceRule by remember { mutableStateOf("RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0") }
     var defaultStartNotBefore by remember { mutableStateOf("") }
     var defaultEstimatedDuration by remember { mutableStateOf("") }
-    Sheet(onDismiss = onDismiss) {
-        SectionTitle("Create routine")
-        SingleLineField(value = title, onValueChange = { title = it }, label = "Routine title")
-        SingleLineField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        RecurrenceRuleEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+        Text("Create routine", style = ThemeTokens.type.sectionTitle)
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Routine title", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = detail,
+            onValueChange = { detail = it },
+            label = { Text("Routine detail", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        RoutineRecurrenceEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
         Text(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
-        SingleLineField(value = defaultStartNotBefore, onValueChange = { defaultStartNotBefore = it }, label = "Default start not before")
-        SingleLineField(value = defaultEstimatedDuration, onValueChange = { defaultEstimatedDuration = it }, label = "Default estimated duration")
-        ActionRow {
-            ActionButton(label = "Cancel", onClick = onDismiss)
-            ActionButton(
-                label = "Create",
+        OutlinedTextField(
+            value = defaultStartNotBefore,
+            onValueChange = { defaultStartNotBefore = it },
+            label = { Text("Default start not before", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = defaultEstimatedDuration,
+            onValueChange = { defaultEstimatedDuration = it },
+            label = { Text("Default estimated duration", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel", style = ThemeTokens.type.body)
+            }
+            Button(
                 onClick = {
                     onCreate(
                         title,
@@ -854,12 +1074,16 @@ internal fun CreateRoutineSheet(
                     )
                 },
                 enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
-            )
+            ) {
+                Text("Create", style = ThemeTokens.type.body)
+            }
+        }
         }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun TaskActionsSheet(
     task: TaskListItemView?,
     history: List<JournalEntryView>,
@@ -902,8 +1126,14 @@ internal fun TaskActionsSheet(
         structured.nextOccurrence(after)
     }
 
-    Sheet(onDismiss = onDismiss) {
-        SectionTitle(if (isRoutineDerived) "Routine: ${task.title}" else task.title)
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+        Text(if (isRoutineDerived) "Routine: ${task.title}" else task.title, style = ThemeTokens.type.sectionTitle)
         if (isRoutineDerived) {
             Text("Routine: ${routine?.templateTitle}", style = ThemeTokens.type.bodyMuted)
             nextOccurrence?.let {
@@ -911,29 +1141,78 @@ internal fun TaskActionsSheet(
             }
         }
         StatusPill(task.status)
-        SingleLineField(value = title, onValueChange = { title = it }, label = "Title", enabled = !isRoutineDerived)
-        SingleLineField(value = detail, onValueChange = { detail = it }, label = "Detail", enabled = !isRoutineDerived)
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Title", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = if (isRoutineDerived) ThemeTokens.type.bodyMuted else ThemeTokens.type.body,
+            singleLine = true,
+            enabled = !isRoutineDerived,
+        )
+        OutlinedTextField(
+            value = detail,
+            onValueChange = { detail = it },
+            label = { Text("Detail", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = if (isRoutineDerived) ThemeTokens.type.bodyMuted else ThemeTokens.type.body,
+            singleLine = true,
+            enabled = !isRoutineDerived,
+        )
 
         if (!isRoutineDerived) {
             Text("Parent task", style = ThemeTokens.type.label)
-            SingleSelectSegments(
-                options = listOf("No parent") + availableParents.map { it.title },
-                selected = availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent",
-                onSelect = { label ->
-                    parentId = availableParents.firstOrNull { it.title == label }?.id
-                },
-            )
+            val parentOptions = listOf("No parent") + availableParents.map { it.title }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                parentOptions.forEachIndexed { index, label ->
+                    SegmentedButton(
+                        selected = label == (availableParents.firstOrNull { it.id == parentId }?.title ?: "No parent"),
+                        onClick = { parentId = availableParents.firstOrNull { it.title == label }?.id },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = parentOptions.size),
+                    ) {
+                        Text(label, style = ThemeTokens.type.body)
+                    }
+                }
+            }
         }
 
-        SingleLineField(value = startNotBefore, onValueChange = { startNotBefore = it }, label = "Start not before", enabled = !isRoutineDerived)
-        SingleLineField(value = endNotAfter, onValueChange = { endNotAfter = it }, label = "End not after", enabled = !isRoutineDerived)
-        SingleLineField(value = estimatedDuration, onValueChange = { estimatedDuration = it }, label = "Estimated duration", enabled = !isRoutineDerived)
+        OutlinedTextField(
+            value = startNotBefore,
+            onValueChange = { startNotBefore = it },
+            label = { Text("Start not before", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = if (isRoutineDerived) ThemeTokens.type.bodyMuted else ThemeTokens.type.body,
+            singleLine = true,
+            enabled = !isRoutineDerived,
+        )
+        OutlinedTextField(
+            value = endNotAfter,
+            onValueChange = { endNotAfter = it },
+            label = { Text("End not after", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = if (isRoutineDerived) ThemeTokens.type.bodyMuted else ThemeTokens.type.body,
+            singleLine = true,
+            enabled = !isRoutineDerived,
+        )
+        OutlinedTextField(
+            value = estimatedDuration,
+            onValueChange = { estimatedDuration = it },
+            label = { Text("Estimated duration", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = if (isRoutineDerived) ThemeTokens.type.bodyMuted else ThemeTokens.type.body,
+            singleLine = true,
+            enabled = !isRoutineDerived,
+        )
 
-        ActionRow {
-            ActionButton(label = "Close", onClick = onDismiss)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Close", style = ThemeTokens.type.body)
+            }
             if (!isRoutineDerived) {
-                ActionButton(
-                    label = "Save",
+                Button(
                     onClick = {
                         val draft = normalizeTaskSaveDraft(
                             title = title,
@@ -954,26 +1233,37 @@ internal fun TaskActionsSheet(
                         )
                     },
                     enabled = !isPomodoroActive && title.isNotBlank(),
-                )
+                ) {
+                    Text("Save", style = ThemeTokens.type.body)
+                }
             }
         }
         if (taskDetailActionLabels(task).any { it != "Delete task" }) {
-            SingleLineField(value = note, onValueChange = { note = it }, label = "Task note")
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Task note", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
         }
         Text("History", style = ThemeTokens.type.label)
         JournalTimeline(history)
         if (isPomodoroActive) {
-            InlineError("Pomodoro is active. Task edits are temporarily disabled.")
+            Text("Pomodoro is active. Task edits are temporarily disabled.", color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
         } else {
             val actions = taskDetailActionLabels(task)
             if ("Progress" in actions || "Complete" in actions || "Skip" in actions || "Postpone" in actions || "Pomodoro" in actions) {
-                ActionRow {
-                    if ("Progress" in actions) ActionButton(label = "Progress", onClick = { onProgress(note) })
-                    if ("Complete" in actions) ActionButton(label = "Complete", onClick = { onComplete(note) })
-                    if ("Skip" in actions) ActionButton(label = "Skip", onClick = { onSkip(note) })
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                    verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                ) {
+                    if ("Progress" in actions) Button(onClick = { onProgress(note) }) { Text("Progress", style = ThemeTokens.type.body) }
+                    if ("Complete" in actions) Button(onClick = { onComplete(note) }) { Text("Complete", style = ThemeTokens.type.body) }
+                    if ("Skip" in actions) Button(onClick = { onSkip(note) }) { Text("Skip", style = ThemeTokens.type.body) }
                     if ("Postpone" in actions) {
-                        ActionButton(
-                            label = "Postpone",
+                        Button(
                             onClick = {
                                 onPostpone(
                                     task.id,
@@ -983,21 +1273,32 @@ internal fun TaskActionsSheet(
                                     note.ifBlank { null },
                                 )
                             },
-                        )
+                        ) {
+                            Text("Postpone", style = ThemeTokens.type.body)
+                        }
                     }
-                    if ("Pomodoro" in actions) ActionButton(label = "Pomodoro", onClick = onStartPomodoro, enabled = task.status.isOpen())
+                    if ("Pomodoro" in actions) {
+                        Button(onClick = onStartPomodoro, enabled = task.status.isOpen()) {
+                            Text("Pomodoro", style = ThemeTokens.type.body)
+                        }
+                    }
                 }
             }
             if ("Delete task" in actions) {
-                ActionRow {
-                    ActionButton(label = "Delete task", onClick = onDelete)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                    verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                ) {
+                    Button(onClick = onDelete) { Text("Delete task", style = ThemeTokens.type.body) }
                 }
             }
+        }
         }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun RoutineActionsSheet(
     routine: RoutineListItemView?,
     onDismiss: () -> Unit,
@@ -1011,25 +1312,53 @@ internal fun RoutineActionsSheet(
     var recurrenceRule by remember(routine.id) { mutableStateOf(routine.recurrenceRule) }
     var defaultStartNotBefore by remember(routine.id) { mutableStateOf(routine.defaultStartNotBefore.orEmpty()) }
     var defaultEstimatedDuration by remember(routine.id) { mutableStateOf(routine.defaultEstimatedDuration.orEmpty()) }
-    Sheet(onDismiss = onDismiss) {
-        SectionTitle(routine.templateTitle)
-        SingleLineField(value = title, onValueChange = { title = it }, label = "Routine title")
-        SingleLineField(value = detail, onValueChange = { detail = it }, label = "Routine detail")
-        RecurrenceRuleEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+        Text(routine.templateTitle, style = ThemeTokens.type.sectionTitle)
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Routine title", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = detail,
+            onValueChange = { detail = it },
+            label = { Text("Routine detail", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
+        RoutineRecurrenceEditor(rule = recurrenceRule, onRuleChange = { recurrenceRule = it })
         Text(describeRecurrenceRule(recurrenceRule), style = ThemeTokens.type.bodyMuted)
-        SingleLineField(
+        OutlinedTextField(
             value = defaultStartNotBefore,
             onValueChange = { defaultStartNotBefore = it },
-            label = "Default start not before",
+            label = { Text("Default start not before", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
         )
-        SingleLineField(
+        OutlinedTextField(
             value = defaultEstimatedDuration,
             onValueChange = { defaultEstimatedDuration = it },
-            label = "Default estimated duration",
+            label = { Text("Default estimated duration", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
         )
-        ActionRow {
-            ActionButton(
-                label = "Save",
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+            Button(
                 onClick = {
                     val draft = normalizeRoutineSaveDraft(
                         id = routine.id,
@@ -1049,15 +1378,21 @@ internal fun RoutineActionsSheet(
                     )
                 },
                 enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
-            )
-            ActionButton(label = if (routine.isActive) "Pause" else "Activate", onClick = onToggle)
-            ActionButton(label = "Delete", onClick = onDelete)
-            ActionButton(label = "Close", onClick = onDismiss)
+            ) {
+                Text("Save", style = ThemeTokens.type.body)
+            }
+            Button(onClick = onToggle) {
+                Text(if (routine.isActive) "Pause" else "Activate", style = ThemeTokens.type.body)
+            }
+            Button(onClick = onDelete) { Text("Delete", style = ThemeTokens.type.body) }
+            OutlinedButton(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body) }
+        }
         }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun StartPomodoroSheet(
     state: AppUiState,
     hasActive: Boolean,
@@ -1068,33 +1403,60 @@ internal fun StartPomodoroSheet(
     var selectedTaskId by remember(openTasks) { mutableStateOf<String?>(openTasks.firstOrNull()?.taskId) }
     var selectedPhase by remember { mutableStateOf(PomodoroPhase.FOCUS) }
 
-    Sheet(onDismiss = onDismiss) {
-        SectionTitle("Start pomodoro")
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+        Text("Start pomodoro", style = ThemeTokens.type.sectionTitle)
         if (hasActive) {
-            InlineError("A timer is already active. Complete or stop it first.")
-            ActionButton(label = "Close", onClick = onDismiss)
-            return@Sheet
+            Text("A timer is already active. Complete or stop it first.", color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
+            Button(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body) }
+            return@Column
         }
         Text("Task", style = ThemeTokens.type.label)
-        SingleSelectSegments(
-            options = listOf("No task") + openTasks.map { it.title },
-            selected = openTasks.firstOrNull { it.taskId == selectedTaskId }?.title ?: "No task",
-            onSelect = { label -> selectedTaskId = openTasks.firstOrNull { it.title == label }?.taskId },
-        )
+        val taskOptions = listOf("No task") + openTasks.map { it.title }
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            taskOptions.forEachIndexed { index, label ->
+                SegmentedButton(
+                    selected = label == (openTasks.firstOrNull { it.taskId == selectedTaskId }?.title ?: "No task"),
+                    onClick = { selectedTaskId = openTasks.firstOrNull { it.title == label }?.taskId },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = taskOptions.size),
+                ) {
+                    Text(label, style = ThemeTokens.type.body)
+                }
+            }
+        }
         Text("Mode", style = ThemeTokens.type.label)
-        SingleSelectSegments(
-            options = PomodoroPhase.entries.map { it.label() },
-            selected = selectedPhase.label(),
-            onSelect = { label -> selectedPhase = pomodoroPhaseFromLabel(label) },
-        )
-        ActionRow {
-            ActionButton(label = "Cancel", onClick = onDismiss)
-            ActionButton(label = "Start", onClick = { onStart(selectedTaskId, selectedPhase) })
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            PomodoroPhase.entries.forEachIndexed { index, phase ->
+                val label = phase.label()
+                SegmentedButton(
+                    selected = label == selectedPhase.label(),
+                    onClick = { selectedPhase = pomodoroPhaseFromLabel(label) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = PomodoroPhase.entries.size),
+                ) {
+                    Text(label, style = ThemeTokens.type.body)
+                }
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+            OutlinedButton(onClick = onDismiss) { Text("Cancel", style = ThemeTokens.type.body) }
+            Button(onClick = { onStart(selectedTaskId, selectedPhase) }) {
+                Text("Start", style = ThemeTokens.type.body)
+            }
+        }
         }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun CompletePomodoroSheet(
     state: AppUiState,
     liveNow: Long,
@@ -1107,20 +1469,43 @@ internal fun CompletePomodoroSheet(
     var note by remember(active.id) { mutableStateOf(active.note.orEmpty()) }
     var taskUpdate by remember(active.id) { mutableStateOf(PomodoroTaskUpdate.NONE) }
 
-    Sheet(onDismiss = onDismiss) {
-        SectionTitle(if (remaining <= 0) "Session complete" else "Active pomodoro")
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+        ) {
+        Text(if (remaining <= 0) "Session complete" else "Active pomodoro", style = ThemeTokens.type.sectionTitle)
         Text(active.taskTitle ?: "Standalone timer", style = ThemeTokens.type.body)
-        SingleLineField(value = note, onValueChange = { note = it }, label = "Session note")
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it },
+            label = { Text("Session note", style = ThemeTokens.type.label) },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = ThemeTokens.type.body,
+            singleLine = true,
+        )
         if (active.taskId != null) {
-            SingleSelectSegments(
-                options = PomodoroTaskUpdate.entries.map { it.label() },
-                selected = taskUpdate.label(),
-                onSelect = { label -> taskUpdate = pomodoroTaskUpdateFromLabel(label) },
-            )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                PomodoroTaskUpdate.entries.forEachIndexed { index, update ->
+                    val label = update.label()
+                    SegmentedButton(
+                        selected = label == taskUpdate.label(),
+                        onClick = { taskUpdate = pomodoroTaskUpdateFromLabel(label) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = PomodoroTaskUpdate.entries.size),
+                    ) {
+                        Text(label, style = ThemeTokens.type.body)
+                    }
+                }
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
-            ActionButton(label = "Stop", onClick = { onStop(note) })
-            ActionButton(label = if (remaining <= 0) "Save" else "Complete", onClick = { onSave(note, taskUpdate) })
+            Button(onClick = { onStop(note) }) { Text("Stop", style = ThemeTokens.type.body) }
+            Button(onClick = { onSave(note, taskUpdate) }) {
+                Text(if (remaining <= 0) "Save" else "Complete", style = ThemeTokens.type.body)
+            }
+        }
         }
     }
 }
@@ -1238,11 +1623,6 @@ internal data class TaskCreateDraft(
     val customDurationMinutes: String = "",
 )
 
-internal enum class ButtonVariant {
-    PRIMARY,
-    SECONDARY,
-}
-
 internal data class RoutineSaveDraft(
     val id: String,
     val title: String,
@@ -1265,84 +1645,70 @@ internal data class RoutineRecurrenceEditorState(
 )
 
 @Composable
-private fun ActionButton(
-    label: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    variant: ButtonVariant = ButtonVariant.PRIMARY,
+private fun RoutineRecurrenceEditor(
+    rule: String,
+    onRuleChange: (String) -> Unit,
 ) {
-    val shape = RoundedCornerShape(ThemeTokens.radii.smallDp)
-    val primaryStyle = ThemeTokens.primaryActionButtonStyle
-    when (variant) {
-        ButtonVariant.PRIMARY -> Button(
-            onClick = onClick,
-            enabled = enabled,
-            shape = shape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = primaryStyle.containerColor,
-                contentColor = primaryStyle.contentColor,
-                disabledContainerColor = primaryStyle.disabledContainerColor,
-                disabledContentColor = primaryStyle.disabledContentColor,
-            ),
-        ) {
-            Text(label, style = ThemeTokens.type.body)
-        }
+    var state by remember(rule) { mutableStateOf(recurrenceEditorStateFor(rule)) }
 
-        ButtonVariant.SECONDARY -> OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            shape = shape,
-            border = androidx.compose.foundation.BorderStroke(1.dp, ThemeTokens.colors.border),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = ThemeTokens.colors.surface,
-                contentColor = ThemeTokens.colors.textPrimary,
-                disabledContainerColor = ThemeTokens.colors.surface,
-                disabledContentColor = ThemeTokens.colors.textTertiary,
-            ),
-        ) {
-            Text(label, style = ThemeTokens.type.body)
-        }
-    }
-}
-
-@Composable
-private fun SingleLineField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    enabled: Boolean = true,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, style = ThemeTokens.type.label) },
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = if (enabled) ThemeTokens.type.body else ThemeTokens.type.bodyMuted,
-        singleLine = true,
-        enabled = enabled,
-    )
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun SingleSelectSegments(
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        options.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) {
-                Text(option, style = ThemeTokens.type.body)
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
+        Text("Recurrence", style = ThemeTokens.type.label)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            RoutineRecurrencePreset.entries.forEachIndexed { index, preset ->
+                val label = preset.label()
+                SegmentedButton(
+                    selected = label == state.preset.label(),
+                    onClick = {
+                        val next = state.copy(preset = recurrencePresetFromLabel(label))
+                        state = next
+                        onRuleChange(buildRecurrenceRule(next))
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = RoutineRecurrencePreset.entries.size),
+                ) {
+                    Text(label, style = ThemeTokens.type.body)
+                }
             }
         }
+
+        if (state.preset == RoutineRecurrencePreset.CUSTOM) {
+            OutlinedTextField(
+                value = state.customRule,
+                onValueChange = {
+                    state = state.copy(customRule = it)
+                    onRuleChange(it)
+                },
+                label = { Text("Recurrence rule (RRULE)", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+        } else {
+            OutlinedTextField(
+                value = state.time,
+                onValueChange = {
+                    val next = state.copy(time = it)
+                    state = next
+                    onRuleChange(buildRecurrenceRule(next))
+                },
+                label = { Text("Time (HH:MM)", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+        }
     }
+}
+
+private fun RoutineRecurrencePreset.label(): String = when (this) {
+    RoutineRecurrencePreset.DAILY -> "Daily"
+    RoutineRecurrencePreset.WEEKDAYS -> "Weekdays"
+    RoutineRecurrencePreset.CUSTOM -> "Custom"
+}
+
+private fun recurrencePresetFromLabel(label: String): RoutineRecurrencePreset = when (label) {
+    "Daily" -> RoutineRecurrencePreset.DAILY
+    "Weekdays" -> RoutineRecurrencePreset.WEEKDAYS
+    else -> RoutineRecurrencePreset.CUSTOM
 }
 
 internal fun normalizeTaskSaveDraft(
@@ -1546,13 +1912,6 @@ private fun AppTab.tabLabel(): String = when (this) {
     AppTab.TODAY -> "Day"
     AppTab.TASKS -> "Tasks"
     AppTab.SETTINGS -> "Settings"
-}
-
-private fun appTabFromLabel(label: String): AppTab = when (label) {
-    "Day" -> AppTab.TODAY
-    "Tasks" -> AppTab.TASKS
-    "Settings" -> AppTab.SETTINGS
-    else -> AppTab.TODAY
 }
 
 private fun TaskSubTab.label(): String = when (this) {
