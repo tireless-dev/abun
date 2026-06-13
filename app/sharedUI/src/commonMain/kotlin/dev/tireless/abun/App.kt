@@ -74,6 +74,7 @@ import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
+import dev.tireless.abun.ui.theme.withMaterialContentColor
 import kotlinx.coroutines.delay
 
 private enum class OverlaySheet {
@@ -351,7 +352,7 @@ internal fun GuideScreenContent(
                 singleLine = true,
             )
             Button(onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting) {
-                Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP", style = ThemeTokens.type.body)
+                Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             if (state.auth.otpRequested) {
                 OutlinedTextField(
@@ -364,11 +365,11 @@ internal fun GuideScreenContent(
                 )
                 state.auth.debugOtpHint?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
                 Button(onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting) {
-                    Text("Verify and login", style = ThemeTokens.type.body)
+                    Text("Verify and login", style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
             Button(onClick = onSkipLogin, enabled = !state.auth.isSubmitting) {
-                Text("Skip for now", style = ThemeTokens.type.body)
+                Text("Skip for now", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             state.auth.errorMessage?.let {
                 Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
@@ -412,7 +413,7 @@ internal fun TodayScreen(
                 Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
             }
             Button(onClick = onStartPomodoro) {
-                Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body)
+                Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
         MetricRow(
@@ -463,7 +464,7 @@ internal fun TasksScreen(
                 onClick = { onSelectPanel(taskSubTabFromLabel(option)) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskSubTab.entries.size),
             ) {
-                Text(option, style = ThemeTokens.type.body)
+                Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
     }
@@ -505,7 +506,7 @@ private fun TaskListScreen(
                     onClick = { onSelectTaskFilter(taskListFilterFromLabel(option)) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskListFilter.entries.size),
                 ) {
-                    Text(option, style = ThemeTokens.type.body)
+                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -533,7 +534,7 @@ private fun RoutineListScreen(
         ) {
             SectionHeader("Routine support", "Routines")
             Button(onClick = onCreateRoutine) {
-                Text("Create", style = ThemeTokens.type.body)
+                Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
         if (state.taskView.routines.isEmpty()) {
@@ -554,10 +555,10 @@ internal fun PomodoroScreen(state: AppUiState, liveNow: Long, onOpenStart: () ->
         Text(active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "00:00", style = ThemeTokens.type.display)
         Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
         if (active == null) {
-            Button(onClick = onOpenStart) { Text("Start", style = ThemeTokens.type.body) }
+            Button(onClick = onOpenStart) { Text("Start", style = ThemeTokens.type.body.withMaterialContentColor()) }
         } else {
             Text("${active.phase.label()} • ${active.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
-            Button(onClick = onOpenStart) { Text("Complete or stop", style = ThemeTokens.type.body) }
+            Button(onClick = onOpenStart) { Text("Complete or stop", style = ThemeTokens.type.body.withMaterialContentColor()) }
         }
     }
 
@@ -666,7 +667,7 @@ internal fun SettingsScreenContent(
                     onClick = { selectedDateFormat = dateFormatFromLabel(option) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
                 ) {
-                    Text(option, style = ThemeTokens.type.body)
+                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -684,7 +685,7 @@ internal fun SettingsScreenContent(
                 )
             },
         ) {
-            Text("Save", style = ThemeTokens.type.body)
+            Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
         }
     }
 }
@@ -792,11 +793,11 @@ private fun TaskRow(
         }
         if (!compact) {
             Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text(if (disabled) "Pomodoro active" else "Manage", style = ThemeTokens.type.body)
+                Text(if (disabled) "Pomodoro active" else "Manage", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         } else {
             Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text("Open", style = ThemeTokens.type.body)
+                Text("Open", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
     }
@@ -851,10 +852,10 @@ private fun RoutineRow(
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
         ) {
             Button(onClick = { onRun(routine) }, enabled = routine.isActive) {
-                Text("Run today", style = ThemeTokens.type.body)
+                Text("Run today", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             Button(onClick = { onOpen(routine) }) {
-                Text("Manage", style = ThemeTokens.type.body)
+                Text("Manage", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
     }
@@ -937,7 +938,7 @@ internal fun CreateTaskSheetContent(
                     onClick = { draft = draft.copy(startDate = option.date) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = dateOptions.size),
                 ) {
-                    Text(option.label, style = ThemeTokens.type.body)
+                    Text(option.label, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -955,7 +956,7 @@ internal fun CreateTaskSheetContent(
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = DurationPreset.entries.size),
                 ) {
-                    Text(preset.label, style = ThemeTokens.type.body)
+                    Text(preset.label, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -972,7 +973,7 @@ internal fun CreateTaskSheetContent(
         OutlinedButton(
             onClick = { draft = draft.copy(hasSchedule = false, startDate = null, durationPreset = DurationPreset.NONE, customDurationMinutes = "") },
         ) {
-            Text("Clear schedule", style = ThemeTokens.type.body)
+            Text("Clear schedule", style = ThemeTokens.type.body.withMaterialContentColor())
         }
     } else {
         Text("This task will go to backlog.", style = ThemeTokens.type.bodyMuted)
@@ -984,7 +985,7 @@ internal fun CreateTaskSheetContent(
                 )
             },
         ) {
-            Text("Add schedule", style = ThemeTokens.type.body)
+            Text("Add schedule", style = ThemeTokens.type.body.withMaterialContentColor())
         }
     }
     FlowRow(
@@ -992,13 +993,13 @@ internal fun CreateTaskSheetContent(
         verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
     ) {
         OutlinedButton(onClick = onDismiss) {
-            Text("Cancel", style = ThemeTokens.type.body)
+            Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor())
         }
         Button(
             onClick = { onCreate(normalizeTaskCreateDraft(draft)) },
             enabled = createEnabled,
         ) {
-            Text("Create", style = ThemeTokens.type.body)
+            Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
         }
     }
 }
@@ -1061,7 +1062,7 @@ internal fun CreateRoutineSheet(
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
         ) {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel", style = ThemeTokens.type.body)
+                Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             Button(
                 onClick = {
@@ -1075,7 +1076,7 @@ internal fun CreateRoutineSheet(
                 },
                 enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
             ) {
-                Text("Create", style = ThemeTokens.type.body)
+                Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
         }
@@ -1170,7 +1171,7 @@ internal fun TaskActionsSheet(
                         onClick = { parentId = availableParents.firstOrNull { it.title == label }?.id },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = parentOptions.size),
                     ) {
-                        Text(label, style = ThemeTokens.type.body)
+                        Text(label, style = ThemeTokens.type.body.withMaterialContentColor())
                     }
                 }
             }
@@ -1209,7 +1210,7 @@ internal fun TaskActionsSheet(
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
         ) {
             OutlinedButton(onClick = onDismiss) {
-                Text("Close", style = ThemeTokens.type.body)
+                Text("Close", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             if (!isRoutineDerived) {
                 Button(
@@ -1234,7 +1235,7 @@ internal fun TaskActionsSheet(
                     },
                     enabled = !isPomodoroActive && title.isNotBlank(),
                 ) {
-                    Text("Save", style = ThemeTokens.type.body)
+                    Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -1259,9 +1260,9 @@ internal fun TaskActionsSheet(
                     horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                     verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                 ) {
-                    if ("Progress" in actions) Button(onClick = { onProgress(note) }) { Text("Progress", style = ThemeTokens.type.body) }
-                    if ("Complete" in actions) Button(onClick = { onComplete(note) }) { Text("Complete", style = ThemeTokens.type.body) }
-                    if ("Skip" in actions) Button(onClick = { onSkip(note) }) { Text("Skip", style = ThemeTokens.type.body) }
+                    if ("Progress" in actions) Button(onClick = { onProgress(note) }) { Text("Progress", style = ThemeTokens.type.body.withMaterialContentColor()) }
+                    if ("Complete" in actions) Button(onClick = { onComplete(note) }) { Text("Complete", style = ThemeTokens.type.body.withMaterialContentColor()) }
+                    if ("Skip" in actions) Button(onClick = { onSkip(note) }) { Text("Skip", style = ThemeTokens.type.body.withMaterialContentColor()) }
                     if ("Postpone" in actions) {
                         Button(
                             onClick = {
@@ -1274,12 +1275,12 @@ internal fun TaskActionsSheet(
                                 )
                             },
                         ) {
-                            Text("Postpone", style = ThemeTokens.type.body)
+                            Text("Postpone", style = ThemeTokens.type.body.withMaterialContentColor())
                         }
                     }
                     if ("Pomodoro" in actions) {
                         Button(onClick = onStartPomodoro, enabled = task.status.isOpen()) {
-                            Text("Pomodoro", style = ThemeTokens.type.body)
+                            Text("Pomodoro", style = ThemeTokens.type.body.withMaterialContentColor())
                         }
                     }
                 }
@@ -1289,7 +1290,7 @@ internal fun TaskActionsSheet(
                     horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                     verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                 ) {
-                    Button(onClick = onDelete) { Text("Delete task", style = ThemeTokens.type.body) }
+                    Button(onClick = onDelete) { Text("Delete task", style = ThemeTokens.type.body.withMaterialContentColor()) }
                 }
             }
         }
@@ -1379,13 +1380,13 @@ internal fun RoutineActionsSheet(
                 },
                 enabled = title.isNotBlank() && recurrenceRule.isNotBlank(),
             ) {
-                Text("Save", style = ThemeTokens.type.body)
+                Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
             }
             Button(onClick = onToggle) {
-                Text(if (routine.isActive) "Pause" else "Activate", style = ThemeTokens.type.body)
+                Text(if (routine.isActive) "Pause" else "Activate", style = ThemeTokens.type.body.withMaterialContentColor())
             }
-            Button(onClick = onDelete) { Text("Delete", style = ThemeTokens.type.body) }
-            OutlinedButton(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body) }
+            Button(onClick = onDelete) { Text("Delete", style = ThemeTokens.type.body.withMaterialContentColor()) }
+            OutlinedButton(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body.withMaterialContentColor()) }
         }
         }
     }
@@ -1413,7 +1414,7 @@ internal fun StartPomodoroSheet(
         Text("Start pomodoro", style = ThemeTokens.type.sectionTitle)
         if (hasActive) {
             Text("A timer is already active. Complete or stop it first.", color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
-            Button(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body) }
+            Button(onClick = onDismiss) { Text("Close", style = ThemeTokens.type.body.withMaterialContentColor()) }
             return@Column
         }
         Text("Task", style = ThemeTokens.type.label)
@@ -1425,7 +1426,7 @@ internal fun StartPomodoroSheet(
                     onClick = { selectedTaskId = openTasks.firstOrNull { it.title == label }?.taskId },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = taskOptions.size),
                 ) {
-                    Text(label, style = ThemeTokens.type.body)
+                    Text(label, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -1438,7 +1439,7 @@ internal fun StartPomodoroSheet(
                     onClick = { selectedPhase = pomodoroPhaseFromLabel(label) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = PomodoroPhase.entries.size),
                 ) {
-                    Text(label, style = ThemeTokens.type.body)
+                    Text(label, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
@@ -1446,9 +1447,9 @@ internal fun StartPomodoroSheet(
             horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
         ) {
-            OutlinedButton(onClick = onDismiss) { Text("Cancel", style = ThemeTokens.type.body) }
+            OutlinedButton(onClick = onDismiss) { Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor()) }
             Button(onClick = { onStart(selectedTaskId, selectedPhase) }) {
-                Text("Start", style = ThemeTokens.type.body)
+                Text("Start", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
         }
@@ -1495,15 +1496,15 @@ internal fun CompletePomodoroSheet(
                         onClick = { taskUpdate = pomodoroTaskUpdateFromLabel(label) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = PomodoroTaskUpdate.entries.size),
                     ) {
-                        Text(label, style = ThemeTokens.type.body)
+                        Text(label, style = ThemeTokens.type.body.withMaterialContentColor())
                     }
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { onStop(note) }) { Text("Stop", style = ThemeTokens.type.body) }
+            Button(onClick = { onStop(note) }) { Text("Stop", style = ThemeTokens.type.body.withMaterialContentColor()) }
             Button(onClick = { onSave(note, taskUpdate) }) {
-                Text(if (remaining <= 0) "Save" else "Complete", style = ThemeTokens.type.body)
+                Text(if (remaining <= 0) "Save" else "Complete", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
         }
@@ -1665,7 +1666,7 @@ private fun RoutineRecurrenceEditor(
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = RoutineRecurrencePreset.entries.size),
                 ) {
-                    Text(label, style = ThemeTokens.type.body)
+                    Text(label, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }

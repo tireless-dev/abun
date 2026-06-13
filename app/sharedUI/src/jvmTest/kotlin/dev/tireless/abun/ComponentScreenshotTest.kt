@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.ui.theme.ThemeTokens
+import dev.tireless.abun.ui.theme.withMaterialContentColor
 import kotlin.test.Test
 
 class ComponentScreenshotTest {
@@ -55,8 +56,8 @@ class ComponentScreenshotTest {
                 horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                 verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
             ) {
-                Button(onClick = {}) { Text("Enabled", style = ThemeTokens.type.body) }
-                Button(onClick = {}, enabled = false) { Text("Disabled", style = ThemeTokens.type.body) }
+                Button(onClick = {}) { Text("Enabled", style = ThemeTokens.type.body.withMaterialContentColor()) }
+                Button(onClick = {}, enabled = false) { Text("Disabled", style = ThemeTokens.type.body.withMaterialContentColor()) }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -65,7 +66,7 @@ class ComponentScreenshotTest {
                 ExtendedFloatingActionButton(
                     onClick = {},
                     icon = { Text("+") },
-                    text = { Text("Task", style = ThemeTokens.type.label) },
+                    text = { Text("Task", style = ThemeTokens.type.label.withMaterialContentColor()) },
                 )
             }
         }
@@ -112,7 +113,7 @@ class ComponentScreenshotTest {
                 ExtendedFloatingActionButton(
                     onClick = {},
                     icon = { Text("+") },
-                    text = { Text("Task", style = ThemeTokens.type.label) },
+                    text = { Text("Task", style = ThemeTokens.type.label.withMaterialContentColor()) },
                 )
             },
         ) { _ ->
