@@ -5,6 +5,7 @@
 - **Ignore Web App**: For all development work, ignore the web app (`app/webApp`) unless explicitly requested.
 - **Cross-Platform Alignment**: Ensure all changes align with the Kotlin Multiplatform (KMP) architecture and the server-side implementation.
 - **Architecture & Product Design Alignment**: After every implementation, update the relevant architecture and product design documents so they match the implemented behavior.
+- **Design System Alignment**: Treat the shared editorial Material 3 design system in `docs/base/shared-ui-design-system.md` and `app/sharedUI` as the source of truth for future UI work. New or modified shared UI should use the shared theme tokens and minimal editorial primitives rather than introducing feature-local styling, decorative effects, or one-off spacing/radius/color rules.
 - **TDD (Test-Driven Development)**: Follow TDD for every step of development. Write failing tests before implementing logic.
 - **Target Support**: Ensure changes work for both Desktop and Android targets.
 - **No Integration Tests**: Automated integration tests are not required for AI agents (they will be executed manually by the user). Focus on unit and component tests.
@@ -36,7 +37,7 @@ Every implementation must include documentation updates before it is considered 
 ./gradlew :app:desktopApp:test
 
 # Verify core logic (common)
-./gradlew :core:commonTest
+./gradlew :core:jvmTest
 ```
 
 ## Notes

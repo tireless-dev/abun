@@ -13,14 +13,17 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.tireless.abun.app.AppTab
+import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 import kotlin.test.Test
@@ -40,7 +43,7 @@ class ComponentScreenshotTest {
             Text("Muted supporting copy", style = ThemeTokens.type.bodyMuted)
             Text("Inline error message", color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
             HorizontalDivider()
-            Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+            EditorialCard {
                 Text("Section title", style = ThemeTokens.type.sectionTitle)
                 Text("Plain section content with custom spacing.", style = ThemeTokens.type.body)
             }
@@ -96,16 +99,31 @@ class ComponentScreenshotTest {
         MaterialScaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(title = { Text("Today", style = ThemeTokens.type.title) })
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = ThemeTokens.colors.background,
+                        titleContentColor = ThemeTokens.colors.textPrimary,
+                    ),
+                    title = { Text("Today", style = ThemeTokens.type.title) },
+                )
             },
             bottomBar = {
-                TabRow(selectedTabIndex = AppTab.entries.indexOf(AppTab.TODAY)) {
-                    AppTab.entries.forEach { tab ->
-                        Tab(
-                            selected = tab == AppTab.TODAY,
-                            onClick = {},
-                            text = { Text(tab.tabLabelForScreenshot()) },
-                        )
+                Surface(color = ThemeTokens.colors.surface, contentColor = ThemeTokens.colors.textSecondary) {
+                    SecondaryTabRow(
+                        selectedTabIndex = AppTab.entries.indexOf(AppTab.TODAY),
+                        containerColor = ThemeTokens.colors.surface,
+                        contentColor = ThemeTokens.colors.textSecondary,
+                        divider = { HorizontalDivider(color = ThemeTokens.colors.border) },
+                    ) {
+                        AppTab.entries.forEach { tab ->
+                            Tab(
+                                selected = tab == AppTab.TODAY,
+                                onClick = {},
+                                selectedContentColor = ThemeTokens.colors.textPrimary,
+                                unselectedContentColor = ThemeTokens.colors.textSecondary,
+                                text = { Text(tab.tabLabelForScreenshot(), style = ThemeTokens.type.label) },
+                            )
+                        }
                     }
                 }
             },

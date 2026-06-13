@@ -2,10 +2,12 @@ package dev.tireless.abun.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 private val LocalAppSpacing = staticCompositionLocalOf { DefaultSpacing }
 private val LocalAppRadii = staticCompositionLocalOf { DefaultRadii }
@@ -39,6 +41,11 @@ fun AppTheme(
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val shapes = Shapes(
+        small = RoundedCornerShape(DefaultRadii.smallDp),
+        medium = RoundedCornerShape(DefaultRadii.mediumDp),
+        large = RoundedCornerShape(DefaultRadii.largeDp),
+    )
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAppSpacing provides DefaultSpacing,
@@ -47,6 +54,7 @@ fun AppTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
+            shapes = shapes,
             content = content,
         )
     }

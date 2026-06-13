@@ -9,9 +9,13 @@ This document defines the shared technical shape used by all modules.
 - Kotlin Multiplatform app
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
-- shared Compose UI uses Material 3 primitives directly for screens, sheets, buttons, text fields, segmented choices, and app chrome without a reusable wrapper component layer
+- shared Compose UI uses Material 3 primitives directly for screens, sheets, buttons, text fields, segmented choices, and app chrome, with a small shared editorial design-language layer for screen padding, section framing, flat outlined surfaces, and muted status tags
 - server-side HTTP API with PostgreSQL persistence
 - local-first sync engine shared across synced resources
+
+Shared UI design-system reference:
+
+- editorial Material 3 tokens and primitive guidance live in [shared-ui-design-system.md](/Users/jerry/Workspace/_tools/abun/docs/base/shared-ui-design-system.md)
 
 ## Server Runtime Status
 
@@ -102,3 +106,9 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 - The Desktop target is the primary fast validation surface for shared mobile UI behavior.
 - The Desktop app should launch in a portrait phone-like window by default and apply a desktop-specific minimum size guardrail so responsive mobile layouts can be checked without starting the Android target.
 - The Desktop runtime should include an SLF4J backend so JVM dependencies such as Ktor/CIO emit normal logs instead of falling back to the no-op logger.
+
+## Shared UI Boundary
+
+- `app/sharedUI` is the cross-platform source of truth for the app’s visual system across Desktop and Android.
+- New shared UI work should prefer shared theme tokens plus the minimal editorial primitives before introducing feature-local spacing, surface, or chip styling.
+- The shared layer should stay intentionally small: it exists to enforce consistent layout and surface language, not to wrap every Material 3 control.

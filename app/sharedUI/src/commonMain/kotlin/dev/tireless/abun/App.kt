@@ -1,6 +1,7 @@
 package dev.tireless.abun
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,17 +23,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
@@ -72,6 +78,9 @@ import kotlinx.datetime.toLocalDateTime
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
+import dev.tireless.abun.ui.EditorialCard
+import dev.tireless.abun.ui.EditorialScreen
+import dev.tireless.abun.ui.EditorialStatusTag
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
@@ -134,6 +143,10 @@ fun App() {
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = ThemeTokens.colors.background,
+                        titleContentColor = ThemeTokens.colors.textPrimary,
+                    ),
                     title = {
                         Text(
                             text = state.selectedTab.tabLabel(),
@@ -143,13 +156,22 @@ fun App() {
                 )
             },
             bottomBar = {
-                TabRow(selectedTabIndex = AppTab.entries.indexOf(state.selectedTab).coerceAtLeast(0)) {
-                    AppTab.entries.forEach { tab ->
-                        Tab(
-                            selected = state.selectedTab == tab,
-                            onClick = { controller.selectTab(tab) },
-                            text = { Text(tab.tabLabel()) },
-                        )
+                Surface(color = ThemeTokens.colors.surface, contentColor = ThemeTokens.colors.textSecondary) {
+                    SecondaryTabRow(
+                        selectedTabIndex = AppTab.entries.indexOf(state.selectedTab).coerceAtLeast(0),
+                        containerColor = ThemeTokens.colors.surface,
+                        contentColor = ThemeTokens.colors.textSecondary,
+                        divider = { HorizontalDivider(color = ThemeTokens.colors.border) },
+                    ) {
+                        AppTab.entries.forEach { tab ->
+                            Tab(
+                                selected = state.selectedTab == tab,
+                                onClick = { controller.selectTab(tab) },
+                                selectedContentColor = ThemeTokens.colors.textPrimary,
+                                unselectedContentColor = ThemeTokens.colors.textSecondary,
+                                text = { Text(tab.tabLabel(), style = ThemeTokens.type.label) },
+                            )
+                        }
                     }
                 }
             },
@@ -160,20 +182,20 @@ fun App() {
                             createTaskContext = taskCreateContextFor(state.selectedTab, state.selectedDate)
                             currentSheet = OverlaySheet.CREATE_TASK
                         },
+                        containerColor = ThemeTokens.colors.surface,
+                        contentColor = ThemeTokens.colors.textPrimary,
+                        shape = RoundedCornerShape(ThemeTokens.radii.mediumDp),
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
                         icon = { Text("+") },
-                        text = { Text(fabLabel) },
+                        text = { Text(fabLabel, style = ThemeTokens.type.label.withMaterialContentColor()) },
                     )
                 }
             },
         ) { padding: PaddingValues ->
-            Column(
+            EditorialScreen(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(ThemeTokens.colors.background)
                     .padding(padding)
-                    .padding(ThemeTokens.spacing.screenPaddingDp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
             ) {
                 StatusStrip(state)
                 when (state.selectedTab) {
@@ -333,13 +355,11 @@ internal fun GuideScreenContent(
     var otpCode by remember(state.auth.prefilledOtp) { mutableStateOf(state.auth.prefilledOtp) }
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ThemeTokens.colors.background)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
-            .padding(ThemeTokens.spacing.screenPaddingDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+            .fillMaxSize(),
     ) {
-        Panel {
+        EditorialScreen {
+            Panel {
             Text("abun", style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold), color = ThemeTokens.colors.primary)
             Text("Sign in", style = ThemeTokens.type.display)
             Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.bodyMuted)
@@ -375,12 +395,13 @@ internal fun GuideScreenContent(
                 Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
             }
         }
+        }
     }
 }
 
 @Composable
 private fun StatusStrip(state: AppUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
         state.syncState.errorMessage?.let { Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body) }
         if (state.auth.mode == AuthMode.GUEST) {
@@ -692,20 +713,13 @@ internal fun SettingsScreenContent(
 
 @Composable
 private fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ThemeTokens.colors.surface, RoundedCornerShape(ThemeTokens.radii.smallDp))
-            .padding(ThemeTokens.spacing.mdDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-        content = content,
-    )
+    EditorialCard(content = content)
 }
 
 @Composable
 private fun SectionHeader(eyebrow: String, title: String) {
-    Column {
-        Text(eyebrow, style = ThemeTokens.type.label.copy(fontWeight = FontWeight.Bold))
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+        Text(eyebrow, style = ThemeTokens.type.label, color = ThemeTokens.colors.textTertiary)
         Text(title, style = ThemeTokens.type.sectionTitle)
     }
 }
@@ -717,10 +731,12 @@ private fun MetricRow(items: List<Pair<String, String>>) {
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.smallDp))
-                    .padding(ThemeTokens.spacing.smDp),
+                    .background(ThemeTokens.colors.surfaceMuted, RoundedCornerShape(ThemeTokens.radii.mediumDp))
+                    .border(1.dp, ThemeTokens.colors.border, RoundedCornerShape(ThemeTokens.radii.mediumDp))
+                    .padding(ThemeTokens.spacing.mdDp),
+                verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
             ) {
-                Text(value, style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold))
+                Text(value, style = ThemeTokens.type.cardTitle)
                 Text(label, style = ThemeTokens.type.bodyMuted)
             }
         }
@@ -754,13 +770,7 @@ private fun JournalTimeline(entries: List<JournalEntryView>) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         entries.forEach { entry ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.smallDp))
-                    .padding(ThemeTokens.spacing.mdDp),
-                verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
-            ) {
+            EditorialCard {
                 Text(entry.title, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
                 Text("${taskEventLabel(entry.eventType)} • ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
                 entry.content?.takeIf(String::isNotBlank)?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
@@ -776,14 +786,8 @@ private fun TaskRow(
     disabled: Boolean,
     onOpenTask: (TaskListItemView) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.smallDp))
-            .padding(ThemeTokens.spacing.mdDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-    ) {
-        Text(task.title, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
+    EditorialCard {
+        Text(task.title, style = ThemeTokens.type.cardTitle)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
@@ -805,27 +809,7 @@ private fun TaskRow(
 
 @Composable
 private fun StatusPill(status: TaskStatus) {
-    val background = when (status) {
-        TaskStatus.IN_PROGRESS -> Color(0xFFEAF6FA)
-        TaskStatus.PENDING -> Color(0xFFFBF6DD)
-        TaskStatus.COMPLETED -> Color(0xFFEAF6EA)
-        TaskStatus.CANCELLED -> Color(0xFFFFEFEF)
-        TaskStatus.UNKNOWN -> ThemeTokens.colors.surfaceElevated
-    }
-    val color = when (status) {
-        TaskStatus.IN_PROGRESS -> Color(0xFF24586B)
-        TaskStatus.PENDING -> Color(0xFF695411)
-        TaskStatus.COMPLETED -> ThemeTokens.colors.success
-        TaskStatus.CANCELLED -> ThemeTokens.colors.error
-        TaskStatus.UNKNOWN -> ThemeTokens.colors.textSecondary
-    }
-    Box(
-        modifier = Modifier
-            .background(background, RoundedCornerShape(50))
-            .padding(horizontal = ThemeTokens.spacing.smDp, vertical = ThemeTokens.spacing.xsDp),
-    ) {
-        Text(statusLabel(status), style = ThemeTokens.type.label.copy(fontWeight = FontWeight.Bold), color = color)
-    }
+    EditorialStatusTag(status = status)
 }
 
 @Composable
@@ -834,14 +818,8 @@ private fun RoutineRow(
     onOpen: (RoutineListItemView) -> Unit,
     onRun: (RoutineListItemView) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.smallDp))
-            .padding(ThemeTokens.spacing.mdDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
-    ) {
-        Text(routine.templateTitle, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
+    EditorialCard {
+        Text(routine.templateTitle, style = ThemeTokens.type.cardTitle)
         routine.templateDetail?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
         Text(describeRecurrenceRule(routine.recurrenceRule), style = ThemeTokens.type.bodyMuted)
         routine.defaultStartNotBefore?.let { Text("Default start: $it", style = ThemeTokens.type.label) }
@@ -863,14 +841,8 @@ private fun RoutineRow(
 
 @Composable
 private fun PomodoroRow(session: PomodoroSessionView) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ThemeTokens.colors.surfaceElevated, RoundedCornerShape(ThemeTokens.radii.smallDp))
-            .padding(ThemeTokens.spacing.mdDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
-    ) {
-        Text(session.phase.label(), style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
+    EditorialCard {
+        Text(session.phase.label(), style = ThemeTokens.type.cardTitle)
         Text(session.taskTitle ?: "Standalone timer", style = ThemeTokens.type.bodyMuted)
         Text("${session.state.name.lowercase()} • ${session.durationMinutes}m", style = ThemeTokens.type.label)
         session.note?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
@@ -889,7 +861,7 @@ internal fun CreateTaskSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(ThemeTokens.spacing.lgDp),
-            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
         ) {
         CreateTaskSheetContent(
             context = context,

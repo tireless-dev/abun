@@ -10,6 +10,7 @@ data class AppSpacing(
     val md: Int,
     val lg: Int,
     val xl: Int,
+    val xxl: Int,
     val screenPadding: Int,
 ) {
     val xsDp get() = xs.dp
@@ -17,6 +18,7 @@ data class AppSpacing(
     val mdDp get() = md.dp
     val lgDp get() = lg.dp
     val xlDp get() = xl.dp
+    val xxlDp get() = xxl.dp
     val screenPaddingDp get() = screenPadding.dp
 }
 
@@ -31,5 +33,5 @@ data class AppRadii(
     val largeDp get() = large.dp
 }
 
-internal val DefaultSpacing = AppSpacing(xs = 4, sm = 8, md = 12, lg = 16, xl = 24, screenPadding = 12)
-internal val DefaultRadii = AppRadii(small = 8, medium = 12, large = 16)
+internal val DefaultSpacing = AppSpacing(xs = 4, sm = 8, md = 16, lg = 24, xl = 32, xxl = 48, screenPadding = 24)
+internal val DefaultRadii = AppRadii(small = 8, medium = 12, large = 20)

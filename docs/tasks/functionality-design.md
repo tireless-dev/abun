@@ -6,6 +6,7 @@ This document describes the user-facing behavior of the tasks module. It is the 
 
 UI implementation note:
 - current shared task surfaces use direct Material 3 components for sheets, forms, segmented selectors, buttons, and app chrome
+- current task surfaces follow the shared editorial Material 3 language: neutral-first color, spacious 8/16/24/32 rhythm, flat outlined cards, muted status tags, and low-noise app chrome
 - this is an implementation detail only; the user-facing workflows below are unchanged by the Material 3 wrapper removal
 
 ## Primary User Jobs
@@ -26,6 +27,7 @@ UI implementation note:
 - default selected date: today
 - alternate selected dates: past and future days
 - purpose: show what is open for that day and what happened on that day
+- visual treatment: calm editorial workspace with sectioned panels for open work, timeline history, and pomodoro state
 
 This surface replaces the idea of a purely live “today dashboard.” It is a date-scoped workspace.
 
@@ -36,6 +38,7 @@ This surface replaces the idea of a purely live “today dashboard.” It is a d
 - purpose: create, edit, structure, postpone, and review tasks as records
 - hierarchy is visible here in tree mode
 - backlog lives here
+- shared visual language: task/routine rows appear as flat outlined cards with muted metadata and action buttons kept secondary to the record content
 
 Default behavior:
 
@@ -83,7 +86,7 @@ Rules:
 - excludes unscheduled backlog-only tasks
 - excludes expired routine occurrences from later days
 - includes tasks that are relevant or available for the selected date
-- uses labels/chips to explain why a task is shown
+- uses muted labels/tags to explain why a task is shown without adding bright status noise
 - should be sortable by urgency and relevance without requiring explicit priority fields
 
 ### Day timeline
