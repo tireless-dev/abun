@@ -10,6 +10,7 @@ This document defines the shared technical shape used by all modules.
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
 - shared Compose UI uses Material 3 primitives directly for common controls such as buttons, text, segmented choices, and text fields
+- shared primary action buttons should map to the active Material 3 `primary` and `onPrimary` tokens rather than reusing text colors as button containers
 - server-side HTTP API with PostgreSQL persistence
 - local-first sync engine shared across synced resources
 

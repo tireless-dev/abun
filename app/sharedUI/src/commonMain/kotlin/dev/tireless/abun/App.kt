@@ -71,6 +71,7 @@ import dev.tireless.abun.ui.layout.Scaffold
 import dev.tireless.abun.ui.layout.ScreenContainer
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
+import dev.tireless.abun.ui.theme.primaryActionButtonStyle
 import kotlinx.coroutines.delay
 
 private enum class OverlaySheet {
@@ -1271,16 +1272,17 @@ private fun ActionButton(
     variant: ButtonVariant = ButtonVariant.PRIMARY,
 ) {
     val shape = RoundedCornerShape(ThemeTokens.radii.smallDp)
+    val primaryStyle = ThemeTokens.primaryActionButtonStyle
     when (variant) {
         ButtonVariant.PRIMARY -> Button(
             onClick = onClick,
             enabled = enabled,
             shape = shape,
             colors = ButtonDefaults.buttonColors(
-                containerColor = ThemeTokens.colors.textPrimary,
-                contentColor = ThemeTokens.colors.surface,
-                disabledContainerColor = ThemeTokens.colors.surfaceElevated,
-                disabledContentColor = ThemeTokens.colors.textTertiary,
+                containerColor = primaryStyle.containerColor,
+                contentColor = primaryStyle.contentColor,
+                disabledContainerColor = primaryStyle.disabledContainerColor,
+                disabledContentColor = primaryStyle.disabledContentColor,
             ),
         ) {
             Text(label, style = ThemeTokens.type.body)
