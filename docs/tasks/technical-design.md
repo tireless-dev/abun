@@ -68,6 +68,14 @@ Single logical transaction:
 2. insert `CREATED` task event
 3. mark both records dirty for sync
 
+Quick-create normalization rules:
+
+- `Tasks` launch context defaults to backlog output
+- `Day` launch context defaults to `start_not_before` on the selected date
+- clearing schedule removes task planning fields before persistence
+- human-friendly create controls normalize into the existing task fields rather than changing the storage contract
+- the first quick-create flow writes `start_not_before` and `estimated_duration` when set, while leaving `end_not_after` unset unless a future create-flow revision introduces it
+
 ### Progress task
 
 Insert a `PROGRESSED` task event. Do not mutate the task lifecycle state directly.

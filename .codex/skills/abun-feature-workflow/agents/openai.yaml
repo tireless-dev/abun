@@ -1,0 +1,3 @@
+display_name: Abun Feature Workflow
+short_description: Repo-specific feature workflow for Abun.
+default_prompt: Guide this Abun feature from detail and docs through TDD, validation, and completion.

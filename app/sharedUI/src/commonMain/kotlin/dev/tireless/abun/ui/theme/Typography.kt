@@ -1,5 +1,7 @@
 package dev.tireless.abun.ui.theme
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -15,11 +17,20 @@ data class AppType(
     val label: TextStyle,
 )
 
-internal fun appType(colors: AppColors): AppType = AppType(
-    display = TextStyle(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary),
-    title = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary),
-    sectionTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary),
-    body = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal, color = colors.textPrimary),
-    bodyMuted = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal, color = colors.textSecondary),
-    label = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, color = colors.textSecondary),
+internal val AppTypography = Typography(
+    displaySmall = TextStyle(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold),
+    headlineSmall = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
+    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
+    labelMedium = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+)
+
+internal fun appType(typography: Typography, colors: ColorScheme): AppType = AppType(
+    display = typography.displaySmall.copy(color = colors.onSurface),
+    title = typography.headlineSmall.copy(color = colors.onSurface),
+    sectionTitle = typography.titleMedium.copy(color = colors.onSurface),
+    body = typography.bodyMedium.copy(color = colors.onSurface),
+    bodyMuted = typography.bodySmall.copy(color = colors.onSurfaceVariant),
+    label = typography.labelMedium.copy(color = colors.onSurfaceVariant),
 )

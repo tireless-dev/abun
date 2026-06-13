@@ -173,10 +173,24 @@ User outcome:
 - the task appears in backlog or day-based task views based on its planning fields
 - a corresponding `CREATED` event exists in the journal/history model
 
+Quick-create fields:
+
+- `title`
+- `detail`
+- scheduling controls
+
+Quick-create exclusions:
+
+- no parent selection during creation
+- no raw timestamp or ISO duration entry in the normal create flow
+
 Default creation rule:
 
 - creating a task from `Tasks` creates it in backlog by default
-- scheduling is optional and happens afterward
+- creating a task from `Day` defaults to a scheduled task with `start_not_before` on the selected day
+- clearing scheduling before create returns the task to backlog behavior, even when launched from `Day`
+- after create, the sheet closes and returns the user to the current surface
+- scheduling remains optional and further refinement still belongs in task detail
 
 ### Define or update planning window
 

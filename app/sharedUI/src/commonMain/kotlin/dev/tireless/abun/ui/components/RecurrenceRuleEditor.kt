@@ -1,11 +1,18 @@
 package dev.tireless.abun.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import dev.tireless.abun.RoutineRecurrenceEditorState
 import dev.tireless.abun.RoutineRecurrencePreset
@@ -14,6 +21,7 @@ import dev.tireless.abun.recurrenceEditorStateFor
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun RecurrenceRuleEditor(
     rule: String,
     onRuleChange: (String) -> Unit
@@ -21,35 +29,47 @@ fun RecurrenceRuleEditor(
     var state by remember(rule) { mutableStateOf(recurrenceEditorStateFor(rule)) }
 
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp)) {
-        AppText("Recurrence", style = ThemeTokens.type.label)
-        SegmentedControl(
-            options = listOf("Daily", "Weekdays", "Custom"),
-            selected = state.preset.label(),
-            onSelect = { label ->
-                val next = state.copy(preset = recurrencePresetFromLabel(label))
-                state = next
-                onRuleChange(buildRecurrenceRule(next))
-            },
-        )
+        Text("Recurrence", style = ThemeTokens.type.label)
+        SingleChoiceSegmentedButtonRow {
+            listOf("Daily", "Weekdays", "Custom").forEachIndexed { index, label ->
+                SegmentedButton(
+                    selected = state.preset.label() == label,
+                    onClick = {
+                        val next = state.copy(preset = recurrencePresetFromLabel(label))
+                        state = next
+                        onRuleChange(buildRecurrenceRule(next))
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
+                ) {
+                    Text(label, style = ThemeTokens.type.body)
+                }
+            }
+        }
 
         if (state.preset == RoutineRecurrencePreset.CUSTOM) {
-            TextField(
+            OutlinedTextField(
                 value = state.customRule,
                 onValueChange = {
                     state = state.copy(customRule = it)
                     onRuleChange(it)
                 },
-                label = "Recurrence rule (RRULE)",
+                label = { Text("Recurrence rule (RRULE)", style = ThemeTokens.type.label) },
+                modifier = Modifier,
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
             )
         } else {
-            TextField(
+            OutlinedTextField(
                 value = state.time,
                 onValueChange = {
                     val next = state.copy(time = it)
                     state = next
                     onRuleChange(buildRecurrenceRule(next))
                 },
-                label = "Time (HH:MM)",
+                label = { Text("Time (HH:MM)", style = ThemeTokens.type.label) },
+                modifier = Modifier,
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
             )
         }
     }

@@ -1,5 +1,10 @@
 package dev.tireless.abun
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.AuthViewState
@@ -7,6 +12,9 @@ import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
+import dev.tireless.abun.ui.components.Section
+import dev.tireless.abun.ui.layout.ScreenContainer
+import io.github.takahirom.roborazzi.captureRoboImage
 import kotlin.test.Test
 
 class AppScreenScreenshotTest {
@@ -132,10 +140,52 @@ class AppScreenScreenshotTest {
 
     @Test
     fun createTaskSheet() = captureScreenshot("sheets/create_task") {
-        CreateTaskSheet(
-            availableParents = populatedTaskView().tasks,
-            onDismiss = {},
-            onCreate = { _, _, _, _, _, _ -> },
+        ScreenContainer(applyVerticalSafeInsets = false) {
+            Section {
+                CreateTaskSheetContent(
+                    context = TaskCreateContext(
+                        source = TaskCreateSource.DAY,
+                        selectedDate = "2026-06-11",
+                    ),
+                    onDismiss = {},
+                    onCreate = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun createTaskSheetFull() = captureScreenshot("sheets/create_task_full") {
+        Section {
+            CreateTaskSheetContent(
+                context = TaskCreateContext(
+                    source = TaskCreateSource.DAY,
+                    selectedDate = "2026-06-11",
+                ),
+                onDismiss = {},
+                onCreate = {},
+            )
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun createTaskSheetNodeCapture() = runDesktopComposeUiTest {
+        setContent {
+            Section(modifier = Modifier.testTag("create-task-sheet-content")) {
+                CreateTaskSheetContent(
+                    context = TaskCreateContext(
+                        source = TaskCreateSource.DAY,
+                        selectedDate = "2026-06-11",
+                    ),
+                    onDismiss = {},
+                    onCreate = {},
+                )
+            }
+        }
+
+        onNodeWithTag("create-task-sheet-content").captureRoboImage(
+            filePath = "src/jvmTest/screenshots/sheets/create_task_node.png",
         )
     }
 

@@ -1,30 +1,23 @@
 package dev.tireless.abun.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun Sheet(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.3f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.BottomCenter,
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
     ) {
         Section(
             modifier = Modifier
