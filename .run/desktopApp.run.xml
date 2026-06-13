@@ -1,12 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="desktopApp" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
-      <option name="env">
-        <map>
-          <entry key="JAVA_HOME" value="$USER_HOME$/.local/share/mise/installs/java/temurin-21.0.11+10.0.LTS" />
-          <entry key="PATH" value="$USER_HOME$/.local/share/mise/installs/bun/latest/bin:$USER_HOME$/.local/share/mise/installs/node/latest/bin:$USER_HOME$/.local/share/mise/installs/java/temurin-21/bin:$USER_HOME$/.local/share/mise/installs/python/latest/bin:$USER_HOME$/.local/share/mise/installs/uv/latest/uv-aarch64-apple-darwin:$USER_HOME$/.local/share/mise/installs/gradle/latest/gradle-9.5.1/bin:$USER_HOME$/.local/share/mise/installs/kotlin/2.1.21/kotlinc/bin:$USER_HOME$/.antigravity/antigravity/bin:$PROJECT_DIR$/../../_tools:$PROJECT_DIR$/../wat:$USER_HOME$/.bun/bin:$USER_HOME$/Library/pnpm:$USER_HOME$/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$USER_HOME$/.nix-profile/bin:/etc/profiles/per-user/jerry/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$USER_HOME$/Library/Android/sdk/emulator:$USER_HOME$/Library/Android/sdk/platform-tools:$USER_HOME$/.orbstack/bin:$USER_HOME$/.local/bin:$USER_HOME$/.bun/bin:$USER_HOME$/oops:$USER_HOME$/Library/Application Support/JetBrains/Toolbox/scripts" />
-        </map>
-      </option>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
       <option name="externalSystemIdString" value="GRADLE" />
