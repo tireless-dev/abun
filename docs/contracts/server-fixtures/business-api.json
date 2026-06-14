@@ -1,0 +1,29 @@
+{
+  "create_task": {
+    "request": {
+      "id": "fixture-task",
+      "title": "Fixture task",
+      "detail": "Frozen business API task contract",
+      "start_not_before": "2026-06-01T09:00:00Z",
+      "end_not_after": "2026-06-01T11:00:00Z",
+      "estimated_duration": "PT2H"
+    },
+    "status": 201
+  },
+  "get_task": {
+    "request": {},
+    "status": 200,
+    "response": {
+      "id": "fixture-task",
+      "title": "Fixture task",
+      "detail": "Frozen business API task contract",
+      "start_not_before": "2026-06-01T09:00:00Z",
+      "end_not_after": "2026-06-01T11:00:00Z",
+      "estimated_duration": "PT2H",
+      "is_deleted": false,
+      "server_version": "__any_long__",
+      "server_updated_at": "__any_string__",
+      "created_at": "__any_string__"
+    }
+  }
+}

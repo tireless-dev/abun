@@ -8,6 +8,7 @@ import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AndroidDatabaseDriverFactory
 import dev.tireless.abun.app.AndroidNodeIdProvider
 import dev.tireless.abun.app.AppDependencies
+import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
 import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DemoAuthProvider
@@ -34,10 +35,10 @@ actual fun rememberAbunAppController(): AbunAppController {
                 nodeIdProvider = AndroidNodeIdProvider(),
                 idGenerator = StableStringIdGenerator(),
                 timeProvider = DefaultTimeProvider(),
-                serverBaseUrl = "http://10.0.2.2:8080",
                 debugAuthPreset = debugAuthPreset(
                     enabled = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
                 ),
+                serverBaseUrl = DEFAULT_SERVER_BASE_URL,
             ),
         )
     }

@@ -10,6 +10,7 @@ import dev.tireless.abun.app.DemoAuthProvider
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.JvmNodeIdProvider
+import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.StableStringIdGenerator
 import dev.tireless.abun.app.ThemePreference
 import io.ktor.client.HttpClient
@@ -31,8 +32,8 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = JvmNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            serverBaseUrl = "http://127.0.0.1:8080",
             debugAuthPreset = debugAuthPreset(enabled = System.getProperty("abun.debug") == "true"),
+            serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
 }

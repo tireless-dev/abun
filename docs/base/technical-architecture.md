@@ -10,24 +10,12 @@ This document defines the shared technical shape used by all modules.
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
 - shared Compose UI uses Material 3 primitives directly for screens, sheets, buttons, text fields, segmented choices, and app chrome, with a small shared editorial design-language layer for screen padding, section framing, flat outlined surfaces, and muted status tags
-- server-side HTTP API with PostgreSQL persistence
+- Cloudflare Worker with PostgreSQL persistence through Hyperdrive-compatible access
 - local-first sync engine shared across synced resources
 
 Shared UI design-system reference:
 
 - editorial Material 3 tokens and primitive guidance live in [shared-ui-design-system.md](/Users/jerry/Workspace/_tools/abun/docs/base/shared-ui-design-system.md)
-
-## Server Runtime Status
-
-The buildable server implementation currently checked into the repo is the JVM `:server` module:
-
-- Ktor/Netty routing in [Application.kt](/Users/jerry/Workspace/_tools/abun/server/src/main/kotlin/dev/tireless/abun/Application.kt)
-- JDBC/Hikari/PostgreSQL persistence in [SyncServices.kt](/Users/jerry/Workspace/_tools/abun/server/src/main/kotlin/dev/tireless/abun/SyncServices.kt)
-- schema bootstrap in [schema.sql](/Users/jerry/Workspace/_tools/abun/server/src/main/resources/db/schema.sql)
-
-The Cloudflare Workers migration is the intended replacement path for the JVM server, but Worker source is not currently present as a committed, buildable implementation under `workers/api`. Generated Wrangler cache files under `workers/api/.wrangler` are not architectural source of truth.
-
-Until the Worker source, tests, and deployment configuration are committed, architecture docs should describe Cloudflare Workers as a migration target rather than the active implementation.
 
 ## Layering
 
@@ -42,15 +30,24 @@ The client is responsible for:
 - tracking dirty state for synced resources
 - running pull-then-push sync cycles
 
-### Server
+### Backend
 
-The server-side API is responsible for:
+The Worker backend is responsible for:
 
 - authenticating the user
 - enforcing ownership boundaries
 - validating incoming mutations
 - storing canonical synced records
 - assigning server-side sync metadata
+
+The current production shape serves both site and API concerns from the same origin:
+
+- `/` landing page
+- `/app` web application shell
+- `/mobile` mobile/download page
+- `/api/auth/*` OTP authentication
+- `/api/sync/*` local-first sync APIs
+- `/api/*` direct business APIs
 
 ## Resource Categories
 
@@ -86,7 +83,7 @@ Current example:
 
 ### Ownership strategy
 
-- The server-side API must bind synced data to the authenticated user.
+- The backend must bind synced data to the authenticated user.
 - Client-provided ownership metadata is never authoritative.
 
 ### Deletion strategy

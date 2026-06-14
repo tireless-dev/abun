@@ -1,5 +1,6 @@
 package dev.tireless.abun.app
 
+import dev.tireless.abun.TestSharedAccount
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 
@@ -106,7 +107,7 @@ enum class AuthMode {
 data class AuthViewState(
     val showGuide: Boolean = true,
     val mode: AuthMode = AuthMode.GUEST,
-    val email: String = "",
+    val email: String = TestSharedAccount.EMAIL,
     val otpRequested: Boolean = false,
     val prefilledOtp: String = "",
     val debugOtpHint: String? = null,

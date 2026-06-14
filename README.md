@@ -1,4 +1,4 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
+This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop (JVM), backed by a Cloudflare Worker on `https://abun.tireless.dev`.
 
 * [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
@@ -16,18 +16,20 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
     Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./app/sharedUI/src/jvmMain/kotlin)
     folder is the appropriate location.
 
-* [/app/webApp](./app/webApp) contains a React web application. It talks to the server through the direct
-  `/api/*` business API family and does not use the local-first sync layer as its primary data path.
+* [/app/webApp](./app/webApp) contains a React web application. In production it is served from `/app` by the same Worker,
+  and it talks to the server through the direct `/api/*` business API family rather than using the local-first sync layer as
+  its primary data path.
+  The Worker serves these assets from `app/webApp/dist`, so web changes must be rebuilt before Worker verification or deployment.
 
 * [/core](./core/src) is for the code that will be shared between all targets in the project.
   The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
   can add code to the platform-specific folders here too.
 
-* [/server](./server/src/main/kotlin) contains the currently checked-in Ktor server application.
-
-* [/workers/api](./workers/api) is reserved for the Cloudflare Workers replacement backend. At the moment,
-  only generated Wrangler/cache artifacts may exist there locally; committed Worker source and configuration
-  should be added before treating it as the active server implementation.
+* [/workers/api](./workers/api/src) is for the Cloudflare Worker that serves:
+  - the landing page at `/`
+  - the web app at `/app`
+  - the mobile placeholder/download page at `/mobile`
+  - the API families at `/api/auth/*`, `/api/sync/*`, and `/api/*`
 
 ### Running the apps
 
@@ -37,14 +39,32 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Desktop app:
   - Hot reload: `./gradlew :app:desktopApp:hotRun --auto`
   - Standard run: `./gradlew :app:desktopApp:run`
-- Server: `./gradlew :server:run`
-- Cloudflare Workers API: not currently committed as a buildable source tree
+- Workers API:
+  1. Install [Bun](https://bun.sh/)
+  2. Run the Worker locally:
+     ```shell
+     cd workers/api
+     bun install
+     bun run dev
+     ```
+  3. Before shipping API changes, verify and deploy:
+     ```shell
+     bun run test
+     bun run typecheck
+     bun run deploy
+     ```
 - Web app:
   1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
-  2. Build and run the web application:
+  2. Build the static assets consumed by the Worker:
      ```shell
+     cd app/webApp
      npm install
-     npm run start
+     npm run build
+     ```
+  3. If you need to ship web changes, deploy the Worker after the build so the updated `/app` assets are published:
+     ```shell
+     cd workers/api
+     bun run deploy
      ```
 - iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
 
@@ -54,8 +74,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :app:sharedUI:testAndroidHostTest :app:sharedLogic:testAndroidHostTest`
 - Desktop tests: `./gradlew :app:sharedUI:jvmTest :app:sharedLogic:jvmTest`
-- Server tests: `./gradlew :server:test`
-- Cloudflare Workers API tests: not currently available until the Worker source tree is committed
+- Workers API tests: `cd workers/api && bun run test`
 - Web tests: `./gradlew :app:sharedLogic:jsTest`
 - iOS tests: `./gradlew :app:sharedUI:iosSimulatorArm64Test :app:sharedLogic:iosSimulatorArm64Test`
 

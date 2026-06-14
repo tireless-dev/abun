@@ -9,9 +9,8 @@ import dev.tireless.abun.app.AppJson
 import dev.tireless.abun.app.AuthProvider
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DebugAuthPreset
-import dev.tireless.abun.app.DatabaseDriverFactory
 import dev.tireless.abun.app.DateFormatPreference
-import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.app.DatabaseDriverFactory
 import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.JournalEntryView
@@ -25,6 +24,8 @@ import dev.tireless.abun.app.SyncRemoteApi
 import dev.tireless.abun.app.SyncScope
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TimeProvider
+import dev.tireless.abun.app.DemoAuthProvider
+import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.app.createDatabase
 import dev.tireless.abun.app.createHybridClock
 import dev.tireless.abun.app.deriveTodayViewState
@@ -156,6 +157,11 @@ class SharedLogicDesktopTest {
         assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
         assertEquals("abun@tireless.dev", controller.state.value.auth.email)
         assertEquals("424242", controller.state.value.auth.prefilledOtp)
+    }
+
+    @Test
+    fun `auth defaults prefill shared test account email`() {
+        assertEquals(TestSharedAccount.EMAIL, dev.tireless.abun.app.AuthViewState().email)
     }
 
     @Test
@@ -916,32 +922,32 @@ class SharedLogicDesktopTest {
             MockEngine { request ->
                 requests += "${request.method.value} ${request.url.encodedPath}"
                 val body = when (request.url.encodedPath) {
-                    "/sync/preferences" -> if (request.method.value == "GET") {
+                    "/api/sync/preferences" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(items = emptyList<SyncPreference>()))
                     }
-                    "/sync/routines" -> if (request.method.value == "GET") {
+                    "/api/sync/routines" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(items = emptyList<String>()))
                     }
-                    "/sync/tasks" -> if (request.method.value == "GET") {
+                    "/api/sync/tasks" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(taskPushResponse))
                     }
-                    "/sync/alarms" -> if (request.method.value == "GET") {
+                    "/api/sync/alarms" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncAlarm>()))
                     }
-                    "/sync/task-events" -> if (request.method.value == "GET") {
+                    "/api/sync/task-events" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(taskEventPushResponse))
                     }
-                    "/sync/pomodoro-sessions" -> if (request.method.value == "GET") {
+                    "/api/sync/pomodoro-sessions" -> if (request.method.value == "GET") {
                         AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
                     } else {
                         AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>()))
@@ -969,18 +975,81 @@ class SharedLogicDesktopTest {
         assertTrue(store.dirtyTaskEvents().isEmpty())
         assertEquals(
             listOf(
-                "GET /sync/preferences",
-                "GET /sync/routines",
-                "GET /sync/tasks",
-                "GET /sync/alarms",
-                "GET /sync/task-events",
-                "GET /sync/pomodoro-sessions",
-                "POST /sync/tasks",
-                "POST /sync/task-events",
+                "GET /api/sync/preferences",
+                "GET /api/sync/routines",
+                "GET /api/sync/tasks",
+                "GET /api/sync/alarms",
+                "GET /api/sync/task-events",
+                "GET /api/sync/pomodoro-sessions",
+                "POST /api/sync/tasks",
+                "POST /api/sync/task-events",
             ),
             requests,
         )
         assertEquals(0L, store.syncCursor(SyncScope.TASKS))
+    }
+
+    @Test
+    fun `verify email otp authenticates and marks sync ready`() = runTest {
+        val authProvider = DemoAuthProvider()
+        val controller = AbunAppController.create(
+            AppDependencies(
+                databaseDriverFactory = inMemoryDriverFactory(),
+                httpClient = HttpClient(
+                    MockEngine { request ->
+                        val body = when (request.url.encodedPath) {
+                            "/api/auth/otp/verify" -> AppJson.encodeToString(
+                                dev.tireless.abun.app.OtpVerifyResponse(
+                                    accessToken = "uid:${TestSharedAccount.USER_ID}",
+                                    userId = TestSharedAccount.USER_ID,
+                                ),
+                            )
+                            "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                            else -> error("Unexpected path ${request.url.encodedPath}")
+                        }
+                        respond(
+                            content = body,
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                ) {
+                    install(ContentNegotiation) { json(AppJson) }
+                },
+                authProvider = authProvider,
+                nodeIdProvider = object : DeviceNodeIdProvider {
+                    override fun nodeId(): String = "test-device"
+                },
+                idGenerator = testIdGenerator(),
+                timeProvider = testTimeProvider(),
+                serverBaseUrl = "http://localhost:8080",
+            ),
+        )
+
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+        var synced = false
+        repeat(200) {
+            if (
+                controller.state.value.auth.mode == AuthMode.AUTHENTICATED &&
+                controller.state.value.syncState.lastSyncedAt != null
+            ) {
+                synced = true
+                return@repeat
+            }
+            Thread.sleep(10)
+        }
+
+        val state = controller.state.value
+        assertTrue(synced)
+        assertEquals(AuthMode.AUTHENTICATED, state.auth.mode)
+        assertEquals(true, state.syncState.syncReady)
+        assertTrue(state.syncState.lastSyncedAt != null)
+        assertEquals("uid:${TestSharedAccount.USER_ID}", authProvider.bearerToken())
     }
 
     private fun testStore(
@@ -1114,5 +1183,11 @@ class SharedLogicDesktopTest {
         }
 
         override fun deterministicId(namespace: String, seed: String): String = "$namespace:$seed"
+    }
+
+    private fun inMemoryDriverFactory(): DatabaseDriverFactory = object : DatabaseDriverFactory {
+        override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
+            AbunDatabase.Schema.create(it)
+        }
     }
 }

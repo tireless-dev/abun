@@ -1,0 +1,75 @@
+{
+  "sync_tasks": {
+    "request": {
+      "items": [
+        {
+          "id": "sync-fixture-task",
+          "title": "Fixture sync task",
+          "detail": "Frozen sync task contract",
+          "start_not_before": "2026-06-01T09:00:00Z",
+          "end_not_after": "2026-06-01T11:00:00Z",
+          "estimated_duration": "PT2H",
+          "hlc_map": {
+            "title": "1715959378000-0001-deviceA",
+            "detail": "1715959378000-0001-deviceA",
+            "start_not_before": "1715959378000-0001-deviceA",
+            "end_not_after": "1715959378000-0001-deviceA",
+            "estimated_duration": "1715959378000-0001-deviceA"
+          },
+          "dirty_fields": [
+            "title",
+            "detail",
+            "start_not_before",
+            "end_not_after",
+            "estimated_duration"
+          ]
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "items": [
+        {
+          "id": "sync-fixture-task",
+          "title": "Fixture sync task",
+          "detail": "Frozen sync task contract",
+          "start_not_before": "2026-06-01T09:00:00Z",
+          "end_not_after": "2026-06-01T11:00:00Z",
+          "estimated_duration": "PT2H",
+          "hlc_map": {
+            "title": "1715959378000-0001-deviceA",
+            "detail": "1715959378000-0001-deviceA",
+            "start_not_before": "1715959378000-0001-deviceA",
+            "end_not_after": "1715959378000-0001-deviceA",
+            "estimated_duration": "1715959378000-0001-deviceA"
+          },
+          "dirty_fields": [
+            "title",
+            "detail",
+            "start_not_before",
+            "end_not_after",
+            "estimated_duration"
+          ],
+          "accepted_fields": [
+            "title",
+            "detail",
+            "start_not_before",
+            "end_not_after",
+            "estimated_duration"
+          ],
+          "rejected_fields": [],
+          "server_version": "__any_long__",
+          "server_updated_at": "__any_string__",
+          "created_at": "__any_string__"
+        }
+      ]
+    },
+    "accepted_fields": [
+      "title",
+      "detail",
+      "start_not_before",
+      "end_not_after",
+      "estimated_duration"
+    ]
+  }
+}

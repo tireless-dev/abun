@@ -199,7 +199,6 @@ fun App() {
                     .padding(padding)
                     .verticalScroll(rememberScrollState()),
             ) {
-                StatusStrip(state)
                 when (state.selectedTab) {
                     AppTab.TODAY -> TodayScreen(
                         state = state,
@@ -411,8 +410,6 @@ private fun StatusStrip(state: AppUiState) {
         }
     }
 }
-
-@Composable
 internal fun TodayScreen(
     state: AppUiState,
     liveNow: Long,
@@ -633,6 +630,10 @@ internal fun SettingsScreenContent(
     var selectedThemePreference by remember(state.preferences) { mutableStateOf(state.preferences.themePreference) }
     var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
+    Panel {
+        SectionHeader("Cloud", "Sync status")
+        SyncStatusPanel(state)
+    }
     Panel {
         SectionHeader("Defaults", "Task")
         OutlinedTextField(
