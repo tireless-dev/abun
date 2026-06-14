@@ -38,6 +38,7 @@ The client is responsible for:
 - rendering UI from local state
 - validating and applying local writes
 - persisting module data in SQLite
+- persisting local-only runtime preferences such as login-guide omission and device theme preference in platform preference storage when the state must survive app restarts without syncing to the server
 - tracking dirty state for synced resources
 - running pull-then-push sync cycles
 

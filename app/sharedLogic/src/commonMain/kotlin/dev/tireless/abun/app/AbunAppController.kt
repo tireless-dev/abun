@@ -14,6 +14,7 @@ class AbunAppController(
 ) {
     private val timeProvider = dependencies.timeProvider
     private val debugAuthPreset = dependencies.debugAuthPreset
+    private val loginPreferenceStore = dependencies.loginPreferenceStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authProvider = dependencies.authProvider as? MutableAuthProvider
         ?: error("App requires MutableAuthProvider for onboarding/auth flow")
@@ -39,12 +40,13 @@ class AbunAppController(
             syncState = SyncStateView(syncReady = false),
             auth = debugAuthPreset?.let {
                 AuthViewState(
+                    showGuide = !loginPreferenceStore.isLoginOmitted(),
                     email = it.email,
                     otpRequested = true,
                     prefilledOtp = it.otp,
                     debugOtpHint = "Debug OTP: ${it.otp}",
                 )
-            } ?: AuthViewState(),
+            } ?: AuthViewState(showGuide = !loginPreferenceStore.isLoginOmitted()),
         ),
     )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
@@ -58,6 +60,7 @@ class AbunAppController(
     }
 
     fun skipLogin() {
+        loginPreferenceStore.setLoginOmitted(true)
         _state.value = _state.value.copy(
             auth = _state.value.auth.copy(
                 showGuide = false,
@@ -65,6 +68,22 @@ class AbunAppController(
                 errorMessage = null,
             ),
             syncState = _state.value.syncState.copy(syncReady = true),
+        )
+    }
+
+    fun reopenLogin() {
+        loginPreferenceStore.setLoginOmitted(false)
+        _state.value = _state.value.copy(
+            auth = _state.value.auth.copy(
+                showGuide = true,
+                mode = AuthMode.GUEST,
+                otpRequested = false,
+                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
+                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
+                isSubmitting = false,
+                errorMessage = null,
+            ),
+            syncState = _state.value.syncState.copy(syncReady = false),
         )
     }
 
@@ -372,9 +391,8 @@ class AbunAppController(
     }
 
     fun updateThemePreference(themePreference: ThemePreference) {
-        store.updateThemePreference(themePreference)
+        loginPreferenceStore.setThemePreference(themePreference)
         refresh()
-        requestSync()
     }
 
     fun syncNow() {
@@ -441,7 +459,7 @@ class AbunAppController(
 
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
         store.autoMarkMissedTasks()
-        val preferences = store.preferences()
+        val preferences = store.preferences().copy(themePreference = loginPreferenceStore.themePreference())
         val tasks = store.allTasks(_state.value.selectedDate)
         val openTasks = store.openTasksForDate(_state.value.selectedDate)
         val alarms = store.alarms(preferences)
@@ -472,6 +490,7 @@ class AbunAppController(
     }
 
     private fun completeLogin(accessToken: String) {
+        loginPreferenceStore.setLoginOmitted(false)
         authProvider.updateToken(accessToken)
         _state.value = _state.value.copy(
             auth = _state.value.auth.copy(

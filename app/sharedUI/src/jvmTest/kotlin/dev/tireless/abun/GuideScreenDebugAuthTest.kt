@@ -34,4 +34,21 @@ class GuideScreenDebugAuthTest {
         onNodeWithText("OTP code").fetchSemanticsNode()
         onNodeWithText("Debug OTP: 424242").fetchSemanticsNode()
     }
+
+    @Test
+    fun `settings shows reopen login action for guest mode`() = runDesktopComposeUiTest {
+        setContent {
+            SettingsScreenContent(
+                state = screenshotState(
+                    auth = AuthViewState(showGuide = false, mode = AuthMode.GUEST),
+                ),
+                onUpdateThemePreference = {},
+                onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                onReopenLogin = {},
+            )
+        }
+
+        onNodeWithText("Login anytime to enable cloud sync on this device.").fetchSemanticsNode()
+        onNodeWithText("Open login").fetchSemanticsNode()
+    }
 }

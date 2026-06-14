@@ -603,6 +603,7 @@ private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
         state = state,
         onUpdateThemePreference = controller::updateThemePreference,
         onUpdatePreferences = controller::updatePreferences,
+        onReopenLogin = controller::reopenLogin,
     )
 }
 
@@ -621,6 +622,7 @@ internal fun SettingsScreenContent(
         themePreference: ThemePreference,
         rolloverTime: String,
     ) -> Unit,
+    onReopenLogin: () -> Unit,
 ) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
@@ -738,6 +740,15 @@ internal fun SettingsScreenContent(
             },
         ) {
             Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
+        }
+    }
+    if (state.auth.mode == AuthMode.GUEST) {
+        Panel {
+            SectionHeader("Account", "Login")
+            Text("Login anytime to enable cloud sync on this device.", style = ThemeTokens.type.bodyMuted)
+            Button(onClick = onReopenLogin) {
+                Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
+            }
         }
     }
 }

@@ -141,6 +141,7 @@ class AppScreenScreenshotTest {
                 state = state,
                 onUpdateThemePreference = {},
                 onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                onReopenLogin = {},
             )
         }
     }

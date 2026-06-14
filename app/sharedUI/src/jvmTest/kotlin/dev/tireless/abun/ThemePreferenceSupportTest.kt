@@ -25,6 +25,7 @@ class ThemePreferenceSupportTest {
                 state = screenshotState(),
                 onUpdateThemePreference = {},
                 onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                onReopenLogin = {},
             )
         }
 

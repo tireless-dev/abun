@@ -134,20 +134,6 @@ class LocalStore(
         )
     }
 
-    fun updateThemePreference(themePreference: ThemePreference) {
-        updatePreferences(
-            titlePrefix = preferences().titlePrefix,
-            defaultAlarmLeadMinutes = preferences().defaultAlarmLeadMinutes,
-            focusMinutes = preferences().focusMinutes,
-            shortBreakMinutes = preferences().shortBreakMinutes,
-            longBreakMinutes = preferences().longBreakMinutes,
-            timezoneOverride = preferences().timezoneOverride,
-            dateFormat = preferences().dateFormat,
-            themePreference = themePreference,
-            rolloverTime = preferences().rolloverTime,
-        )
-    }
-
     fun activePomodoroSession(
         preferences: PreferencesViewState = preferences(),
         nowEpochMillis: Long = timeProvider.nowEpochMillis(),
@@ -1138,7 +1124,6 @@ class LocalStore(
         persistPreferenceEntry(PREF_POMODORO_LONG_BREAK_MINUTES, preferences.longBreakMinutes.toString(), PreferenceValueType.INT)
         persistPreferenceEntry(PREF_APP_TIMEZONE_OVERRIDE, preferences.timezoneOverride, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_APP_DATE_FORMAT, preferences.dateFormat.name, PreferenceValueType.ENUM)
-        persistPreferenceEntry(PREF_APP_THEME_PREFERENCE, preferences.themePreference.name, PreferenceValueType.ENUM)
         persistPreferenceEntry(PREF_APP_ROLLOVER_TIME, preferences.rolloverTime, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_TASK_BLANK_TITLE_POLICY, preferences.blankTitlePolicy.name, PreferenceValueType.ENUM)
     }
@@ -1690,7 +1675,7 @@ private fun List<MutableSyncRow<LocalPreference>>.toPreferencesViewState(): Pref
         longBreakMinutes = byKey[PREF_POMODORO_LONG_BREAK_MINUTES]?.entity?.value?.toIntOrNull() ?: 15,
         timezoneOverride = byKey[PREF_APP_TIMEZONE_OVERRIDE]?.entity?.value ?: "SYSTEM",
         dateFormat = byKey[PREF_APP_DATE_FORMAT]?.entity?.value?.let(DateFormatPreference::valueOf) ?: DateFormatPreference.ISO,
-        themePreference = byKey[PREF_APP_THEME_PREFERENCE]?.entity?.value?.let(ThemePreference::valueOf) ?: ThemePreference.SYSTEM,
+        themePreference = ThemePreference.SYSTEM,
         blankTitlePolicy = byKey[PREF_TASK_BLANK_TITLE_POLICY]?.entity?.value?.let(BlankTitlePolicy::valueOf) ?: BlankTitlePolicy.REJECT_BLANK,
         rolloverTime = byKey[PREF_APP_ROLLOVER_TIME]?.entity?.value ?: "02:00",
     )

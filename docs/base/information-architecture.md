@@ -41,6 +41,8 @@ The app writes locally first. Remote persistence is asynchronous and must not be
 - local reads are authoritative for current UI rendering
 - local writes happen before remote sync
 - remote changes arrive through pull and merge, not by directly mutating UI state from network events
+- guest-mode onboarding dismissal is a per-device local behavior and not a synced cross-device preference
+- theme preference is a per-device presentation choice and not a synced cross-device preference
 
 ### Status tagging
 

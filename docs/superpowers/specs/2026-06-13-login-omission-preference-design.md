@@ -50,10 +50,10 @@ The current shared auth guide is controlled only by in-memory UI state. If the u
 
 ### Persistence boundary
 
-Use the existing shared SQLDelight-backed `preference` table in `app/sharedLogic` as the persistence boundary for this feature.
+Use a platform-backed local preference store outside the shared SQLDelight sync tables as the persistence boundary for this feature.
 
 - Add a dedicated local preference key for login omission.
-- Read and write that key from shared logic rather than platform-specific storage.
+- Read and write that key through a shared logic dependency rather than through synced SQLite preferences.
 - Treat the key as local UI/runtime state, not as part of synced `PreferencesViewState`.
 
 ### Controller behavior
@@ -78,7 +78,7 @@ The Settings affordance should follow the existing shared editorial Material 3 p
 
 ## Data Model
 
-Add one local preference key in shared logic:
+Add one local preference key in the platform-backed local preference store:
 
 - `app.auth.login_omitted`
 
@@ -87,7 +87,7 @@ Stored values:
 - `"true"` when the user has chosen to skip login
 - `null` when omission is not active
 
-This state is intentionally separate from synced app preferences because it represents a per-device onboarding dismissal choice rather than a cross-device product preference.
+This state is intentionally separate from synced app preferences because it represents a per-device onboarding dismissal choice rather than a cross-device product preference. It must not be written into the synced SQLite `preference` table.
 
 ## State Rules
 

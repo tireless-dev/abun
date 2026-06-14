@@ -16,6 +16,7 @@ import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
+import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.LocalStore
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
@@ -82,6 +83,79 @@ class SharedLogicDesktopTest {
         assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
         assertEquals(false, controller.state.value.auth.otpRequested)
         assertTrue(controller.state.value.syncState.syncReady)
+    }
+
+    @Test
+    fun `skipping login hides guide and next controller start stays omitted`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val first = testController(loginPreferenceStore = loginPreferenceStore)
+
+        first.skipLogin()
+
+        assertFalse(first.state.value.auth.showGuide)
+
+        val second = testController(loginPreferenceStore = loginPreferenceStore)
+
+        assertFalse(second.state.value.auth.showGuide)
+        assertEquals(AuthMode.GUEST, second.state.value.auth.mode)
+    }
+
+    @Test
+    fun `reopen login from settings clears omission and shows guide`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val controller = testController(loginPreferenceStore = loginPreferenceStore)
+
+        controller.skipLogin()
+        controller.reopenLogin()
+
+        assertTrue(controller.state.value.auth.showGuide)
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+
+        val second = testController(loginPreferenceStore = loginPreferenceStore)
+        assertTrue(second.state.value.auth.showGuide)
+    }
+
+    @Test
+    fun `successful login clears stored omission`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val controller = testController(
+            loginPreferenceStore = loginPreferenceStore,
+            debugAuthPreset = DebugAuthPreset(
+                email = "abun@tireless.dev",
+                otp = "424242",
+                accessToken = "debug-token",
+                userId = "debug-user",
+            ),
+        )
+
+        controller.skipLogin()
+        controller.verifyEmailOtp("424242")
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+
+        val second = testController(loginPreferenceStore = loginPreferenceStore)
+        assertTrue(second.state.value.auth.showGuide)
+    }
+
+    @Test
+    fun `stored login omission still hides guide when debug auth preset is enabled`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setLoginOmitted(true)
+        }
+
+        val controller = testController(
+            loginPreferenceStore = loginPreferenceStore,
+            debugAuthPreset = DebugAuthPreset(
+                email = "abun@tireless.dev",
+                otp = "424242",
+                accessToken = "debug-token",
+                userId = "debug-user",
+            ),
+        )
+
+        assertFalse(controller.state.value.auth.showGuide)
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+        assertEquals("abun@tireless.dev", controller.state.value.auth.email)
+        assertEquals("424242", controller.state.value.auth.prefilledOtp)
     }
 
     @Test
@@ -709,7 +783,7 @@ class SharedLogicDesktopTest {
         assertEquals("[focus]", preferences.titlePrefix)
         assertEquals(20, preferences.defaultAlarmLeadMinutes)
         assertEquals(DateFormatPreference.MONTH_DAY, preferences.dateFormat)
-        assertEquals(ThemePreference.DARK, preferences.themePreference)
+        assertEquals(ThemePreference.SYSTEM, preferences.themePreference)
         assertEquals(30, session.durationMinutes)
         assertTrue(store.activePomodoroSession(preferences) != null)
         assertEquals(
@@ -721,7 +795,6 @@ class SharedLogicDesktopTest {
                 "pomodoro.long_break_minutes",
                 "app.timezone_override",
                 "app.date_format",
-                "app.theme_preference",
                 "app.rollover_time",
                 "task.blank_title_policy",
             ),
@@ -730,15 +803,17 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `theme preference updates independently for immediate app theme changes`() {
-        val store = testStore()
+    fun `theme preference updates locally and persists across controller restarts`() = runTest {
+        val localPreferenceStore = TestLoginPreferenceStore()
+        val first = testController(loginPreferenceStore = localPreferenceStore)
 
-        store.updateThemePreference(ThemePreference.DARK)
+        first.updateThemePreference(ThemePreference.DARK)
 
-        val preferences = store.preferences()
+        assertEquals(ThemePreference.DARK, first.state.value.preferences.themePreference)
 
-        assertEquals(ThemePreference.DARK, preferences.themePreference)
-        assertEquals(listOf("app.theme_preference"), store.dirtyPreferences().map { it.key }.filter { it == "app.theme_preference" })
+        val second = testController(loginPreferenceStore = localPreferenceStore)
+
+        assertEquals(ThemePreference.DARK, second.state.value.preferences.themePreference)
     }
 
     @Test
@@ -911,14 +986,10 @@ class SharedLogicDesktopTest {
     private fun testStore(
         timeProvider: TimeProvider = testTimeProvider(),
         idGenerator: IdGenerator = testIdGenerator(),
+        databaseDriverFactory: DatabaseDriverFactory = testDatabaseDriverFactory(),
     ): LocalStore {
-        val driverFactory = object : DatabaseDriverFactory {
-            override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
-                AbunDatabase.Schema.create(it)
-            }
-        }
         return LocalStore(
-            database = createDatabase(driverFactory),
+            database = createDatabase(databaseDriverFactory),
             timeProvider = timeProvider,
             idGenerator = idGenerator,
             clock = createHybridClock(object : DeviceNodeIdProvider {
@@ -931,13 +1002,11 @@ class SharedLogicDesktopTest {
         timeProvider: TimeProvider = testTimeProvider(),
         idGenerator: IdGenerator = testIdGenerator(),
         debugAuthPreset: DebugAuthPreset? = null,
+        databaseDriverFactory: DatabaseDriverFactory = testDatabaseDriverFactory(),
+        loginPreferenceStore: LoginPreferenceStore = TestLoginPreferenceStore(),
     ) = AbunAppController.create(
         AppDependencies(
-            databaseDriverFactory = object : DatabaseDriverFactory {
-                override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
-                    AbunDatabase.Schema.create(it)
-                }
-            },
+            databaseDriverFactory = databaseDriverFactory,
             httpClient = HttpClient(
                 MockEngine { request ->
                     val body = when (request.url.encodedPath) {
@@ -959,6 +1028,7 @@ class SharedLogicDesktopTest {
                 install(ContentNegotiation) { json(AppJson) }
             },
             authProvider = dev.tireless.abun.app.DemoAuthProvider(),
+            loginPreferenceStore = loginPreferenceStore,
             nodeIdProvider = object : DeviceNodeIdProvider {
                 override fun nodeId(): String = "test-device"
             },
@@ -968,6 +1038,36 @@ class SharedLogicDesktopTest {
             debugAuthPreset = debugAuthPreset,
         ),
     )
+
+    private fun testDatabaseDriverFactory(): DatabaseDriverFactory {
+        val jdbcUrl = "jdbc:sqlite:file:test-${System.nanoTime()}?mode=memory&cache=shared"
+        var schemaCreated = false
+        return object : DatabaseDriverFactory {
+            override fun createDriver(): SqlDriver = JdbcSqliteDriver(jdbcUrl).also {
+                if (!schemaCreated) {
+                    AbunDatabase.Schema.create(it)
+                    schemaCreated = true
+                }
+            }
+        }
+    }
+
+    private class TestLoginPreferenceStore : LoginPreferenceStore {
+        private var omitted = false
+        private var themePreference = ThemePreference.SYSTEM
+
+        override fun isLoginOmitted(): Boolean = omitted
+
+        override fun setLoginOmitted(isOmitted: Boolean) {
+            omitted = isOmitted
+        }
+
+        override fun themePreference(): ThemePreference = themePreference
+
+        override fun setThemePreference(themePreference: ThemePreference) {
+            this.themePreference = themePreference
+        }
+    }
 
     private suspend fun waitFor(
         timeoutMillis: Long = 2_000,

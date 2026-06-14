@@ -30,10 +30,18 @@ interface TimeProvider {
     fun today(): LocalDate
 }
 
+interface LoginPreferenceStore {
+    fun isLoginOmitted(): Boolean
+    fun setLoginOmitted(isOmitted: Boolean)
+    fun themePreference(): ThemePreference
+    fun setThemePreference(themePreference: ThemePreference)
+}
+
 data class AppDependencies(
     val databaseDriverFactory: DatabaseDriverFactory,
     val httpClient: HttpClient,
     val authProvider: AuthProvider,
+    val loginPreferenceStore: LoginPreferenceStore,
     val nodeIdProvider: DeviceNodeIdProvider,
     val idGenerator: IdGenerator,
     val timeProvider: TimeProvider,
