@@ -1,6 +1,8 @@
 export interface ApiClientOptions {
   baseUrl?: string;
   bearerToken?: string;
+  getBearerToken?: () => string | undefined | Promise<string | undefined>;
+  refreshBearerToken?: () => Promise<string | undefined>;
   fetchImpl?: typeof fetch;
   maxReadRetries?: number;
 }
@@ -12,8 +14,11 @@ export type PomodoroSessionState = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type PomodoroTaskUpdate = 'NONE' | 'PROGRESS' | 'COMPLETE' | 'CANCEL';
 export type PreferenceValueType = 'STRING' | 'INT' | 'ENUM';
 
-export interface OtpVerifyResponse {
+export interface AuthSessionResponse {
   access_token: string;
+  access_token_expires_at: string;
+  refresh_token: string;
+  refresh_token_expires_at: string;
   user_id: string;
 }
 
@@ -170,6 +175,8 @@ export class ApiError extends Error {
   }
 }
 
+const OTP_EMAIL_METHOD = 'otp_email';
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -179,10 +186,19 @@ export function createAbunApiClient(options: ApiClientOptions = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const maxReadRetries = options.maxReadRetries ?? 2;
 
+  async function resolveBearerToken(): Promise<string | undefined> {
+    if (options.getBearerToken) {
+      return await options.getBearerToken();
+    }
+    return options.bearerToken;
+  }
+
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const method = (init?.method ?? 'GET').toUpperCase();
     const isIdempotentRead = method === 'GET' || method === 'HEAD';
     const retries = isIdempotentRead ? maxReadRetries : 0;
+    let refreshAttempted = false;
+    let overrideBearerToken: string | undefined;
 
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -191,11 +207,28 @@ export function createAbunApiClient(options: ApiClientOptions = {}) {
         if (init?.body !== undefined) {
           headers.set('Content-Type', 'application/json');
         }
-        if (options.bearerToken) {
-          headers.set('Authorization', `Bearer ${options.bearerToken}`);
+
+        const bearerToken = overrideBearerToken ?? await resolveBearerToken();
+        if (bearerToken) {
+          headers.set('Authorization', `Bearer ${bearerToken}`);
         }
 
         const response = await fetchImpl(`${baseUrl}${path}`, { ...init, headers });
+
+        if (
+          response.status === 401 &&
+          !refreshAttempted &&
+          !path.startsWith('/auth/') &&
+          options.refreshBearerToken
+        ) {
+          refreshAttempted = true;
+          const refreshedToken = await options.refreshBearerToken();
+          if (refreshedToken) {
+            overrideBearerToken = refreshedToken;
+            continue;
+          }
+        }
+
         if (!response.ok) {
           let message = response.statusText;
           let details: unknown;
@@ -221,9 +254,26 @@ export function createAbunApiClient(options: ApiClientOptions = {}) {
   }
 
   return {
-    requestOtp: (email: string) => request<void>('/api/auth/otp/request', { method: 'POST', body: JSON.stringify({ email }) }),
+    requestOtp: (email: string) => request<void>('/auth/request', {
+      method: 'POST',
+      body: JSON.stringify({ method: OTP_EMAIL_METHOD, email }),
+    }),
     verifyOtp: (email: string, otp: string) =>
-      request<OtpVerifyResponse>('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+      request<AuthSessionResponse>('/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({ method: OTP_EMAIL_METHOD, email, otp }),
+      }),
+    refreshSession: (refreshToken: string) =>
+      request<AuthSessionResponse>('/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }),
+    logout: (refreshToken: string, accessToken?: string) =>
+      request<void>('/auth/logout', {
+        method: 'POST',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }),
 
     listPreferences: () => request<PreferenceResponse[]>('/api/preferences'),
     getPreference: (key: string) => request<PreferenceResponse>(`/api/preferences/${encodeURIComponent(key)}`),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ApiError,
   type AlarmResponse,
+  type AuthSessionResponse,
   type PomodoroPhase,
   type PomodoroSessionResponse,
   type PomodoroTaskUpdate,
@@ -44,6 +45,9 @@ type AuthState = {
   email: string;
   otp: string;
   token: string;
+  tokenExpiresAt: number;
+  refreshToken: string;
+  refreshTokenExpiresAt: number;
   userId: string;
 };
 
@@ -53,9 +57,17 @@ type TaskWithStatus = TaskResponse & {
   latestEvent?: TaskEventResponse;
 };
 
-const TOKEN_KEY = 'abun_access_token';
-const USER_KEY = 'abun_user_id';
+type StoredAuthSession = {
+  accessToken: string;
+  accessTokenExpiresAt: number;
+  refreshToken: string;
+  refreshTokenExpiresAt: number;
+  userId: string;
+};
+
+const SESSION_KEY = 'abun_auth_session';
 const UNDO_MS = 5000;
+const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60_000;
 
 const DEFAULT_PREFS: PreferencesState = {
   titlePrefix: '',
@@ -167,13 +179,40 @@ function isOpenStatus(status: TaskStatus): boolean {
   return status === 'PENDING' || status === 'IN_PROGRESS' || status === 'UNKNOWN';
 }
 
+function readStoredSession(): StoredAuthSession | null {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredAuthSession>;
+    if (
+      typeof parsed.accessToken === 'string' &&
+      typeof parsed.accessTokenExpiresAt === 'number' &&
+      typeof parsed.refreshToken === 'string' &&
+      typeof parsed.refreshTokenExpiresAt === 'number' &&
+      typeof parsed.userId === 'string'
+    ) {
+      return parsed as StoredAuthSession;
+    }
+  } catch {
+    // ignore invalid session payloads
+  }
+
+  localStorage.removeItem(SESSION_KEY);
+  return null;
+}
+
 export function App() {
+  const initialSession = readStoredSession();
   const [auth, setAuth] = useState<AuthState>({
-    mode: localStorage.getItem(TOKEN_KEY) ? 'AUTH' : 'ANON',
+    mode: initialSession ? 'AUTH' : 'ANON',
     email: '',
     otp: '',
-    token: localStorage.getItem(TOKEN_KEY) ?? '',
-    userId: localStorage.getItem(USER_KEY) ?? '',
+    token: initialSession?.accessToken ?? '',
+    tokenExpiresAt: initialSession?.accessTokenExpiresAt ?? 0,
+    refreshToken: initialSession?.refreshToken ?? '',
+    refreshTokenExpiresAt: initialSession?.refreshTokenExpiresAt ?? 0,
+    userId: initialSession?.userId ?? '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -205,7 +244,15 @@ export function App() {
     taskUpdate: 'NONE',
   });
 
-  const client = useMemo(() => createAbunApiClient({ bearerToken: auth.token || undefined }), [auth.token]);
+  const authClient = useMemo(() => createAbunApiClient(), []);
+  const client = useMemo(
+    () =>
+      createAbunApiClient({
+        getBearerToken: async () => auth.token || undefined,
+        refreshBearerToken: async () => await refreshAccessToken(),
+      }),
+    [auth.token, auth.refreshToken, auth.tokenExpiresAt, auth.refreshTokenExpiresAt],
+  );
 
   function pushToast(type: ToastType, message: string) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -229,7 +276,7 @@ export function App() {
   }
 
   async function loadAll() {
-    if (!auth.token) return;
+    if (!auth.token && !auth.refreshToken) return;
     setLoading(true);
     setError(null);
     try {
@@ -268,7 +315,9 @@ export function App() {
           .sort((a, b) => (a.event_time < b.event_time ? 1 : -1)),
       );
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) logout();
+      if (e instanceof ApiError && e.status === 401) {
+        clearAuthSession();
+      }
       const message = e instanceof Error ? e.message : 'Failed loading data';
       setError(message);
       pushToast('error', message);
@@ -277,25 +326,71 @@ export function App() {
     }
   }
 
-  function logout() {
+  function clearAuthSession() {
     pendingDeletes.forEach((d) => window.clearTimeout(d.timerId));
     setPendingDeletes([]);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    setAuth({ mode: 'ANON', email: '', otp: '', token: '', userId: '' });
+    localStorage.removeItem(SESSION_KEY);
+    setAuth((prev) => ({
+      ...prev,
+      mode: 'ANON',
+      otp: '',
+      token: '',
+      tokenExpiresAt: 0,
+      refreshToken: '',
+      refreshTokenExpiresAt: 0,
+      userId: '',
+    }));
     setTasks([]);
     setRoutines([]);
     setAlarms([]);
     setPomodoroSessions([]);
     setJournalEntries([]);
+  }
+
+  async function logout() {
+    const refreshToken = auth.refreshToken;
+    const accessToken = auth.token;
+    clearAuthSession();
+    if (refreshToken) {
+      try {
+        await authClient.logout(refreshToken, accessToken || undefined);
+      } catch {
+        // local logout still wins
+      }
+    }
     pushToast('info', 'Logged out');
+  }
+
+  async function refreshAccessToken(force = false): Promise<string | undefined> {
+    if (!auth.refreshToken) {
+      return auth.token || undefined;
+    }
+
+    const now = Date.now();
+    if (!force && auth.token && auth.tokenExpiresAt - ACCESS_TOKEN_REFRESH_WINDOW_MS > now) {
+      return auth.token;
+    }
+
+    if (auth.refreshTokenExpiresAt <= now) {
+      clearAuthSession();
+      return undefined;
+    }
+
+    try {
+      const response = await authClient.refreshSession(auth.refreshToken);
+      persistAuthSession(response);
+      return response.access_token;
+    } catch {
+      clearAuthSession();
+      return undefined;
+    }
   }
 
   useEffect(() => () => pendingDeletes.forEach((d) => window.clearTimeout(d.timerId)), [pendingDeletes]);
 
   useEffect(() => {
     void loadAll();
-  }, [auth.token, selectedDate]);
+  }, [auth.token, auth.refreshToken, selectedDate]);
 
   async function requestOtp() {
     await runAction(async () => {
@@ -312,10 +407,29 @@ export function App() {
       const otp = auth.otp.trim();
       if (!email || !otp) throw new Error('Email and OTP are required');
       const response = await client.verifyOtp(email, otp);
-      localStorage.setItem(TOKEN_KEY, response.access_token);
-      localStorage.setItem(USER_KEY, response.user_id);
-      setAuth((prev) => ({ ...prev, mode: 'AUTH', token: response.access_token, userId: response.user_id, otp: '' }));
+      persistAuthSession(response);
     }, 'Logged in');
+  }
+
+  function persistAuthSession(response: AuthSessionResponse) {
+    const nextSession = {
+      accessToken: response.access_token,
+      accessTokenExpiresAt: Date.parse(response.access_token_expires_at),
+      refreshToken: response.refresh_token,
+      refreshTokenExpiresAt: Date.parse(response.refresh_token_expires_at),
+      userId: response.user_id,
+    } satisfies StoredAuthSession;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+    setAuth((prev) => ({
+      ...prev,
+      mode: 'AUTH',
+      otp: '',
+      token: nextSession.accessToken,
+      tokenExpiresAt: nextSession.accessTokenExpiresAt,
+      refreshToken: nextSession.refreshToken,
+      refreshTokenExpiresAt: nextSession.refreshTokenExpiresAt,
+      userId: nextSession.userId,
+    }));
   }
 
   async function appendEvent(taskId: string, type: TaskEventType, content?: string) {
