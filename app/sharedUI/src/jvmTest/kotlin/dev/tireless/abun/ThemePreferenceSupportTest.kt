@@ -26,6 +26,7 @@ class ThemePreferenceSupportTest {
                 onUpdateThemePreference = {},
                 onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
                 onReopenLogin = {},
+                onLogout = {},
             )
         }
 

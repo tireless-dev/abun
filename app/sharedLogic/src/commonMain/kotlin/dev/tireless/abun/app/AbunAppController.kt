@@ -1,5 +1,6 @@
 package dev.tireless.abun.app
 
+import dev.tireless.abun.TestSharedAccount
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,8 +17,15 @@ class AbunAppController(
     private val debugAuthPreset = dependencies.debugAuthPreset
     private val loginPreferenceStore = dependencies.loginPreferenceStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val authProvider = dependencies.authProvider as? MutableAuthProvider
-        ?: error("App requires MutableAuthProvider for onboarding/auth flow")
+    private val authRemoteApi = AuthRemoteApi(
+        baseUrl = dependencies.serverBaseUrl,
+        client = dependencies.httpClient,
+    )
+    private val authSessionManager = AuthSessionManager(
+        loginPreferenceStore = loginPreferenceStore,
+        authRemoteApi = authRemoteApi,
+        timeProvider = dependencies.timeProvider,
+    )
     private val store = LocalStore(
         database = createDatabase(dependencies.databaseDriverFactory),
         timeProvider = dependencies.timeProvider,
@@ -27,7 +35,7 @@ class AbunAppController(
     private val remoteApi = SyncRemoteApi(
         baseUrl = dependencies.serverBaseUrl,
         client = dependencies.httpClient,
-        authProvider = dependencies.authProvider,
+        accessTokenProvider = authSessionManager,
     )
     private val syncEngine = SyncEngine(
         localStore = store,
@@ -37,16 +45,8 @@ class AbunAppController(
     private val _state = MutableStateFlow(
         AppUiState(
             selectedDate = dependencies.timeProvider.today().toString(),
-            syncState = SyncStateView(syncReady = false),
-            auth = debugAuthPreset?.let {
-                AuthViewState(
-                    showGuide = !loginPreferenceStore.isLoginOmitted(),
-                    email = it.email,
-                    otpRequested = true,
-                    prefilledOtp = it.otp,
-                    debugOtpHint = "Debug OTP: ${it.otp}",
-                )
-            } ?: AuthViewState(showGuide = !loginPreferenceStore.isLoginOmitted()),
+            syncState = SyncStateView(syncReady = initialSyncReady()),
+            auth = initialAuthViewState(),
         ),
     )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
@@ -55,8 +55,10 @@ class AbunAppController(
     private var syncRequestedWhileRunning = false
 
     init {
-        authProvider.updateToken(null)
         refresh()
+        scope.launch {
+            restoreSessionOnStartup()
+        }
     }
 
     fun skipLogin() {
@@ -112,7 +114,7 @@ class AbunAppController(
             }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
-            runCatching { remoteApi.requestOtp(email) }
+            runCatching { authRemoteApi.requestOtp(email) }
                 .onSuccess {
                     _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, otpRequested = true))
                 }
@@ -131,16 +133,25 @@ class AbunAppController(
         debugAuthPreset
             ?.takeIf { email == it.email.trim() && code.trim() == it.otp.trim() }
             ?.let {
-                completeLogin(it.accessToken)
+                scope.launch {
+                    completeLogin(it.toAuthSession())
+                }
                 return
             }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
-            runCatching { remoteApi.verifyOtp(email, code) }
-                .onSuccess { response -> completeLogin(response.accessToken) }
+            runCatching { authRemoteApi.verifyOtp(email, code) }
+                .onSuccess { response -> completeLogin(response.toAuthSession()) }
                 .onFailure {
                     _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = false, errorMessage = it.message ?: "OTP verification failed"))
                 }
+        }
+    }
+
+    fun logout() {
+        scope.launch {
+            authSessionManager.logout()
+            transitionToGuest(showGuide = true)
         }
     }
 
@@ -446,9 +457,13 @@ class AbunAppController(
                 }.onSuccess {
                     refresh(lastSyncedAt = timeProvider.nowEpochMillis().let(::epochMillisToIsoString))
                 }.onFailure {
-                    _state.value = _state.value.copy(
-                        syncState = _state.value.syncState.copy(isSyncing = false, errorMessage = it.message ?: "Sync failed"),
-                    )
+                    if (it is AuthSessionExpiredException) {
+                        transitionToGuest(showGuide = true)
+                    } else {
+                        _state.value = _state.value.copy(
+                            syncState = _state.value.syncState.copy(isSyncing = false, errorMessage = it.message ?: "Sync failed"),
+                        )
+                    }
                 }
             } while (syncRequestedWhileRunning)
         } finally {
@@ -489,9 +504,9 @@ class AbunAppController(
         fun create(dependencies: AppDependencies): AbunAppController = AbunAppController(dependencies)
     }
 
-    private fun completeLogin(accessToken: String) {
+    private suspend fun completeLogin(session: AuthSession) {
         loginPreferenceStore.setLoginOmitted(false)
-        authProvider.updateToken(accessToken)
+        authSessionManager.completeLogin(session)
         _state.value = _state.value.copy(
             auth = _state.value.auth.copy(
                 showGuide = false,
@@ -503,6 +518,75 @@ class AbunAppController(
             syncState = _state.value.syncState.copy(syncReady = true),
         )
         requestSync(immediate = true)
+    }
+
+    private suspend fun restoreSessionOnStartup() {
+        val restored = authSessionManager.restoreSession()
+        if (restored != null) {
+            _state.value = _state.value.copy(
+                auth = _state.value.auth.copy(
+                    showGuide = false,
+                    mode = AuthMode.AUTHENTICATED,
+                    errorMessage = null,
+                ),
+                syncState = _state.value.syncState.copy(syncReady = true),
+            )
+            requestSync(immediate = true)
+            return
+        }
+
+        if (authSessionManager.storedSession() == null && _state.value.auth.mode == AuthMode.GUEST) {
+            return
+        }
+
+        transitionToGuest(showGuide = true)
+    }
+
+    private fun transitionToGuest(showGuide: Boolean) {
+        loginPreferenceStore.setLoginOmitted(false)
+        _state.value = _state.value.copy(
+            auth = _state.value.auth.copy(
+                showGuide = showGuide,
+                mode = AuthMode.GUEST,
+                otpRequested = false,
+                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
+                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
+                isSubmitting = false,
+                errorMessage = null,
+            ),
+            syncState = _state.value.syncState.copy(syncReady = false, isSyncing = false),
+        )
+    }
+
+    private fun initialAuthViewState(): AuthViewState {
+        val storedSession = authSessionManager.storedSession()
+        val now = timeProvider.nowEpochMillis()
+        if (storedSession != null && storedSession.refreshTokenExpiresAtEpochMillis > now) {
+            return AuthViewState(
+                showGuide = false,
+                mode = AuthMode.AUTHENTICATED,
+                email = debugAuthPreset?.email ?: TestSharedAccount.EMAIL,
+                otpRequested = false,
+                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
+                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
+            )
+        }
+
+        return debugAuthPreset?.let {
+            AuthViewState(
+                showGuide = !loginPreferenceStore.isLoginOmitted(),
+                email = it.email,
+                otpRequested = true,
+                prefilledOtp = it.otp,
+                debugOtpHint = "Debug OTP: ${it.otp}",
+            )
+        } ?: AuthViewState(showGuide = !loginPreferenceStore.isLoginOmitted())
+    }
+
+    private fun initialSyncReady(): Boolean {
+        val storedSession = authSessionManager.storedSession() ?: return false
+        val now = timeProvider.nowEpochMillis()
+        return storedSession.accessTokenExpiresAtEpochMillis > now
     }
 }
 

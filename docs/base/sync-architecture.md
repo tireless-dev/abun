@@ -67,14 +67,24 @@ Used by the local-first client:
 
 Current Kotlin clients call these routes through [SyncRemoteApi.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/SyncRemoteApi.kt):
 
-- `POST /auth/otp/request`
-- `POST /auth/otp/verify`
-- `GET|POST /sync/preferences`
-- `GET|POST /sync/routines`
-- `GET|POST /sync/tasks`
-- `GET|POST /sync/alarms`
-- `GET|POST /sync/task-events`
-- `GET|POST /sync/pomodoro-sessions`
+- `POST /auth/request`
+- `POST /auth/verify`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET|POST /api/sync/preferences`
+- `GET|POST /api/sync/routines`
+- `GET|POST /api/sync/tasks`
+- `GET|POST /api/sync/alarms`
+- `GET|POST /api/sync/task-events`
+- `GET|POST /api/sync/pomodoro-sessions`
+
+Sync and direct business calls now have an auth precondition:
+
+- `/api/sync/*` and `/api/*` require a valid access JWT
+- the client must obtain a guaranteed-valid access token before each sync/API request
+- the client should refresh proactively shortly before access-token expiry
+- one defensive retry is allowed for unexpected `401` responses caused by drift or server-side revocation
+- if refresh fails or the session is revoked, the client clears the local auth session, returns to guest mode, and keeps local SQLite data available for later re-sync after login
 
 ### Business APIs
 
@@ -99,5 +109,6 @@ The current codebase already includes:
 - client sync orchestration in [SyncEngine.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/SyncEngine.kt)
 - local schema and sync cursors in [AbunDatabase.sq](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/sqldelight/dev/tireless/abun/db/AbunDatabase.sq)
 - Worker-hosted sync and business APIs for multiple resources
+- persisted per-device auth sessions plus shared token-refresh handling in the client auth/session manager
 
 This document is intentionally shorter than the retired sync spec. Module-specific sync details should live in the relevant module technical design when they carry domain meaning.

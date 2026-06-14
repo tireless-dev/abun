@@ -26,8 +26,9 @@ The client is responsible for:
 - rendering UI from local state
 - validating and applying local writes
 - persisting module data in SQLite
-- persisting local-only runtime preferences such as login-guide omission and device theme preference in platform preference storage when the state must survive app restarts without syncing to the server
+- persisting local-only runtime preferences such as login-guide omission, device theme preference, and the current per-device auth session in platform preference storage when the state must survive app restarts without syncing to the server
 - tracking dirty state for synced resources
+- restoring a persisted auth session on startup, silently refreshing it when only the access token is stale, and falling back to guest mode when the refresh session is no longer usable
 - running pull-then-push sync cycles
 
 ### Backend
@@ -35,6 +36,8 @@ The client is responsible for:
 The Worker backend is responsible for:
 
 - authenticating the user
+- issuing short-lived signed access JWTs plus rotating refresh tokens
+- storing revocable per-device sessions for refresh-token rotation and logout
 - enforcing ownership boundaries
 - validating incoming mutations
 - storing canonical synced records
@@ -45,9 +48,18 @@ The current production shape serves both site and API concerns from the same ori
 - `/` landing page
 - `/app` web application shell
 - `/mobile` mobile/download page
-- `/api/auth/*` OTP authentication
+- `/auth/*` authentication and session lifecycle APIs
 - `/api/sync/*` local-first sync APIs
 - `/api/*` direct business APIs
+
+Current auth/session endpoints:
+
+- `POST /auth/request`
+- `POST /auth/verify`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+
+OTP email is the only supported auth method today, but it is carried behind the generic auth contract with `method = "otp_email"`.
 
 ## Resource Categories
 
@@ -84,6 +96,7 @@ Current example:
 ### Ownership strategy
 
 - The backend must bind synced data to the authenticated user.
+- Access JWT validation must remain session-aware so revoked device sessions stop authorizing `/api/*` and `/api/sync/*` calls even before the client clears local state.
 - Client-provided ownership metadata is never authoritative.
 
 ### Deletion strategy

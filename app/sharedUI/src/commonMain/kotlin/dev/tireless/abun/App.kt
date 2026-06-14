@@ -410,6 +410,7 @@ private fun StatusStrip(state: AppUiState) {
         }
     }
 }
+@Composable
 internal fun TodayScreen(
     state: AppUiState,
     liveNow: Long,
@@ -601,6 +602,7 @@ private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
         onUpdateThemePreference = controller::updateThemePreference,
         onUpdatePreferences = controller::updatePreferences,
         onReopenLogin = controller::reopenLogin,
+        onLogout = controller::logout,
     )
 }
 
@@ -620,6 +622,7 @@ internal fun SettingsScreenContent(
         rolloverTime: String,
     ) -> Unit,
     onReopenLogin: () -> Unit,
+    onLogout: () -> Unit,
 ) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
@@ -749,6 +752,14 @@ internal fun SettingsScreenContent(
             Text("Login anytime to enable cloud sync on this device.", style = ThemeTokens.type.bodyMuted)
             Button(onClick = onReopenLogin) {
                 Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
+            }
+        }
+    } else {
+        Panel {
+            SectionHeader("Account", "Session")
+            Text("This device is signed in and can sync with your server account.", style = ThemeTokens.type.bodyMuted)
+            OutlinedButton(onClick = onLogout) {
+                Text("Log out", style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
     }

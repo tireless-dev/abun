@@ -10,18 +10,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-class DemoAuthProvider(
-    initialToken: String? = null,
-) : MutableAuthProvider {
-    private var token: String? = initialToken
-
-    override suspend fun bearerToken(): String = token.orEmpty()
-
-    override fun updateToken(token: String?) {
-        this.token = token
-    }
-}
-
 class DefaultTimeProvider : TimeProvider {
     override fun nowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
 

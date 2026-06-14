@@ -43,6 +43,8 @@ The app writes locally first. Remote persistence is asynchronous and must not be
 - remote changes arrive through pull and merge, not by directly mutating UI state from network events
 - guest-mode onboarding dismissal is a per-device local behavior and not a synced cross-device preference
 - theme preference is a per-device presentation choice and not a synced cross-device preference
+- auth session persistence is a per-device runtime state and not synced product data
+- revoking or expiring a device session should not delete local records; it only removes remote authorization until the user signs in again
 
 ### Status tagging
 

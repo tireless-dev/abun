@@ -6,7 +6,7 @@ import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.AppJson
-import dev.tireless.abun.app.AuthProvider
+import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DateFormatPreference
@@ -24,7 +24,6 @@ import dev.tireless.abun.app.SyncRemoteApi
 import dev.tireless.abun.app.SyncScope
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TimeProvider
-import dev.tireless.abun.app.DemoAuthProvider
 import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.app.createDatabase
 import dev.tireless.abun.app.createHybridClock
@@ -58,6 +57,7 @@ import java.sql.DriverManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
@@ -70,6 +70,9 @@ class SharedLogicDesktopTest {
                 otp = "424242",
                 accessToken = "debug-token",
                 userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
             ),
         )
 
@@ -126,6 +129,9 @@ class SharedLogicDesktopTest {
                 otp = "424242",
                 accessToken = "debug-token",
                 userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
             ),
         )
 
@@ -134,7 +140,8 @@ class SharedLogicDesktopTest {
         waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
 
         val second = testController(loginPreferenceStore = loginPreferenceStore)
-        assertTrue(second.state.value.auth.showGuide)
+        waitFor { second.state.value.auth.mode == AuthMode.AUTHENTICATED }
+        assertFalse(second.state.value.auth.showGuide)
     }
 
     @Test
@@ -150,6 +157,9 @@ class SharedLogicDesktopTest {
                 otp = "424242",
                 accessToken = "debug-token",
                 userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
             ),
         )
 
@@ -966,8 +976,8 @@ class SharedLogicDesktopTest {
 
         SyncEngine(
             localStore = store,
-            remoteApi = SyncRemoteApi("http://localhost:8080", client, object : AuthProvider {
-                override suspend fun bearerToken(): String = "demo-user"
+            remoteApi = SyncRemoteApi("http://localhost:8080", client, object : dev.tireless.abun.app.AccessTokenProvider {
+                override suspend fun validAccessToken(forceRefresh: Boolean): String = "demo-user"
             }),
         ).syncNow()
 
@@ -991,16 +1001,19 @@ class SharedLogicDesktopTest {
 
     @Test
     fun `verify email otp authenticates and marks sync ready`() = runTest {
-        val authProvider = DemoAuthProvider()
+        val loginPreferenceStore = TestLoginPreferenceStore()
         val controller = AbunAppController.create(
             AppDependencies(
                 databaseDriverFactory = inMemoryDriverFactory(),
                 httpClient = HttpClient(
                     MockEngine { request ->
                         val body = when (request.url.encodedPath) {
-                            "/api/auth/otp/verify" -> AppJson.encodeToString(
-                                dev.tireless.abun.app.OtpVerifyResponse(
-                                    accessToken = "uid:${TestSharedAccount.USER_ID}",
+                            "/auth/verify" -> AppJson.encodeToString(
+                                dev.tireless.abun.app.AuthSessionResponse(
+                                    accessToken = "access-1",
+                                    accessTokenExpiresAt = "2030-01-01T00:15:00Z",
+                                    refreshToken = "refresh-1",
+                                    refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
                                     userId = TestSharedAccount.USER_ID,
                                 ),
                             )
@@ -1021,7 +1034,7 @@ class SharedLogicDesktopTest {
                 ) {
                     install(ContentNegotiation) { json(AppJson) }
                 },
-                authProvider = authProvider,
+                loginPreferenceStore = loginPreferenceStore,
                 nodeIdProvider = object : DeviceNodeIdProvider {
                     override fun nodeId(): String = "test-device"
                 },
@@ -1049,7 +1062,108 @@ class SharedLogicDesktopTest {
         assertEquals(AuthMode.AUTHENTICATED, state.auth.mode)
         assertEquals(true, state.syncState.syncReady)
         assertTrue(state.syncState.lastSyncedAt != null)
-        assertEquals("uid:${TestSharedAccount.USER_ID}", authProvider.bearerToken())
+        assertEquals(
+            AuthSession(
+                userId = TestSharedAccount.USER_ID,
+                accessToken = "access-1",
+                accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
+                refreshToken = "refresh-1",
+                refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+            ),
+            loginPreferenceStore.authSession(),
+        )
+    }
+
+    @Test
+    fun `controller restores authenticated session from local store when access token is still valid`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "persisted-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
+                    refreshToken = "persisted-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+                ),
+            )
+        }
+        val requests = mutableListOf<String>()
+
+        val controller = testController(
+            timeProvider = fixedTimeProvider("2029-12-31T23:55:00Z"),
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+
+        assertFalse(controller.state.value.auth.showGuide)
+        assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
+        assertTrue(requests.none { it == "POST /auth/refresh" })
+    }
+
+    @Test
+    fun `controller refreshes expired access token on startup when refresh token is still valid`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "expired-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2029-12-31T23:00:00Z"),
+                    refreshToken = "persisted-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+                ),
+            )
+        }
+        val requests = mutableListOf<String>()
+
+        val controller = testController(
+            timeProvider = fixedTimeProvider("2030-01-01T00:00:00Z"),
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+            authRefreshResponse = dev.tireless.abun.app.AuthSessionResponse(
+                accessToken = "refreshed-access",
+                accessTokenExpiresAt = "2030-01-01T00:20:00Z",
+                refreshToken = "refreshed-refresh",
+                refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+                userId = "persisted-user",
+            ),
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED && loginPreferenceStore.authSession()?.accessToken == "refreshed-access" }
+
+        assertTrue(requests.contains("POST /auth/refresh"))
+        assertEquals("refreshed-refresh", loginPreferenceStore.authSession()?.refreshToken)
+    }
+
+    @Test
+    fun `logout clears persisted auth session and returns to login guide`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "persisted-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
+                    refreshToken = "persisted-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+                ),
+            )
+        }
+        val requests = mutableListOf<String>()
+
+        val controller = testController(
+            timeProvider = fixedTimeProvider("2029-12-31T23:55:00Z"),
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+        controller.logout()
+        waitFor { controller.state.value.auth.showGuide }
+
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+        assertNull(loginPreferenceStore.authSession())
+        assertTrue(requests.contains("POST /auth/logout"))
     }
 
     private fun testStore(
@@ -1073,18 +1187,29 @@ class SharedLogicDesktopTest {
         debugAuthPreset: DebugAuthPreset? = null,
         databaseDriverFactory: DatabaseDriverFactory = testDatabaseDriverFactory(),
         loginPreferenceStore: LoginPreferenceStore = TestLoginPreferenceStore(),
+        requestLog: MutableList<String>? = null,
+        authRefreshResponse: dev.tireless.abun.app.AuthSessionResponse = dev.tireless.abun.app.AuthSessionResponse(
+            accessToken = "refreshed-access",
+            accessTokenExpiresAt = "2030-01-01T00:20:00Z",
+            refreshToken = "refreshed-refresh",
+            refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+            userId = "persisted-user",
+        ),
     ) = AbunAppController.create(
         AppDependencies(
             databaseDriverFactory = databaseDriverFactory,
             httpClient = HttpClient(
                 MockEngine { request ->
+                    requestLog?.add("${request.method.value} ${request.url.encodedPath}")
                     val body = when (request.url.encodedPath) {
-                        "/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
-                        "/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
-                        "/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
-                        "/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
-                        "/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
-                        "/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                        "/auth/refresh" -> AppJson.encodeToString(authRefreshResponse)
+                        "/auth/logout" -> ""
+                        "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
                         else -> error("Unexpected path ${request.url.encodedPath}")
                     }
                     respond(
@@ -1096,7 +1221,6 @@ class SharedLogicDesktopTest {
             ) {
                 install(ContentNegotiation) { json(AppJson) }
             },
-            authProvider = dev.tireless.abun.app.DemoAuthProvider(),
             loginPreferenceStore = loginPreferenceStore,
             nodeIdProvider = object : DeviceNodeIdProvider {
                 override fun nodeId(): String = "test-device"
@@ -1124,6 +1248,7 @@ class SharedLogicDesktopTest {
     private class TestLoginPreferenceStore : LoginPreferenceStore {
         private var omitted = false
         private var themePreference = ThemePreference.SYSTEM
+        private var authSession: AuthSession? = null
 
         override fun isLoginOmitted(): Boolean = omitted
 
@@ -1135,6 +1260,16 @@ class SharedLogicDesktopTest {
 
         override fun setThemePreference(themePreference: ThemePreference) {
             this.themePreference = themePreference
+        }
+
+        override fun authSession(): AuthSession? = authSession
+
+        override fun setAuthSession(session: AuthSession) {
+            authSession = session
+        }
+
+        override fun clearAuthSession() {
+            authSession = null
         }
     }
 
@@ -1156,6 +1291,14 @@ class SharedLogicDesktopTest {
 
         override fun nowEpochMillis(): Long = now++
         override fun today(): LocalDate = LocalDate.parse("2026-05-25")
+    }
+
+    private fun fixedTimeProvider(isoInstant: String): TimeProvider = object : TimeProvider {
+        private val now = isoStringToEpochMillis(isoInstant)
+        private val today = LocalDate.parse(isoInstant.substring(0, 10))
+
+        override fun nowEpochMillis(): Long = now
+        override fun today(): LocalDate = today
     }
 
     private fun mutableTimeProvider(nowIso: String, today: String): MutableTestTimeProvider =

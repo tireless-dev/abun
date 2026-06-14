@@ -127,6 +127,18 @@ const SCHEMA_STATEMENTS = [
       created_at text not null
     )
   `,
+  `
+    create table if not exists user_session (
+      id text primary key,
+      user_id text not null,
+      refresh_token_hash text not null,
+      refresh_expires_at text not null,
+      revoked_at text,
+      rotated_at text,
+      created_at text not null,
+      updated_at text not null
+    )
+  `,
 ] as const;
 
 export async function bootstrapSchema(client: DbClient): Promise<void> {

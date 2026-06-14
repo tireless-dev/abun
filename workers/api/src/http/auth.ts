@@ -1,4 +1,5 @@
 import type { WorkerEnv } from "../env";
+import type { AuthServiceLike } from "../services/auth-service";
 import { HttpError } from "./errors";
 
 export function isAuthRequired(env: Partial<WorkerEnv>): boolean {
@@ -18,31 +19,16 @@ export function getBearerToken(request: Request): string | null {
   return token && token.length > 0 ? token : null;
 }
 
-export function requireBearerToken(
+export async function resolveUserId(
   request: Request,
   env: Partial<WorkerEnv>,
-): string | null {
-  if (!isAuthRequired(env)) {
-    return null;
-  }
-
-  const token = getBearerToken(request);
-
-  if (token === null) {
-    throw new HttpError(401, "Missing or invalid bearer token");
-  }
-
-  return token;
-}
-
-export function resolveUserId(
-  request: Request,
-  env: Partial<WorkerEnv>,
-): string {
+  authService: AuthServiceLike,
+): Promise<string> {
   const token = getBearerToken(request);
 
   if (token !== null) {
-    return token.startsWith("uid:") ? token.slice(4) : token;
+    const session = await authService.authenticateAccessToken(token);
+    return session.userId;
   }
 
   if (isAuthRequired(env)) {

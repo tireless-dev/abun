@@ -1,5 +1,6 @@
 package dev.tireless.abun
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,13 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.AuthMode
-import dev.tireless.abun.ui.components.AppText
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 internal enum class SyncBadgeState {
@@ -55,12 +55,12 @@ internal fun syncStatusBadge(state: AppUiState): SyncStatusBadge = when {
 @Composable
 internal fun SyncStatusPanel(state: AppUiState) {
     val badge = syncStatusBadge(state)
-    Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         Row {
             SyncBadge(badge)
         }
         badge.detail?.let {
-            AppText(it, style = ThemeTokens.type.bodyMuted)
+            Text(it, style = ThemeTokens.type.bodyMuted)
         }
     }
 }
@@ -78,6 +78,6 @@ private fun SyncBadge(badge: SyncStatusBadge) {
             .background(background, RoundedCornerShape(50))
             .padding(horizontal = ThemeTokens.spacing.smDp, vertical = ThemeTokens.spacing.xsDp),
     ) {
-        AppText(badge.label, style = ThemeTokens.type.label.copy(fontWeight = FontWeight.Bold), color = text)
+        Text(badge.label, style = ThemeTokens.type.label.copy(fontWeight = FontWeight.Bold), color = text)
     }
 }

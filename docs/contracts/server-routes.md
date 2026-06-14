@@ -4,12 +4,20 @@ This document freezes the current HTTP contract served by the Cloudflare Worker 
 
 ## Auth routes
 
-- `POST /api/auth/otp/request`
-  - Accepts an email payload.
+- `POST /auth/request`
+  - Accepts `method` and `email`.
+  - `method` is currently `otp_email`.
   - Returns `204 No Content` after storing or refreshing the OTP.
-- `POST /api/auth/otp/verify`
-  - Accepts email and OTP.
-  - Returns `200 OK` with an access token and user id.
+- `POST /auth/verify`
+  - Accepts `method`, `email`, and `otp`.
+  - Returns `200 OK` with `user_id`, `access_token`, `access_token_expires_at`, `refresh_token`, and `refresh_token_expires_at`.
+- `POST /auth/refresh`
+  - Accepts `refresh_token`.
+  - Returns a rotated refresh token plus a new access token and expiry metadata.
+- `POST /auth/logout`
+  - Accepts the current `refresh_token`.
+  - Optionally uses the current bearer access token to identify the session.
+  - Returns `204 No Content` after revoking the current device session.
 
 Fixture source: `docs/contracts/server-fixtures/auth.json`
 
@@ -27,6 +35,8 @@ Fixture source: `docs/contracts/server-fixtures/auth.json`
 - `POST /api/sync/task-events`
 - `GET /api/sync/pomodoro-sessions`
 - `POST /api/sync/pomodoro-sessions`
+
+All sync and business routes require a valid bearer access JWT.
 
 The frozen contract test covers the task sync push route and asserts the returned `accepted_fields`.
 

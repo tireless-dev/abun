@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { createPassThroughAuthEnv } from "./helpers/auth";
 
 describe("task sync routes", () => {
   it("accepts newer HLC values and rejects older conflicting task updates", async () => {
     const handler = worker as ExportedHandler;
     const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     const firstResponse = await fetchHandler(
       new Request("http://example.com/api/sync/tasks", {
@@ -79,7 +80,7 @@ describe("task sync routes", () => {
   it("lists synced tasks with pull cursor fields", async () => {
     const handler = worker as ExportedHandler;
     const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     await fetchHandler(
       new Request("http://example.com/api/sync/tasks", {

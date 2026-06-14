@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { createPassThroughAuthEnv } from "./helpers/auth";
 
 describe("api worker auth handling", () => {
   it("returns a 401 JSON error for /api/tasks when bearer auth is required", async () => {
@@ -9,7 +10,7 @@ describe("api worker auth handling", () => {
 
     const response = await fetchHandler(
       request as never,
-      { ABUN_REQUIRE_AUTH: "true" } as never,
+      createPassThroughAuthEnv(),
       {} as ExecutionContext,
     );
 
@@ -47,7 +48,7 @@ describe("api worker auth handling", () => {
 
     const response = await fetchHandler(
       request as never,
-      { ABUN_REQUIRE_AUTH: "true" } as never,
+      createPassThroughAuthEnv(),
       {} as ExecutionContext,
     );
 

@@ -3,9 +3,9 @@ import {
   type WorkerEnv,
 } from "../env";
 import { createDbClient } from "../db/client";
+import { bootstrapSchema } from "../db/schema";
 import { resolveAuthService } from "../services/auth-service";
 import {
-  requireBearerToken,
   resolveUserId,
 } from "./auth";
 import { HttpError } from "./errors";
@@ -71,34 +71,69 @@ export async function routeRequest(
     return serveAppAsset(request, env);
   }
 
-  if (method === "POST" && url.pathname === "/api/auth/otp/request") {
+  if (method === "POST" && url.pathname === "/auth/request") {
     const body = await readJsonBody(request);
+    const authMethod = readRequiredString(body, "method");
     const email = readRequiredString(body, "email");
     return withOptionalDbClient(env, async (dbClient) => {
       const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
-      await auth.requestOtp(email);
+      await auth.requestAuth(authMethod, email);
       return new Response(null, { status: 204 });
     });
   }
 
-  if (method === "POST" && url.pathname === "/api/auth/otp/verify") {
+  if (method === "POST" && url.pathname === "/auth/verify") {
     const body = await readJsonBody(request);
+    const authMethod = readRequiredString(body, "method");
     const email = readRequiredString(body, "email");
     const otp = readRequiredString(body, "otp");
     return withOptionalDbClient(env, async (dbClient) => {
       const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
-      const result = await auth.verifyOtp(email, otp);
+      const result = await auth.verifyAuth(authMethod, email, otp);
 
       return json({
         access_token: result.accessToken,
+        access_token_expires_at: result.accessTokenExpiresAt,
+        refresh_token: result.refreshToken,
+        refresh_token_expires_at: result.refreshTokenExpiresAt,
         user_id: result.userId,
       });
     });
   }
 
-  if (url.pathname === "/api/sync/tasks") {
-    const userId = resolveUserId(request, env);
+  if (method === "POST" && url.pathname === "/auth/refresh") {
+    const body = await readJsonBody(request);
+    const refreshToken = readRequiredString(body, "refresh_token");
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const result = await auth.refreshSession(refreshToken);
+
+      return json({
+        access_token: result.accessToken,
+        access_token_expires_at: result.accessTokenExpiresAt,
+        refresh_token: result.refreshToken,
+        refresh_token_expires_at: result.refreshTokenExpiresAt,
+        user_id: result.userId,
+      });
+    });
+  }
+
+  if (method === "POST" && url.pathname === "/auth/logout") {
+    const body = await readJsonBody(request);
+    return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      await auth.logoutSession({
+        accessToken: request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? null,
+        refreshToken: readOptionalString(body, "refresh_token"),
+      });
+      return new Response(null, { status: 204 });
+    });
+  }
+
+  if (url.pathname === "/api/sync/tasks") {
+    return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
 
       if (method === "GET") {
@@ -120,8 +155,9 @@ export async function routeRequest(
   }
 
   if (url.pathname === "/api/sync/preferences") {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const preferences = resolvePreferenceSyncService(env as Record<string, unknown>, dbClient ?? undefined);
 
       if (method === "GET") {
@@ -142,8 +178,9 @@ export async function routeRequest(
   }
 
   if (url.pathname === "/api/sync/routines") {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const routines = resolveRoutineSyncService(env as Record<string, unknown>, dbClient ?? undefined);
 
       if (method === "GET") {
@@ -164,8 +201,9 @@ export async function routeRequest(
   }
 
   if (url.pathname === "/api/sync/alarms") {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
       const alarms = resolveAlarmSyncService(env as Record<string, unknown>, tasks, dbClient ?? undefined);
 
@@ -187,8 +225,9 @@ export async function routeRequest(
   }
 
   if (url.pathname === "/api/sync/task-events") {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
       const taskEvents = resolveTaskEventSyncService(env as Record<string, unknown>, tasks, dbClient ?? undefined);
 
@@ -210,8 +249,9 @@ export async function routeRequest(
   }
 
   if (url.pathname === "/api/sync/pomodoro-sessions") {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
       const sessions = resolvePomodoroSessionSyncService(env as Record<string, unknown>, tasks, dbClient ?? undefined);
 
@@ -233,8 +273,9 @@ export async function routeRequest(
   }
 
   if (url.pathname.startsWith("/api")) {
-    const userId = resolveUserId(request, env);
     return withOptionalDbClient(env, async (dbClient) => {
+      const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+      const userId = await resolveUserId(request, env, auth);
       const tasks = resolveTaskSyncService(env as Record<string, unknown>, dbClient ?? undefined);
       const preferences = resolvePreferenceSyncService(env as Record<string, unknown>, dbClient ?? undefined);
       const routines = resolveRoutineSyncService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -291,6 +332,20 @@ function readRequiredString(
   return value;
 }
 
+function readOptionalString(
+  body: Record<string, unknown>,
+  field: string,
+): string | null {
+  const value = body[field];
+  if (typeof value === "undefined" || value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new HttpError(400, `${field} must be a string`);
+  }
+  return value;
+}
+
 function html(body: string): Response {
   return new Response(body, {
     headers: {
@@ -322,12 +377,28 @@ async function withOptionalDbClient(
 
   const dbClient = await createDbClient(env);
   try {
+    await ensureSchemaReady(dbClient);
     return await block(dbClient);
   } finally {
     if (!env.HYPERDRIVE) {
       await dbClient.end?.();
     }
   }
+}
+
+let schemaBootstrapPromise: Promise<void> | null = null;
+
+async function ensureSchemaReady(
+  dbClient: Awaited<ReturnType<typeof createDbClient>>,
+): Promise<void> {
+  if (schemaBootstrapPromise === null) {
+    schemaBootstrapPromise = bootstrapSchema(dbClient).catch((error) => {
+      schemaBootstrapPromise = null;
+      throw error;
+    });
+  }
+
+  await schemaBootstrapPromise;
 }
 
 async function routeBusinessRequest(

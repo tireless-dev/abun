@@ -8,12 +8,16 @@ interface DatabaseDriverFactory {
     fun createDriver(): SqlDriver
 }
 
-interface AuthProvider {
-    suspend fun bearerToken(): String
-}
+data class AuthSession(
+    val userId: String,
+    val accessToken: String,
+    val accessTokenExpiresAtEpochMillis: Long,
+    val refreshToken: String,
+    val refreshTokenExpiresAtEpochMillis: Long,
+)
 
-interface MutableAuthProvider : AuthProvider {
-    fun updateToken(token: String?)
+interface AccessTokenProvider {
+    suspend fun validAccessToken(forceRefresh: Boolean = false): String
 }
 
 interface DeviceNodeIdProvider {
@@ -35,12 +39,14 @@ interface LoginPreferenceStore {
     fun setLoginOmitted(isOmitted: Boolean)
     fun themePreference(): ThemePreference
     fun setThemePreference(themePreference: ThemePreference)
+    fun authSession(): AuthSession?
+    fun setAuthSession(session: AuthSession)
+    fun clearAuthSession()
 }
 
 data class AppDependencies(
     val databaseDriverFactory: DatabaseDriverFactory,
     val httpClient: HttpClient,
-    val authProvider: AuthProvider,
     val loginPreferenceStore: LoginPreferenceStore,
     val nodeIdProvider: DeviceNodeIdProvider,
     val idGenerator: IdGenerator,
@@ -54,4 +60,15 @@ data class DebugAuthPreset(
     val otp: String,
     val accessToken: String,
     val userId: String,
+    val accessTokenExpiresAtEpochMillis: Long,
+    val refreshToken: String,
+    val refreshTokenExpiresAtEpochMillis: Long,
+)
+
+fun DebugAuthPreset.toAuthSession(): AuthSession = AuthSession(
+    userId = userId,
+    accessToken = accessToken,
+    accessTokenExpiresAtEpochMillis = accessTokenExpiresAtEpochMillis,
+    refreshToken = refreshToken,
+    refreshTokenExpiresAtEpochMillis = refreshTokenExpiresAtEpochMillis,
 )

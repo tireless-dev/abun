@@ -10,6 +10,9 @@ export interface WorkerEnv {
   DB_URL?: string;
   HYPERDRIVE?: HyperdriveBinding;
   ABUN_REQUIRE_AUTH?: string;
+  AUTH_JWT_SECRET?: string;
+  AUTH_ACCESS_TOKEN_TTL_SECONDS?: string;
+  AUTH_REFRESH_TOKEN_TTL_SECONDS?: string;
   ASSETS?: AssetsBinding;
 }
 

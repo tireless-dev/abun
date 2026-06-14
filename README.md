@@ -29,7 +29,9 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, and Desktop 
   - the landing page at `/`
   - the web app at `/app`
   - the mobile placeholder/download page at `/mobile`
-  - the API families at `/api/auth/*`, `/api/sync/*`, and `/api/*`
+  - the auth/session APIs at `/auth/*`
+  - the local-first sync APIs at `/api/sync/*`
+  - the direct business APIs at `/api/*`
 
 ### Running the apps
 

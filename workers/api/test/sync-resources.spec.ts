@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { createPassThroughAuthEnv } from "./helpers/auth";
 
 describe("additional sync resource routes", () => {
   it("syncs preferences per user and returns pull cursor payloads", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     const pushResponse = await fetchHandler(
       new Request("http://example.com/api/sync/preferences", {
@@ -86,7 +87,7 @@ describe("additional sync resource routes", () => {
 
   it("syncs routines and alarms after the parent task exists", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     await pushTask(fetchHandler, env, "user-1", "task-1");
 
@@ -174,7 +175,7 @@ describe("additional sync resource routes", () => {
 
   it("keeps task events append-only and rejects duplicate event ids", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     await pushTask(fetchHandler, env, "user-1", "task-events-1");
 
@@ -271,7 +272,7 @@ describe("additional sync resource routes", () => {
 
   it("syncs pomodoro sessions and preserves field-level conflict decisions", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     await pushTask(fetchHandler, env, "user-1", "task-session-1");
 

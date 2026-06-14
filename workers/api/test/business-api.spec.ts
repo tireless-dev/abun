@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { createPassThroughAuthEnv } from "./helpers/auth";
 
 describe("business api routes", () => {
   it("supports the mutable resource flow and sync visibility", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     const routineResponse = await fetchHandler(
       jsonRequest("http://example.com/api/routines", "user-1", {
@@ -204,7 +205,7 @@ describe("business api routes", () => {
 
   it("keeps task events append-only and exposes task status and journal views", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     await fetchHandler(
       jsonRequest("http://example.com/api/tasks", "user-1", {
@@ -357,7 +358,7 @@ describe("business api routes", () => {
 
   it("returns not found and bad request responses like the Ktor server", async () => {
     const fetchHandler = getFetchHandler();
-    const env = { ABUN_REQUIRE_AUTH: "true" } as never;
+    const env = createPassThroughAuthEnv();
 
     const badAlarm = await fetchHandler(
       jsonRequest("http://example.com/api/alarms", "user-1", {
