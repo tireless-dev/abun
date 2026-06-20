@@ -5,6 +5,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppDependencies
+import dev.tireless.abun.app.AppLogger
 import dev.tireless.abun.app.AppJson
 import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AuthMode
@@ -81,7 +82,10 @@ class SharedLogicDesktopTest {
         assertFalse(controller.state.value.syncState.syncReady)
 
         controller.verifyEmailOtp("424242")
-        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+        waitFor {
+            controller.state.value.auth.mode == AuthMode.AUTHENTICATED &&
+                controller.state.value.syncState.lastSyncedAt != null
+        }
 
         assertFalse(controller.state.value.auth.showGuide)
         assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
@@ -1000,6 +1004,138 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `sync operations emit structured logs for pull and push boundaries`() = runTest {
+        val store = testStore()
+        val logger = RecordingAppLogger()
+        store.createTask("Offline task", "2026-05-25")
+        val client = HttpClient(
+            MockEngine { request ->
+                val body = when (request.url.encodedPath) {
+                    "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                    "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                    "/api/sync/tasks" -> if (request.method.value == "GET") {
+                        AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                    } else {
+                        AppJson.encodeToString(BatchRequest(store.dirtyTasks().map {
+                            it.copy(
+                                acceptedFields = it.dirtyFields,
+                                rejectedFields = emptyList(),
+                                serverVersion = 1,
+                                serverUpdatedAt = "2026-05-25T10:00:00Z",
+                                createdAt = "2026-05-25T09:00:00Z",
+                            )
+                        }))
+                    }
+                    "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                    "/api/sync/task-events" -> if (request.method.value == "GET") {
+                        AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                    } else {
+                        AppJson.encodeToString(BatchRequest(store.dirtyTaskEvents().map {
+                            it.copy(
+                                accepted = true,
+                                serverVersion = 2,
+                                serverUpdatedAt = "2026-05-25T10:00:00Z",
+                                createdAt = "2026-05-25T09:00:00Z",
+                            )
+                        }))
+                    }
+                    "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                    else -> error("Unexpected path ${request.url.encodedPath}")
+                }
+                respond(
+                    content = body,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                )
+            },
+        ) {
+            install(ContentNegotiation) { json(AppJson) }
+        }
+
+        SyncEngine(
+            localStore = store,
+            remoteApi = SyncRemoteApi(
+                baseUrl = "http://localhost:8080",
+                client = client,
+                accessTokenProvider = object : dev.tireless.abun.app.AccessTokenProvider {
+                    override suspend fun validAccessToken(forceRefresh: Boolean): String = "demo-user"
+                },
+                logger = logger,
+            ),
+            logger = logger,
+        ).syncNow()
+
+        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.started" })
+        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.pull.started" && it.context["scope"] == "tasks" })
+        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.push.started" && it.context["scope"] == "tasks" && it.context["itemCount"] == "1" })
+        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.completed" })
+    }
+
+    @Test
+    fun `controller shows readable scoped sync error when task push fails`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "persisted-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
+                    refreshToken = "persisted-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+                ),
+            )
+        }
+        var taskPushAttempted = false
+        val controller = AbunAppController.create(
+            AppDependencies(
+                databaseDriverFactory = testDatabaseDriverFactory(),
+                httpClient = HttpClient(
+                    MockEngine { request ->
+                        val body = when (request.url.encodedPath) {
+                            "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/tasks" -> if (request.method.value == "GET") {
+                                AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                            } else {
+                                taskPushAttempted = true
+                                """{"message":"Internal server error"}"""
+                            }
+                            "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                            else -> error("Unexpected path ${request.url.encodedPath}")
+                        }
+                        respond(
+                            content = body,
+                            status = if (request.url.encodedPath == "/api/sync/tasks" && request.method.value == "POST") HttpStatusCode.InternalServerError else HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                ) {
+                    install(ContentNegotiation) { json(AppJson) }
+                },
+                loginPreferenceStore = loginPreferenceStore,
+                nodeIdProvider = object : DeviceNodeIdProvider {
+                    override fun nodeId(): String = "test-device"
+                },
+                idGenerator = testIdGenerator(),
+                timeProvider = testTimeProvider(),
+                serverBaseUrl = "http://localhost:8080",
+            ),
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
+        controller.createTask("Offline task")
+
+        waitFor {
+            taskPushAttempted &&
+                !controller.state.value.syncState.isSyncing &&
+                controller.state.value.syncState.errorMessage == "Sync failed while pushing tasks: server error (500)."
+        }
+
+        assertTrue(taskPushAttempted)
+    }
+
+    @Test
     fun `verify email otp authenticates and marks sync ready`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore()
         val controller = AbunAppController.create(
@@ -1075,6 +1211,171 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `debug preset otp verification exchanges real server session instead of persisting debug tokens`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val requests = mutableListOf<String>()
+        val controller = AbunAppController.create(
+            AppDependencies(
+                databaseDriverFactory = inMemoryDriverFactory(),
+                httpClient = HttpClient(
+                    MockEngine { request ->
+                        requests += "${request.method.value} ${request.url.encodedPath}"
+                        val body = when (request.url.encodedPath) {
+                            "/auth/request" -> ""
+                            "/auth/verify" -> AppJson.encodeToString(
+                                dev.tireless.abun.app.AuthSessionResponse(
+                                    accessToken = "access-1",
+                                    accessTokenExpiresAt = "2030-01-01T00:15:00Z",
+                                    refreshToken = "refresh-1",
+                                    refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+                                    userId = TestSharedAccount.USER_ID,
+                                ),
+                            )
+                            "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                            else -> error("Unexpected path ${request.url.encodedPath}")
+                        }
+                        respond(
+                            content = body,
+                            status = if (request.url.encodedPath == "/auth/request") HttpStatusCode.NoContent else HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                ) {
+                    install(ContentNegotiation) { json(AppJson) }
+                },
+                loginPreferenceStore = loginPreferenceStore,
+                nodeIdProvider = object : DeviceNodeIdProvider {
+                    override fun nodeId(): String = "test-device"
+                },
+                idGenerator = testIdGenerator(),
+                timeProvider = testTimeProvider(),
+                serverBaseUrl = "http://localhost:8080",
+                debugAuthPreset = DebugAuthPreset(
+                    email = TestSharedAccount.EMAIL,
+                    otp = TestSharedAccount.OTP,
+                    accessToken = "debug-access-token",
+                    userId = "debug-user",
+                    accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                    refreshToken = "debug-refresh-token",
+                    refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                ),
+            ),
+        )
+
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+        waitFor { loginPreferenceStore.authSession()?.accessToken == "access-1" }
+
+        assertTrue(requests.contains("POST /auth/request"))
+        assertTrue(requests.contains("POST /auth/verify"))
+        assertEquals(
+            AuthSession(
+                userId = TestSharedAccount.USER_ID,
+                accessToken = "access-1",
+                accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
+                refreshToken = "refresh-1",
+                refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+            ),
+            loginPreferenceStore.authSession(),
+        )
+    }
+
+    @Test
+    fun `debug preset login exchanges a real session before sync is enabled`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setLoginOmitted(true)
+        }
+        val requests = mutableListOf<String>()
+        val controller = testController(
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+            debugAuthPreset = DebugAuthPreset(
+                email = TestSharedAccount.EMAIL,
+                otp = TestSharedAccount.OTP,
+                accessToken = "debug-access-token",
+                userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+            ),
+            authVerifyResponse = dev.tireless.abun.app.AuthSessionResponse(
+                accessToken = "verified-access",
+                accessTokenExpiresAt = "2030-01-01T00:15:00Z",
+                refreshToken = "verified-refresh",
+                refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+                userId = TestSharedAccount.USER_ID,
+            ),
+        )
+
+        assertFalse(controller.state.value.syncState.syncReady)
+
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+
+        waitFor { controller.state.value.syncState.lastSyncedAt != null }
+
+        val authRequestIndex = requests.indexOf("POST /auth/request")
+        val authVerifyIndex = requests.indexOf("POST /auth/verify")
+        val firstSyncRequestIndex = requests.indexOfFirst { it.startsWith("GET /api/sync/") }
+
+        assertTrue(authRequestIndex >= 0)
+        assertTrue(authVerifyIndex > authRequestIndex)
+        assertTrue(firstSyncRequestIndex > authVerifyIndex)
+        assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
+        assertFalse(controller.state.value.auth.showGuide)
+        assertNull(controller.state.value.auth.errorMessage)
+        assertTrue(controller.state.value.syncState.syncReady)
+        assertFalse(loginPreferenceStore.isLoginOmitted())
+        assertEquals("verified-refresh", loginPreferenceStore.authSession()?.refreshToken)
+    }
+
+    @Test
+    fun `legacy debug session is cleared on startup instead of attempting sync refresh`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "debug-user",
+                    accessToken = "debug-access-token",
+                    accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                    refreshToken = "debug-refresh-token",
+                    refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                ),
+            )
+        }
+        val requests = mutableListOf<String>()
+
+        val controller = testController(
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+            debugAuthPreset = DebugAuthPreset(
+                email = TestSharedAccount.EMAIL,
+                otp = TestSharedAccount.OTP,
+                accessToken = "debug-access-token",
+                userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+            ),
+            authRefreshResponse = dev.tireless.abun.app.AuthSessionResponse(
+                accessToken = "unused",
+                accessTokenExpiresAt = "2030-01-01T00:20:00Z",
+                refreshToken = "unused",
+                refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+                userId = "debug-user",
+            ),
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.GUEST }
+
+        assertNull(loginPreferenceStore.authSession())
+        assertTrue(requests.none { it == "POST /auth/refresh" })
+        assertFalse(controller.state.value.syncState.syncReady)
+    }
+
+    @Test
     fun `controller restores authenticated session from local store when access token is still valid`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore().apply {
             setAuthSession(
@@ -1137,6 +1438,65 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `invalid refresh token returns guest mode with readable auth error`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "expired-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2029-12-31T23:00:00Z"),
+                    refreshToken = "revoked-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
+                ),
+            )
+        }
+        val requests = mutableListOf<String>()
+        val controller = AbunAppController.create(
+            AppDependencies(
+                databaseDriverFactory = testDatabaseDriverFactory(),
+                httpClient = HttpClient(
+                    MockEngine { request ->
+                        requests += "${request.method.value} ${request.url.encodedPath}"
+                        val body = when (request.url.encodedPath) {
+                            "/auth/refresh" -> """{"message":"Refresh token revoked"}"""
+                            "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                            "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                            else -> error("Unexpected path ${request.url.encodedPath}")
+                        }
+                        respond(
+                            content = body,
+                            status = if (request.url.encodedPath == "/auth/refresh") HttpStatusCode.Unauthorized else HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                ) {
+                    install(ContentNegotiation) { json(AppJson) }
+                },
+                loginPreferenceStore = loginPreferenceStore,
+                nodeIdProvider = object : DeviceNodeIdProvider {
+                    override fun nodeId(): String = "test-device"
+                },
+                idGenerator = testIdGenerator(),
+                timeProvider = fixedTimeProvider("2030-01-01T00:00:00Z"),
+                serverBaseUrl = "http://localhost:8080",
+            ),
+        )
+
+        waitFor { controller.state.value.auth.errorMessage != null }
+
+        assertTrue(requests.contains("POST /auth/refresh"))
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+        assertTrue(controller.state.value.auth.showGuide)
+        assertEquals("Your session expired. Please log in again.", controller.state.value.auth.errorMessage)
+        assertFalse(controller.state.value.syncState.syncReady)
+        assertNull(loginPreferenceStore.authSession())
+    }
+
+    @Test
     fun `logout clears persisted auth session and returns to login guide`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore().apply {
             setAuthSession(
@@ -1188,6 +1548,13 @@ class SharedLogicDesktopTest {
         databaseDriverFactory: DatabaseDriverFactory = testDatabaseDriverFactory(),
         loginPreferenceStore: LoginPreferenceStore = TestLoginPreferenceStore(),
         requestLog: MutableList<String>? = null,
+        authVerifyResponse: dev.tireless.abun.app.AuthSessionResponse = dev.tireless.abun.app.AuthSessionResponse(
+            accessToken = "verified-access",
+            accessTokenExpiresAt = "2030-01-01T00:15:00Z",
+            refreshToken = "verified-refresh",
+            refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+            userId = TestSharedAccount.USER_ID,
+        ),
         authRefreshResponse: dev.tireless.abun.app.AuthSessionResponse = dev.tireless.abun.app.AuthSessionResponse(
             accessToken = "refreshed-access",
             accessTokenExpiresAt = "2030-01-01T00:20:00Z",
@@ -1202,6 +1569,8 @@ class SharedLogicDesktopTest {
                 MockEngine { request ->
                     requestLog?.add("${request.method.value} ${request.url.encodedPath}")
                     val body = when (request.url.encodedPath) {
+                        "/auth/request" -> ""
+                        "/auth/verify" -> AppJson.encodeToString(authVerifyResponse)
                         "/auth/refresh" -> AppJson.encodeToString(authRefreshResponse)
                         "/auth/logout" -> ""
                         "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
@@ -1214,7 +1583,12 @@ class SharedLogicDesktopTest {
                     }
                     respond(
                         content = body,
-                        status = HttpStatusCode.OK,
+                        status = when (request.url.encodedPath) {
+                            "/auth/request",
+                            "/auth/logout",
+                            -> HttpStatusCode.NoContent
+                            else -> HttpStatusCode.OK
+                        },
                         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                     )
                 },
@@ -1272,6 +1646,28 @@ class SharedLogicDesktopTest {
             authSession = null
         }
     }
+
+    private class RecordingAppLogger : AppLogger {
+        val entries = mutableListOf<LogEntry>()
+
+        override fun info(message: String, context: Map<String, String>) {
+            entries += LogEntry("INFO", message, context)
+        }
+
+        override fun error(message: String, context: Map<String, String>, throwable: Throwable?) {
+            entries += LogEntry(
+                level = "ERROR",
+                message = message,
+                context = context + mapOf("throwable" to (throwable?.message ?: "")),
+            )
+        }
+    }
+
+    private data class LogEntry(
+        val level: String,
+        val message: String,
+        val context: Map<String, String>,
+    )
 
     private suspend fun waitFor(
         timeoutMillis: Long = 2_000,

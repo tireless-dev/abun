@@ -16,6 +16,7 @@ class AbunAppController(
     private val timeProvider = dependencies.timeProvider
     private val debugAuthPreset = dependencies.debugAuthPreset
     private val loginPreferenceStore = dependencies.loginPreferenceStore
+    private val logger = dependencies.logger
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authRemoteApi = AuthRemoteApi(
         baseUrl = dependencies.serverBaseUrl,
@@ -25,6 +26,7 @@ class AbunAppController(
         loginPreferenceStore = loginPreferenceStore,
         authRemoteApi = authRemoteApi,
         timeProvider = dependencies.timeProvider,
+        logger = logger,
     )
     private val store = LocalStore(
         database = createDatabase(dependencies.databaseDriverFactory),
@@ -36,10 +38,12 @@ class AbunAppController(
         baseUrl = dependencies.serverBaseUrl,
         client = dependencies.httpClient,
         accessTokenProvider = authSessionManager,
+        logger = logger,
     )
     private val syncEngine = SyncEngine(
         localStore = store,
         remoteApi = remoteApi,
+        logger = logger,
     )
 
     private val _state = MutableStateFlow(
@@ -99,6 +103,7 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email is required"))
             return
         }
+        logger.info(message = "auth.otp.requested", context = mapOf("email" to email))
         debugAuthPreset
             ?.takeIf { email == it.email.trim() }
             ?.let {
@@ -130,11 +135,25 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email and OTP are required"))
             return
         }
+        logger.info(message = "auth.otp.verification.started", context = mapOf("email" to email))
         debugAuthPreset
             ?.takeIf { email == it.email.trim() && code.trim() == it.otp.trim() }
             ?.let {
                 scope.launch {
-                    completeLogin(it.toAuthSession())
+                    _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
+                    runCatching {
+                        authRemoteApi.requestOtp(email)
+                        authRemoteApi.verifyOtp(email, code)
+                    }.onSuccess { response ->
+                        completeLogin(response.toAuthSession())
+                    }.onFailure { error ->
+                        _state.value = _state.value.copy(
+                            auth = _state.value.auth.copy(
+                                isSubmitting = false,
+                                errorMessage = error.message ?: "OTP verification failed",
+                            ),
+                        )
+                    }
                 }
                 return
             }
@@ -193,6 +212,13 @@ class AbunAppController(
     ) {
         val preparedTitle = applyTaskDefaults(title)
         if (preparedTitle == null) return
+        logger.info(
+            message = "task.create.started",
+            context = mapOf(
+                "selectedDate" to state.value.selectedDate,
+                "hasSchedule" to (startNotBefore != null || endNotAfter != null).toString(),
+            ),
+        )
         store.createTask(
             title = preparedTitle,
             journalDate = state.value.selectedDate,
@@ -429,6 +455,13 @@ class AbunAppController(
             _state.value = _state.value.copy(syncState = _state.value.syncState.copy(isSyncing = false, syncReady = true))
             return
         }
+        logger.info(
+            message = "sync.requested",
+            context = mapOf(
+                "immediate" to immediate.toString(),
+                "isSyncing" to isSyncing.toString(),
+            ),
+        )
         if (isSyncing) {
             syncRequestedWhileRunning = true
             return
@@ -455,13 +488,16 @@ class AbunAppController(
                 runCatching {
                     syncEngine.syncNow()
                 }.onSuccess {
+                    logger.info(message = "sync.loop.completed")
                     refresh(lastSyncedAt = timeProvider.nowEpochMillis().let(::epochMillisToIsoString))
                 }.onFailure {
                     if (it is AuthSessionExpiredException) {
-                        transitionToGuest(showGuide = true)
+                        logger.error(message = "sync.loop.auth_expired", throwable = it)
+                        transitionToGuest(showGuide = true, authError = it.message)
                     } else {
+                        logger.error(message = "sync.loop.failed", throwable = it)
                         _state.value = _state.value.copy(
-                            syncState = _state.value.syncState.copy(isSyncing = false, errorMessage = it.message ?: "Sync failed"),
+                            syncState = _state.value.syncState.copy(isSyncing = false, errorMessage = it.toReadableSyncMessage()),
                         )
                     }
                 }
@@ -515,13 +551,20 @@ class AbunAppController(
                 otpRequested = false,
                 errorMessage = null,
             ),
-            syncState = _state.value.syncState.copy(syncReady = true),
+            syncState = _state.value.syncState.copy(syncReady = true, errorMessage = null),
         )
         requestSync(immediate = true)
     }
 
     private suspend fun restoreSessionOnStartup() {
-        val restored = authSessionManager.restoreSession()
+        val restored = runCatching { authSessionManager.restoreSession() }
+            .getOrElse { error ->
+                if (error is AuthSessionExpiredException) {
+                    transitionToGuest(showGuide = true, authError = error.message)
+                    return
+                }
+                throw error
+            }
         if (restored != null) {
             _state.value = _state.value.copy(
                 auth = _state.value.auth.copy(
@@ -529,7 +572,7 @@ class AbunAppController(
                     mode = AuthMode.AUTHENTICATED,
                     errorMessage = null,
                 ),
-                syncState = _state.value.syncState.copy(syncReady = true),
+                syncState = _state.value.syncState.copy(syncReady = true, errorMessage = null),
             )
             requestSync(immediate = true)
             return
@@ -542,7 +585,7 @@ class AbunAppController(
         transitionToGuest(showGuide = true)
     }
 
-    private fun transitionToGuest(showGuide: Boolean) {
+    private fun transitionToGuest(showGuide: Boolean, authError: String? = null) {
         loginPreferenceStore.setLoginOmitted(false)
         _state.value = _state.value.copy(
             auth = _state.value.auth.copy(
@@ -552,9 +595,9 @@ class AbunAppController(
                 prefilledOtp = debugAuthPreset?.otp.orEmpty(),
                 debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
                 isSubmitting = false,
-                errorMessage = null,
+                errorMessage = authError,
             ),
-            syncState = _state.value.syncState.copy(syncReady = false, isSyncing = false),
+            syncState = _state.value.syncState.copy(syncReady = false, isSyncing = false, errorMessage = null),
         )
     }
 
@@ -588,6 +631,31 @@ class AbunAppController(
         val now = timeProvider.nowEpochMillis()
         return storedSession.accessTokenExpiresAtEpochMillis > now
     }
+}
+
+private fun Throwable.toReadableSyncMessage(): String = when (this) {
+    is SyncOperationException -> {
+        val scopeLabel = when (scope) {
+            SyncScope.PREFERENCES -> "preferences"
+            SyncScope.ROUTINES -> "routines"
+            SyncScope.TASKS -> "tasks"
+            SyncScope.ALARMS -> "alarms"
+            SyncScope.TASK_EVENTS -> "task events"
+            SyncScope.POMODORO_SESSIONS -> "pomodoro sessions"
+        }
+        "Sync failed while $action $scopeLabel: ${cause.toReadableSyncCause()}."
+    }
+    else -> message ?: "Sync failed"
+}
+
+private fun Throwable?.toReadableSyncCause(): String = when (this) {
+    is RemoteApiException -> when {
+        message.equals("Internal server error", ignoreCase = true) -> "server error ($statusCode)"
+        message.isBlank() -> "request failed ($statusCode)"
+        else -> message
+    }
+    null -> "unknown error"
+    else -> message ?: "unknown error"
 }
 
 private fun AlarmListItemView.toAgendaItem(task: TaskListItemView): AgendaTaskItemView = AgendaTaskItemView(
