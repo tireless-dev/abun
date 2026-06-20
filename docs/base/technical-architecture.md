@@ -28,7 +28,8 @@ The client is responsible for:
 - persisting module data in SQLite
 - persisting local-only runtime preferences such as login-guide omission, device theme preference, and the current per-device auth session in platform preference storage when the state must survive app restarts without syncing to the server
 - tracking dirty state for synced resources
-- restoring a persisted auth session on startup, silently refreshing it when only the access token is stale, and falling back to guest mode when the refresh session is no longer usable
+- treating the shared auth/session controller and session manager as the source of truth for login, startup restore, refresh, logout, and guest fallback behavior across Desktop and Android
+- restoring a persisted auth session on startup, silently refreshing it when only the access token is stale, falling back to guest mode when the refresh session is no longer usable, clearing legacy debug-placeholder sessions instead of treating them as real sync credentials, and surfacing a readable re-login message in shared app state when a revoked or invalid refresh token forces sign-out
 - running pull-then-push sync cycles
 
 ### Backend
@@ -60,6 +61,8 @@ Current auth/session endpoints:
 - `POST /auth/logout`
 
 OTP email is the only supported auth method today, but it is carried behind the generic auth contract with `method = "otp_email"`.
+
+Debug login presets may prefill the shared test-account email and OTP in development builds, but they must still exchange a real server session before sync begins rather than persisting placeholder refresh tokens. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and then enters the normal shared sync path.
 
 ## Resource Categories
 

@@ -81,10 +81,14 @@ Current Kotlin clients call these routes through [SyncRemoteApi.kt](/Users/jerry
 Sync and direct business calls now have an auth precondition:
 
 - `/api/sync/*` and `/api/*` require a valid access JWT
+- shared auth/session logic is the source of truth for login, restore, refresh, logout, and sync gating before these requests run
 - the client must obtain a guaranteed-valid access token before each sync/API request
 - the client should refresh proactively shortly before access-token expiry
 - one defensive retry is allowed for unexpected `401` responses caused by drift or server-side revocation
-- if refresh fails or the session is revoked, the client clears the local auth session, returns to guest mode, and keeps local SQLite data available for later re-sync after login
+- debug OTP shortcuts may prefill credentials in development, but they must still complete a real `/auth/request` plus `/auth/verify` exchange before the first sync cycle starts
+- if refresh fails or the session is revoked, the client clears the local auth session, returns to guest mode, disables sync readiness, keeps local SQLite data available for later re-sync after login, and exposes a readable re-login message through shared app state
+
+This guest fallback is an auth-state transition only. It does not delete local task data or reset local SQLite state.
 
 ### Business APIs
 
@@ -110,5 +114,6 @@ The current codebase already includes:
 - local schema and sync cursors in [AbunDatabase.sq](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/sqldelight/dev/tireless/abun/db/AbunDatabase.sq)
 - Worker-hosted sync and business APIs for multiple resources
 - persisted per-device auth sessions plus shared token-refresh handling in the client auth/session manager
+- additive Worker schema bootstrap steps for evolved sync columns so already-provisioned databases can accept newer task and routine payloads without a manual reset
 
 This document is intentionally shorter than the retired sync spec. Module-specific sync details should live in the relevant module technical design when they carry domain meaning.
