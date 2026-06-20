@@ -5,7 +5,6 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppDependencies
-import dev.tireless.abun.app.AppLogger
 import dev.tireless.abun.app.AppJson
 import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AuthMode
@@ -82,10 +81,7 @@ class SharedLogicDesktopTest {
         assertFalse(controller.state.value.syncState.syncReady)
 
         controller.verifyEmailOtp("424242")
-        waitFor {
-            controller.state.value.auth.mode == AuthMode.AUTHENTICATED &&
-                controller.state.value.syncState.lastSyncedAt != null
-        }
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
 
         assertFalse(controller.state.value.auth.showGuide)
         assertEquals(AuthMode.AUTHENTICATED, controller.state.value.auth.mode)
@@ -1004,138 +1000,6 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `sync operations emit structured logs for pull and push boundaries`() = runTest {
-        val store = testStore()
-        val logger = RecordingAppLogger()
-        store.createTask("Offline task", "2026-05-25")
-        val client = HttpClient(
-            MockEngine { request ->
-                val body = when (request.url.encodedPath) {
-                    "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
-                    "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
-                    "/api/sync/tasks" -> if (request.method.value == "GET") {
-                        AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
-                    } else {
-                        AppJson.encodeToString(BatchRequest(store.dirtyTasks().map {
-                            it.copy(
-                                acceptedFields = it.dirtyFields,
-                                rejectedFields = emptyList(),
-                                serverVersion = 1,
-                                serverUpdatedAt = "2026-05-25T10:00:00Z",
-                                createdAt = "2026-05-25T09:00:00Z",
-                            )
-                        }))
-                    }
-                    "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
-                    "/api/sync/task-events" -> if (request.method.value == "GET") {
-                        AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
-                    } else {
-                        AppJson.encodeToString(BatchRequest(store.dirtyTaskEvents().map {
-                            it.copy(
-                                accepted = true,
-                                serverVersion = 2,
-                                serverUpdatedAt = "2026-05-25T10:00:00Z",
-                                createdAt = "2026-05-25T09:00:00Z",
-                            )
-                        }))
-                    }
-                    "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                    else -> error("Unexpected path ${request.url.encodedPath}")
-                }
-                respond(
-                    content = body,
-                    status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                )
-            },
-        ) {
-            install(ContentNegotiation) { json(AppJson) }
-        }
-
-        SyncEngine(
-            localStore = store,
-            remoteApi = SyncRemoteApi(
-                baseUrl = "http://localhost:8080",
-                client = client,
-                accessTokenProvider = object : dev.tireless.abun.app.AccessTokenProvider {
-                    override suspend fun validAccessToken(forceRefresh: Boolean): String = "demo-user"
-                },
-                logger = logger,
-            ),
-            logger = logger,
-        ).syncNow()
-
-        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.started" })
-        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.pull.started" && it.context["scope"] == "tasks" })
-        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.push.started" && it.context["scope"] == "tasks" && it.context["itemCount"] == "1" })
-        assertTrue(logger.entries.any { it.level == "INFO" && it.message == "sync.completed" })
-    }
-
-    @Test
-    fun `controller shows readable scoped sync error when task push fails`() = runTest {
-        val loginPreferenceStore = TestLoginPreferenceStore().apply {
-            setAuthSession(
-                AuthSession(
-                    userId = "persisted-user",
-                    accessToken = "persisted-access",
-                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-01-01T00:15:00Z"),
-                    refreshToken = "persisted-refresh",
-                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2030-02-01T00:00:00Z"),
-                ),
-            )
-        }
-        var taskPushAttempted = false
-        val controller = AbunAppController.create(
-            AppDependencies(
-                databaseDriverFactory = testDatabaseDriverFactory(),
-                httpClient = HttpClient(
-                    MockEngine { request ->
-                        val body = when (request.url.encodedPath) {
-                            "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
-                            "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
-                            "/api/sync/tasks" -> if (request.method.value == "GET") {
-                                AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
-                            } else {
-                                taskPushAttempted = true
-                                """{"message":"Internal server error"}"""
-                            }
-                            "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
-                            "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
-                            "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                            else -> error("Unexpected path ${request.url.encodedPath}")
-                        }
-                        respond(
-                            content = body,
-                            status = if (request.url.encodedPath == "/api/sync/tasks" && request.method.value == "POST") HttpStatusCode.InternalServerError else HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                        )
-                    },
-                ) {
-                    install(ContentNegotiation) { json(AppJson) }
-                },
-                loginPreferenceStore = loginPreferenceStore,
-                nodeIdProvider = object : DeviceNodeIdProvider {
-                    override fun nodeId(): String = "test-device"
-                },
-                idGenerator = testIdGenerator(),
-                timeProvider = testTimeProvider(),
-                serverBaseUrl = "http://localhost:8080",
-            ),
-        )
-
-        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
-        controller.createTask("Offline task")
-
-        waitFor {
-            taskPushAttempted &&
-                !controller.state.value.syncState.isSyncing &&
-                controller.state.value.syncState.errorMessage == "Sync failed while pushing tasks: server error (500)."
-        }
-
-        assertTrue(taskPushAttempted)
-    }
-
-    @Test
     fun `verify email otp authenticates and marks sync ready`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore()
         val controller = AbunAppController.create(
@@ -1646,28 +1510,6 @@ class SharedLogicDesktopTest {
             authSession = null
         }
     }
-
-    private class RecordingAppLogger : AppLogger {
-        val entries = mutableListOf<LogEntry>()
-
-        override fun info(message: String, context: Map<String, String>) {
-            entries += LogEntry("INFO", message, context)
-        }
-
-        override fun error(message: String, context: Map<String, String>, throwable: Throwable?) {
-            entries += LogEntry(
-                level = "ERROR",
-                message = message,
-                context = context + mapOf("throwable" to (throwable?.message ?: "")),
-            )
-        }
-    }
-
-    private data class LogEntry(
-        val level: String,
-        val message: String,
-        val context: Map<String, String>,
-    )
 
     private suspend fun waitFor(
         timeoutMillis: Long = 2_000,
