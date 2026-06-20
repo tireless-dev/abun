@@ -120,6 +120,29 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `reopen login from settings preserves shared debug convenience but stays guest`() = runTest {
+        val controller = testController(
+            debugAuthPreset = DebugAuthPreset(
+                email = TestSharedAccount.EMAIL,
+                otp = TestSharedAccount.OTP,
+                accessToken = "debug-access-token",
+                userId = "debug-user",
+                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                refreshToken = "debug-refresh-token",
+                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+            ),
+        )
+
+        controller.skipLogin()
+        controller.reopenLogin()
+
+        assertTrue(controller.state.value.auth.showGuide)
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+        assertEquals(TestSharedAccount.EMAIL, controller.state.value.auth.email)
+        assertEquals(TestSharedAccount.OTP, controller.state.value.auth.prefilledOtp)
+    }
+
+    @Test
     fun `successful login clears stored omission`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore()
         val controller = testController(
@@ -1299,6 +1322,34 @@ class SharedLogicDesktopTest {
 
         assertTrue(requests.contains("POST /auth/refresh"))
         assertEquals("refreshed-refresh", loginPreferenceStore.authSession()?.refreshToken)
+    }
+
+    @Test
+    fun `expired restore clears persisted session and keeps guest mode readable`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "expired-access",
+                    accessTokenExpiresAtEpochMillis = isoStringToEpochMillis("2029-12-31T23:00:00Z"),
+                    refreshToken = "expired-refresh",
+                    refreshTokenExpiresAtEpochMillis = isoStringToEpochMillis("2029-12-31T23:30:00Z"),
+                ),
+            )
+        }
+
+        val controller = testController(
+            timeProvider = fixedTimeProvider("2030-01-01T00:00:00Z"),
+            loginPreferenceStore = loginPreferenceStore,
+        )
+
+        waitFor { controller.state.value.auth.errorMessage != null }
+
+        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
+        assertTrue(controller.state.value.auth.showGuide)
+        assertEquals("Your session expired. Please log in again.", controller.state.value.auth.errorMessage)
+        assertFalse(controller.state.value.syncState.syncReady)
+        assertNull(loginPreferenceStore.authSession())
     }
 
     @Test

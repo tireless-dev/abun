@@ -749,7 +749,10 @@ internal fun SettingsScreenContent(
     if (state.auth.mode == AuthMode.GUEST) {
         Panel {
             SectionHeader("Account", "Login")
-            Text("Login anytime to enable cloud sync on this device.", style = ThemeTokens.type.bodyMuted)
+            Text(
+                state.auth.errorMessage ?: "Login anytime to enable cloud sync on this device.",
+                style = ThemeTokens.type.bodyMuted,
+            )
             Button(onClick = onReopenLogin) {
                 Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
             }

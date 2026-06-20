@@ -45,6 +45,7 @@ The app writes locally first. Remote persistence is asynchronous and must not be
 - theme preference is a per-device presentation choice and not a synced cross-device preference
 - auth session persistence is a per-device runtime state and not synced product data
 - revoking or expiring a device session should not delete local records; it only removes remote authorization until the user signs in again
+- when a device session expires, the shared auth flow returns the app to guest mode with a readable re-login message rather than silently discarding the session state
 
 ### Status tagging
 

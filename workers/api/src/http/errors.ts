@@ -19,12 +19,17 @@ export function isHttpError(error: unknown): error is HttpError {
 
 export function toErrorResponse(error: unknown): Response {
   if (isHttpError(error)) {
+    console.error("[worker] http_error", {
+      status: error.status,
+      message: error.message,
+    });
     return json(
       { message: error.message },
       { status: error.status },
     );
   }
 
+  console.error("[worker] unhandled_error", error);
   return json(
     { message: "Internal server error" },
     { status: 500 },

@@ -215,6 +215,7 @@ The current codebase already contains:
 - shared task UI built directly from Material 3 primitives in [App.kt](/Users/jerry/Workspace/_tools/abun/app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/App.kt) rather than through reusable shared wrapper components
 - Worker/PostgreSQL APIs and database schema for synced task resources in `workers/api`
 - generic auth/session endpoints at `/auth/*` plus protected task sync/business routes under `/api/*`
+- reviewed on 2026-06-19: task creation still uses the same task-plus-`CREATED`-event sync contract, while the Worker now relies on additive schema bootstrap for newer task columns and the shared client emits structured logs around task creation and sync boundaries for diagnosis
 
 ## Settled Technical Decisions
 

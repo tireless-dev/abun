@@ -122,6 +122,7 @@ class SyncRemoteApi(
     private val baseUrl: String,
     private val client: HttpClient,
     private val accessTokenProvider: AccessTokenProvider,
+    private val logger: AppLogger = DefaultAppLogger,
 ) {
     suspend fun pullPreferences(cursor: Long, limit: Int): PullResponse<SyncPreference> = pull("preferences", cursor, limit)
     suspend fun pullRoutines(cursor: Long, limit: Int): PullResponse<SyncRoutine> = pull("routines", cursor, limit)
@@ -139,6 +140,14 @@ class SyncRemoteApi(
 
     private suspend inline fun <reified T> pull(resource: String, cursor: Long, limit: Int): PullResponse<T> =
         executeAuthorizedRequest {
+            logger.info(
+                message = "sync.remote.pull.request",
+                context = mapOf(
+                    "resource" to resource,
+                    "cursor" to cursor.toString(),
+                    "limit" to limit.toString(),
+                ),
+            )
             expectJson(
                 client.get("$baseUrl/api/sync/$resource?cursor=$cursor&limit=$limit") {
                     authorize(it)
@@ -148,6 +157,13 @@ class SyncRemoteApi(
 
     private suspend inline fun <reified T> push(resource: String, items: List<T>): List<T> =
         executeAuthorizedRequest {
+            logger.info(
+                message = "sync.remote.push.request",
+                context = mapOf(
+                    "resource" to resource,
+                    "itemCount" to items.size.toString(),
+                ),
+            )
             expectJson<BatchRequest<T>>(
                 client.post("$baseUrl/api/sync/$resource") {
                     authorize(it)
@@ -164,8 +180,14 @@ class SyncRemoteApi(
             block(accessTokenProvider.validAccessToken())
         } catch (error: RemoteApiException) {
             if (error.statusCode != HttpStatusCode.Unauthorized.value) {
+                logger.error(
+                    message = "sync.remote.request.failed",
+                    context = mapOf("statusCode" to error.statusCode.toString()),
+                    throwable = error,
+                )
                 throw error
             }
+            logger.info(message = "sync.remote.request.retrying_after_unauthorized")
             block(accessTokenProvider.validAccessToken(forceRefresh = true))
         }
     }

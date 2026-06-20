@@ -52,4 +52,44 @@ class GuideScreenDebugAuthTest {
         onNodeWithText("Login anytime to enable cloud sync on this device.").fetchSemanticsNode()
         onNodeWithText("Open login").fetchSemanticsNode()
     }
+
+    @Test
+    fun `settings shows readable relogin message for guest auth expiry`() = runDesktopComposeUiTest {
+        setContent {
+            SettingsScreenContent(
+                state = screenshotState(
+                    auth = AuthViewState(
+                        showGuide = false,
+                        mode = AuthMode.GUEST,
+                        errorMessage = "Your session expired. Please log in again.",
+                    ),
+                ),
+                onUpdateThemePreference = {},
+                onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                onReopenLogin = {},
+                onLogout = {},
+            )
+        }
+
+        onNodeWithText("Your session expired. Please log in again.").fetchSemanticsNode()
+        onNodeWithText("Open login").fetchSemanticsNode()
+    }
+
+    @Test
+    fun `settings shows signed in session state for authenticated mode`() = runDesktopComposeUiTest {
+        setContent {
+            SettingsScreenContent(
+                state = screenshotState(
+                    auth = AuthViewState(showGuide = false, mode = AuthMode.AUTHENTICATED),
+                ),
+                onUpdateThemePreference = {},
+                onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                onReopenLogin = {},
+                onLogout = {},
+            )
+        }
+
+        onNodeWithText("This device is signed in and can sync with your server account.").fetchSemanticsNode()
+        onNodeWithText("Log out").fetchSemanticsNode()
+    }
 }

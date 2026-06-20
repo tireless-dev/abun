@@ -28,7 +28,7 @@ The client is responsible for:
 - persisting module data in SQLite
 - persisting local-only runtime preferences such as login-guide omission, device theme preference, and the current per-device auth session in platform preference storage when the state must survive app restarts without syncing to the server
 - tracking dirty state for synced resources
-- treating the shared auth/session controller and session manager as the source of truth for login, startup restore, refresh, logout, and guest fallback behavior across Desktop and Android
+- treating the shared auth/session controller and session manager as the source of truth for login, startup restore, refresh, logout, and guest fallback behavior across Android, iOS, and Desktop
 - restoring a persisted auth session on startup, silently refreshing it when only the access token is stale, falling back to guest mode when the refresh session is no longer usable, clearing legacy debug-placeholder sessions instead of treating them as real sync credentials, and surfacing a readable re-login message in shared app state when a revoked or invalid refresh token forces sign-out
 - running pull-then-push sync cycles
 

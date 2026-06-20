@@ -30,6 +30,24 @@ class SharedUICommonTest {
     }
 
     @Test
+    fun `guest preferences keep local only badge when auth needs relogin`() {
+        val badge = syncStatusBadge(
+            AppUiState(
+                selectedDate = "2026-05-30",
+                auth = AuthViewState(
+                    mode = AuthMode.GUEST,
+                    errorMessage = "Your session expired. Please log in again.",
+                ),
+                syncState = SyncStateView(syncReady = false),
+            ),
+        )
+
+        assertEquals(SyncBadgeState.LOCAL_ONLY, badge.state)
+        assertEquals("Local-only", badge.label)
+        assertEquals(null, badge.detail)
+    }
+
+    @Test
     fun `syncing preferences show syncing badge`() {
         val badge = syncStatusBadge(
             AppUiState(

@@ -53,6 +53,7 @@ data class AppDependencies(
     val timeProvider: TimeProvider,
     val serverBaseUrl: String,
     val debugAuthPreset: DebugAuthPreset? = null,
+    val logger: AppLogger = DefaultAppLogger,
 )
 
 data class DebugAuthPreset(

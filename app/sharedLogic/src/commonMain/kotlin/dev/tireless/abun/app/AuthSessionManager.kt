@@ -1,7 +1,7 @@
 package dev.tireless.abun.app
 
 class AuthSessionExpiredException(
-    message: String = "Auth session expired",
+    message: String = "Your session expired. Please log in again.",
     cause: Throwable? = null,
 ) : Exception(message, cause)
 
@@ -37,7 +37,7 @@ class AuthSessionManager(
             session.refreshTokenExpiresAtEpochMillis > now -> refreshSession(session)
             else -> {
                 clearSession()
-                null
+                throw AuthSessionExpiredException()
             }
         }
     }

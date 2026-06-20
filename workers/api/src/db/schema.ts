@@ -52,6 +52,15 @@ const SCHEMA_STATEMENTS = [
     )
   `,
   `
+    alter table routine add column if not exists recurrence_rule text
+  `,
+  `
+    alter table routine add column if not exists default_start_not_before text
+  `,
+  `
+    alter table routine add column if not exists default_estimated_duration text
+  `,
+  `
     create table if not exists task (
       id text primary key,
       user_id text not null,
@@ -68,6 +77,24 @@ const SCHEMA_STATEMENTS = [
       server_updated_at text not null,
       created_at text not null
     )
+  `,
+  `
+    alter table task add column if not exists parent_id text
+  `,
+  `
+    alter table task add column if not exists routine_id text
+  `,
+  `
+    alter table task add column if not exists detail text
+  `,
+  `
+    alter table task add column if not exists start_not_before text
+  `,
+  `
+    alter table task add column if not exists end_not_after text
+  `,
+  `
+    alter table task add column if not exists estimated_duration text
   `,
   `
     create table if not exists alarm (
@@ -98,6 +125,12 @@ const SCHEMA_STATEMENTS = [
       server_updated_at text not null,
       created_at text not null
     )
+  `,
+  `
+    alter table task_event add column if not exists postponed_json text
+  `,
+  `
+    alter table task_event add column if not exists server_updated_at text
   `,
   `
     create table if not exists pomodoro_session (

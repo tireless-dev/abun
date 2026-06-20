@@ -3,6 +3,7 @@ import type { DbClient } from "../../src/db/transaction";
 
 type TableRow = Record<string, unknown>;
 type DatabaseState = Map<string, TableRow[]>;
+type TableSchemaState = Map<string, Set<string>>;
 
 export interface TestDbContext {
   client: DbClient;
@@ -28,6 +29,8 @@ export async function withTestDb<T>(
 function createFakeDbClient(): DbClient {
   let state = new Map<string, TableRow[]>();
   let transactionState: DatabaseState | null = null;
+  let schemas = new Map<string, Set<string>>();
+  let transactionSchemas: TableSchemaState | null = null;
 
   const cloneState = (source: DatabaseState): DatabaseState =>
     new Map(
@@ -37,7 +40,16 @@ function createFakeDbClient(): DbClient {
       ]),
     );
 
+  const cloneSchemas = (source: TableSchemaState): TableSchemaState =>
+    new Map(
+      Array.from(source.entries(), ([tableName, columns]) => [
+        tableName,
+        new Set(columns),
+      ]),
+    );
+
   const activeState = (): DatabaseState => transactionState ?? state;
+  const activeSchemas = (): TableSchemaState => transactionSchemas ?? schemas;
 
   const query: DbClient["query"] = async (sql, values = []) => {
     const normalized = normalizeSql(sql);
@@ -48,6 +60,7 @@ function createFakeDbClient(): DbClient {
       }
 
       transactionState = cloneState(state);
+      transactionSchemas = cloneSchemas(schemas);
       return { rows: [], rowCount: 0 };
     }
 
@@ -57,34 +70,53 @@ function createFakeDbClient(): DbClient {
       }
 
       state = transactionState;
+      schemas = transactionSchemas ?? schemas;
       transactionState = null;
+      transactionSchemas = null;
       return { rows: [], rowCount: 0 };
     }
 
     if (normalized === "rollback") {
       transactionState = null;
+      transactionSchemas = null;
       return { rows: [], rowCount: 0 };
     }
 
     const tables = activeState();
+    const tableSchemas = activeSchemas();
 
     if (normalized.startsWith("drop table if exists ")) {
       const tableName = normalized.slice("drop table if exists ".length).trim();
       tables.delete(tableName);
+      tableSchemas.delete(tableName);
       return { rows: [], rowCount: 0 };
     }
 
     if (normalized.startsWith("create table if not exists ")) {
-      const tableName = readTableName(normalized, "create table if not exists ");
+      const { tableName, columns } = readCreateTableDefinition(normalized, "create table if not exists ");
       if (!tables.has(tableName)) {
         tables.set(tableName, []);
       }
+      tableSchemas.set(tableName, columns);
       return { rows: [], rowCount: 0 };
     }
 
     if (normalized.startsWith("create table ")) {
-      const tableName = readTableName(normalized, "create table ");
+      const { tableName, columns } = readCreateTableDefinition(normalized, "create table ");
       tables.set(tableName, []);
+      tableSchemas.set(tableName, columns);
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (normalized.startsWith("alter table ")) {
+      const match = normalized.match(/^alter table ([a-z0-9_]+) add column if not exists ([a-z0-9_]+) /);
+      if (!match) {
+        throw new Error(`Unsupported alter statement in test DB: ${sql}`);
+      }
+      const [, tableName, columnName] = match;
+      const columns = tableSchemas.get(tableName) ?? new Set<string>();
+      columns.add(columnName);
+      tableSchemas.set(tableName, columns);
       return { rows: [], rowCount: 0 };
     }
 
@@ -110,8 +142,15 @@ function createFakeDbClient(): DbClient {
 
       const [, tableName, columnList] = match;
       const columns = columnList.split(",").map((column) => column.trim());
+      const knownColumns = tableSchemas.get(tableName);
+      if (!knownColumns) {
+        throw new Error(`Unknown table in test DB insert: ${tableName}`);
+      }
       const row: TableRow = {};
       columns.forEach((column, index) => {
+        if (!knownColumns.has(column)) {
+          throw new Error(`Unknown column ${column} for table ${tableName} in test DB`);
+        }
         row[column] = values[index];
       });
 
@@ -140,7 +179,9 @@ function createFakeDbClient(): DbClient {
     query,
     end: async () => {
       transactionState = null;
+      transactionSchemas = null;
       state = new Map();
+      schemas = new Map();
     },
   };
 }
@@ -149,7 +190,7 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-function readTableName(sql: string, prefix: string): string {
+function readCreateTableDefinition(sql: string, prefix: string): { tableName: string; columns: Set<string> } {
   const remainder = sql.slice(prefix.length);
   const tableName = remainder.split(" ", 1)[0];
 
@@ -157,5 +198,17 @@ function readTableName(sql: string, prefix: string): string {
     throw new Error(`Unable to read table name from SQL: ${sql}`);
   }
 
-  return tableName;
+  const body = sql.slice(sql.indexOf("(") + 1, sql.lastIndexOf(")"));
+  const columns = body
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => entry.split(" ", 1)[0])
+    .filter((entry) => entry !== "primary" && entry !== "unique")
+    .reduce<Set<string>>((set, column) => {
+      set.add(column);
+      return set;
+    }, new Set());
+
+  return { tableName, columns };
 }

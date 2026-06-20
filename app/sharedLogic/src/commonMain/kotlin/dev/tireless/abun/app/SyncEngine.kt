@@ -3,8 +3,10 @@ package dev.tireless.abun.app
 class SyncEngine(
     private val localStore: LocalStore,
     private val remoteApi: SyncRemoteApi,
+    private val logger: AppLogger = DefaultAppLogger,
 ) {
     suspend fun syncNow() {
+        logger.info(message = "sync.started")
         pullPreferences()
         pullRoutines()
         pullTasks()
@@ -17,6 +19,7 @@ class SyncEngine(
         pushAlarms()
         pushTaskEvents()
         pushPomodoroSessions()
+        logger.info(message = "sync.completed")
     }
 
     private suspend fun pullPreferences() = pullPaged(SyncScope.PREFERENCES, remoteApi::pullPreferences, localStore::mergeRemotePreferences)
@@ -28,32 +31,50 @@ class SyncEngine(
 
     private suspend fun pushPreferences() {
         val local = localStore.dirtyPreferences()
-        if (local.isNotEmpty()) localStore.mergeRemotePreferences(remoteApi.pushPreferences(local), clearAccepted = true)
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.PREFERENCES.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemotePreferences(runSyncStep("pushing", SyncScope.PREFERENCES) { remoteApi.pushPreferences(local) }, clearAccepted = true)
+        }
     }
 
     private suspend fun pushRoutines() {
         val local = localStore.dirtyRoutines()
-        if (local.isNotEmpty()) localStore.mergeRemoteRoutines(remoteApi.pushRoutines(local), clearAccepted = true)
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.ROUTINES.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteRoutines(runSyncStep("pushing", SyncScope.ROUTINES) { remoteApi.pushRoutines(local) }, clearAccepted = true)
+        }
     }
 
     private suspend fun pushTasks() {
         val local = localStore.dirtyTasks()
-        if (local.isNotEmpty()) localStore.mergeRemoteTasks(remoteApi.pushTasks(local), clearAccepted = true)
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.TASKS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteTasks(runSyncStep("pushing", SyncScope.TASKS) { remoteApi.pushTasks(local) }, clearAccepted = true)
+        }
     }
 
     private suspend fun pushAlarms() {
         val local = localStore.dirtyAlarms()
-        if (local.isNotEmpty()) localStore.mergeRemoteAlarms(remoteApi.pushAlarms(local), clearAccepted = true)
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.ALARMS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteAlarms(runSyncStep("pushing", SyncScope.ALARMS) { remoteApi.pushAlarms(local) }, clearAccepted = true)
+        }
     }
 
     private suspend fun pushTaskEvents() {
         val local = localStore.dirtyTaskEvents()
-        if (local.isNotEmpty()) localStore.mergeRemoteTaskEvents(remoteApi.pushTaskEvents(local))
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.TASK_EVENTS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteTaskEvents(runSyncStep("pushing", SyncScope.TASK_EVENTS) { remoteApi.pushTaskEvents(local) })
+        }
     }
 
     private suspend fun pushPomodoroSessions() {
         val local = localStore.dirtyPomodoroSessions()
-        if (local.isNotEmpty()) localStore.mergeRemotePomodoroSessions(remoteApi.pushPomodoroSessions(local), clearAccepted = true)
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.POMODORO_SESSIONS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemotePomodoroSessions(runSyncStep("pushing", SyncScope.POMODORO_SESSIONS) { remoteApi.pushPomodoroSessions(local) }, clearAccepted = true)
+        }
     }
 
     private suspend fun <T> pullPaged(
@@ -63,7 +84,8 @@ class SyncEngine(
     ) {
         var cursor = localStore.syncCursor(scope)
         do {
-            val response = pull(cursor, 500)
+            logger.info(message = "sync.pull.started", context = mapOf("scope" to scope.wireName, "cursor" to cursor.toString()))
+            val response = runSyncStep("pulling", scope) { pull(cursor, 500) }
             if (response.items.isNotEmpty()) {
                 merge(response.items)
                 cursor = response.nextCursor
@@ -71,4 +93,20 @@ class SyncEngine(
             }
         } while (response.hasMore)
     }
+
+    private suspend fun <T> runSyncStep(
+        action: String,
+        scope: SyncScope,
+        block: suspend () -> T,
+    ): T = try {
+        block()
+    } catch (error: Throwable) {
+        throw SyncOperationException(action = action, scope = scope, cause = error)
+    }
 }
+
+class SyncOperationException(
+    val action: String,
+    val scope: SyncScope,
+    cause: Throwable,
+) : Exception(cause.message ?: "Sync failed", cause)
