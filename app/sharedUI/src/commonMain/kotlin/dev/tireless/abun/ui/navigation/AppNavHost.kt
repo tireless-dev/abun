@@ -5,14 +5,14 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import dev.tireless.abun.SettingsScreenContent
-import dev.tireless.abun.TasksScreen
-import dev.tireless.abun.TodayScreen
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.TasksScreen
 
 @Composable
 fun AppNavHost(
@@ -46,7 +46,7 @@ fun AppNavHost(
         startDestination = routeForTab(state.selectedTab),
     ) {
         composable(AppRoute.Day.route) {
-            TodayScreen(
+            DayScreen(
                 state = state,
                 liveNow = liveNow,
                 onOpenTask = onOpenTask,

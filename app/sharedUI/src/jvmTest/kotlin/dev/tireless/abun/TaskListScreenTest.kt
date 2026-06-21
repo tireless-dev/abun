@@ -16,6 +16,7 @@ import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.sync.TaskStatus
+import dev.tireless.abun.ui.screens.TasksScreen
 import dev.tireless.abun.ui.theme.AppTheme
 import kotlin.test.Test
 

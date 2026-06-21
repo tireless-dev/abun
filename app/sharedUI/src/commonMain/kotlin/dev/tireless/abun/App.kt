@@ -100,6 +100,7 @@ import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialStatusTag
 import dev.tireless.abun.ui.screens.DayScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
+import dev.tireless.abun.ui.screens.TasksScreen
 import dev.tireless.abun.ui.TaskTopBarSubtabOption
 import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
@@ -406,150 +407,6 @@ private fun StatusStrip(state: AppUiState) {
     }
 }
 @Composable
-internal fun TasksScreen(
-    state: AppUiState,
-    liveNow: Long,
-    isPomodoroActive: Boolean,
-    onSelectTaskFilter: (TaskListFilter) -> Unit,
-    onOpenTask: (TaskListItemView) -> Unit,
-    onOpenStartPomodoro: () -> Unit,
-    onCreateRoutine: () -> Unit,
-    onOpenRoutine: (RoutineListItemView) -> Unit,
-    onRunRoutine: (RoutineListItemView) -> Unit,
-) {
-    when (state.selectedTaskSubTab) {
-        TaskSubTab.TASKS -> TaskListScreen(
-            state = state,
-            isPomodoroActive = isPomodoroActive,
-            onSelectTaskFilter = onSelectTaskFilter,
-            onOpenTask = onOpenTask,
-        )
-        TaskSubTab.ROUTINES -> RoutineListScreen(
-            state = state,
-            onCreateRoutine = onCreateRoutine,
-            onOpenRoutine = onOpenRoutine,
-            onRunRoutine = onRunRoutine,
-        )
-        TaskSubTab.POMODORO -> PomodoroScreen(state, liveNow = liveNow, onOpenStart = onOpenStartPomodoro)
-    }
-}
-
-@Composable
-private fun TaskListScreen(
-    state: AppUiState,
-    isPomodoroActive: Boolean,
-    onSelectTaskFilter: (TaskListFilter) -> Unit,
-    onOpenTask: (TaskListItemView) -> Unit,
-) {
-    val filteredTasks = filterTasksForSurface(state.taskView.tasks, state.selectedTaskFilter)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            TaskListFilter.entries.forEachIndexed { index, filter ->
-                val option = filter.label()
-                val isSelected = filter == state.selectedTaskFilter
-                OutlinedButton(
-                    modifier = if (isSelected) Modifier.weight(1f) else Modifier,
-                    onClick = { onSelectTaskFilter(taskListFilterFromLabel(option)) },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isSelected) ThemeTokens.colors.borderStrong else ThemeTokens.colors.border,
-                    ),
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskListFilter.entries.size),
-                    contentPadding = PaddingValues(
-                        horizontal = if (isSelected) ThemeTokens.spacing.mdDp else ThemeTokens.spacing.smDp,
-                        vertical = ThemeTokens.spacing.smDp,
-                    ),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = filter.icon(),
-                            contentDescription = option,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        if (isSelected) {
-                            Text(
-                                option,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThemeTokens.type.body.withMaterialContentColor(),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        TaskStack(
-            tasks = filteredTasks,
-            empty = taskListFilterEmptyState(state.selectedTaskFilter),
-            onOpenTask = onOpenTask,
-            disabled = isPomodoroActive,
-        )
-    }
-}
-
-@Composable
-private fun RoutineListScreen(
-    state: AppUiState,
-    onCreateRoutine: () -> Unit,
-    onOpenRoutine: (RoutineListItemView) -> Unit,
-    onRunRoutine: (RoutineListItemView) -> Unit,
-) {
-    Panel {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SectionHeader("Routine support", "Routines")
-            Button(onClick = onCreateRoutine) {
-                Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-        if (state.taskView.routines.isEmpty()) {
-            Text("No routines.", style = ThemeTokens.type.body)
-        } else {
-            state.taskView.routines.forEach { routine ->
-                RoutineRow(routine, onOpenRoutine, onRunRoutine)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PomodoroScreen(state: AppUiState, liveNow: Long, onOpenStart: () -> Unit) {
-    val active = state.activePomodoroSession
-    Panel {
-        Text("Timer", style = ThemeTokens.type.label)
-        Text(active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "00:00", style = ThemeTokens.type.display)
-        Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
-        if (active == null) {
-            Button(onClick = onOpenStart) { Text("Start", style = ThemeTokens.type.body.withMaterialContentColor()) }
-        } else {
-            Text("${active.phase.label()} • ${active.durationMinutes}m", style = ThemeTokens.type.bodyMuted)
-            Button(onClick = onOpenStart) { Text("Complete or stop", style = ThemeTokens.type.body.withMaterialContentColor()) }
-        }
-    }
-
-    Panel {
-        SectionHeader("History", "Recent sessions")
-        if (state.recentPomodoroSessions.isEmpty()) {
-            Text("No sessions.", style = ThemeTokens.type.body)
-        } else {
-            state.recentPomodoroSessions.forEach { session ->
-                PomodoroRow(session)
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
     SettingsScreenContent(
         state = state,
@@ -824,7 +681,7 @@ private fun StatusPill(status: TaskStatus) {
 }
 
 @Composable
-private fun RoutineRow(
+internal fun RoutineRow(
     routine: RoutineListItemView,
     onOpen: (RoutineListItemView) -> Unit,
     onRun: (RoutineListItemView) -> Unit,
@@ -851,7 +708,7 @@ private fun RoutineRow(
 }
 
 @Composable
-private fun PomodoroRow(session: PomodoroSessionView) {
+internal fun PomodoroRow(session: PomodoroSessionView) {
     EditorialCard {
         Text(session.phase.label(), style = ThemeTokens.type.cardTitle)
         Text(session.taskTitle ?: "Standalone timer", style = ThemeTokens.type.bodyMuted)
@@ -1876,7 +1733,7 @@ private fun weekdayLabel(code: String): String? = when (code) {
     else -> null
 }
 
-private fun taskListFilterEmptyState(filter: TaskListFilter): String = when (filter) {
+internal fun taskListFilterEmptyState(filter: TaskListFilter): String = when (filter) {
     TaskListFilter.ALL_ACTIVE -> "No active tasks."
     TaskListFilter.BACKLOG -> "No backlog tasks."
     TaskListFilter.SCHEDULED -> "No scheduled tasks."
@@ -1902,7 +1759,7 @@ private fun TaskSubTab.icon(): ImageVector = when (this) {
     TaskSubTab.POMODORO -> Lucide.Timer
 }
 
-private fun TaskListFilter.label(): String = when (this) {
+internal fun TaskListFilter.label(): String = when (this) {
     TaskListFilter.ALL_ACTIVE -> "All active"
     TaskListFilter.BACKLOG -> "Backlog"
     TaskListFilter.SCHEDULED -> "Scheduled"
@@ -1910,7 +1767,7 @@ private fun TaskListFilter.label(): String = when (this) {
     TaskListFilter.COMPLETED -> "Completed"
 }
 
-private fun TaskListFilter.icon(): ImageVector = when (this) {
+internal fun TaskListFilter.icon(): ImageVector = when (this) {
     TaskListFilter.ALL_ACTIVE -> Lucide.Diamond
     TaskListFilter.BACKLOG -> Lucide.Inbox
     TaskListFilter.SCHEDULED -> Lucide.CalendarClock
@@ -1918,7 +1775,7 @@ private fun TaskListFilter.icon(): ImageVector = when (this) {
     TaskListFilter.COMPLETED -> Lucide.CheckCheck
 }
 
-private fun taskListFilterFromLabel(label: String): TaskListFilter = when (label) {
+internal fun taskListFilterFromLabel(label: String): TaskListFilter = when (label) {
     "Backlog" -> TaskListFilter.BACKLOG
     "Scheduled" -> TaskListFilter.SCHEDULED
     "Routine-derived" -> TaskListFilter.ROUTINE_DERIVED
@@ -1926,7 +1783,7 @@ private fun taskListFilterFromLabel(label: String): TaskListFilter = when (label
     else -> TaskListFilter.ALL_ACTIVE
 }
 
-private fun PomodoroPhase.label(): String = when (this) {
+internal fun PomodoroPhase.label(): String = when (this) {
     PomodoroPhase.FOCUS -> "Work"
     PomodoroPhase.SHORT_BREAK -> "Short break"
     PomodoroPhase.LONG_BREAK -> "Long break"
