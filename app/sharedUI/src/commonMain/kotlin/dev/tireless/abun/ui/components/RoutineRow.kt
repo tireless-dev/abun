@@ -6,8 +6,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import dev.tireless.abun.app.RoutineListItemView
-import dev.tireless.abun.describeRecurrenceRule
 import dev.tireless.abun.ui.EditorialCard
+import dev.tireless.abun.ui.sheets.describeRecurrenceRule
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 
