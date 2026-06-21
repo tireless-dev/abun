@@ -212,8 +212,9 @@ The current codebase already contains:
 
 - task-oriented view models in [DomainModels.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/DomainModels.kt)
 - local persistence and merge behavior in shared logic
-- shared task UI built directly from Material 3 primitives in [App.kt](/Users/jerry/Workspace/_tools/abun/app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/App.kt) rather than through reusable shared wrapper components
-- the `Tasks` task-instance filter selector in `App.kt` is now implemented as a custom icon-first segmented control: the active filter expands to absorb remaining width and show its label, inactive filters collapse to icon-only buttons, and the list content renders directly in the screen column instead of a nested `Panel`
+- shared task UI still uses direct Material 3 primitives, but the top-level shell in [App.kt](/Users/jerry/Workspace/_tools/abun/app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/App.kt) now delegates route content to Compose Navigation and screen implementations under `app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/screens`
+- top-level shared UI routes use Compose Navigation for `Day`, `Tasks`, and `Settings`, while the `Tasks` subtab selector remains state-driven through `AppUiState.selectedTaskSubTab`
+- the `Tasks` task-instance filter selector is implemented as a custom icon-first segmented control in `ui/screens/TaskListScreen.kt`: the active filter expands to absorb remaining width and show its label, inactive filters collapse to icon-only buttons, and the list content renders directly in the screen column instead of a nested `Panel`
 - Worker/PostgreSQL APIs and database schema for synced task resources in `workers/api`
 - generic auth/session endpoints at `/auth/*` plus protected task sync/business routes under `/api/*`
 - reviewed on 2026-06-19: task creation still uses the same task-plus-`CREATED`-event sync contract, while the Worker now relies on additive schema bootstrap for newer task columns and the shared client emits structured logs around task creation and sync boundaries for diagnosis

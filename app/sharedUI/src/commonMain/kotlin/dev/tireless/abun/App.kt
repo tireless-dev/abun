@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.composables.icons.lucide.CalendarCheck
 import com.composables.icons.lucide.CalendarClock
 import com.composables.icons.lucide.CheckCheck
@@ -98,6 +100,9 @@ import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialStatusTag
+import dev.tireless.abun.ui.navigation.AppNavHost
+import dev.tireless.abun.ui.navigation.appTabForRoute
+import dev.tireless.abun.ui.navigation.routeForTab
 import dev.tireless.abun.ui.screens.DayScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
@@ -128,6 +133,9 @@ internal data class TaskSurfaceGroups(
 fun App() {
     val controller = rememberAbunAppController()
     val state by controller.state.collectAsState()
+    val navController = rememberNavController()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
     val liveNow by rememberLiveNow()
     val activeSession = state.activePomodoroSession
     val activeRemaining = activeSession?.let { it.endsAtEpochMillis - liveNow } ?: 0L
@@ -143,6 +151,26 @@ fun App() {
         if (state.activePomodoroSession != null && activeRemaining <= 0) {
             currentSheet = OverlaySheet.COMPLETE_POMODORO
             controller.selectTaskSubTab(TaskSubTab.POMODORO)
+        }
+    }
+
+    LaunchedEffect(currentRoute) {
+        val routeTab = appTabForRoute(currentRoute)
+        if (routeTab != state.selectedTab) {
+            controller.selectTab(routeTab)
+        }
+    }
+
+    LaunchedEffect(state.selectedTab, currentRoute) {
+        val targetRoute = routeForTab(state.selectedTab)
+        if (currentRoute != null && currentRoute != targetRoute) {
+            navController.navigate(targetRoute) {
+                launchSingleTop = true
+                restoreState = true
+                popUpTo(navController.graph.startDestinationId) {
+                    saveState = true
+                }
+            }
         }
     }
 
@@ -215,7 +243,15 @@ fun App() {
                         AppTab.entries.forEach { tab ->
                             Tab(
                                 selected = state.selectedTab == tab,
-                                onClick = { controller.selectTab(tab) },
+                                onClick = {
+                                    navController.navigate(routeForTab(tab)) {
+                                        launchSingleTop = true
+                                        restoreState = true
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                    }
+                                },
                                 selectedContentColor = ThemeTokens.colors.textPrimary,
                                 unselectedContentColor = ThemeTokens.colors.textSecondary,
                                 text = { Text(tab.tabLabel(), style = ThemeTokens.type.label) },
@@ -251,35 +287,28 @@ fun App() {
                     .padding(padding)
                     .verticalScroll(rememberScrollState()),
             ) {
-                when (state.selectedTab) {
-                    AppTab.TODAY -> DayScreen(
-                        state = state,
-                        liveNow = liveNow,
-                        onOpenTask = {
-                            selectedTask = it
-                            currentSheet = OverlaySheet.TASK_ACTIONS
-                        },
-                        onStartPomodoro = { currentSheet = OverlaySheet.START_POMODORO },
-                    )
-                    AppTab.TASKS -> TasksScreen(
-                        state = state,
-                        liveNow = liveNow,
-                        isPomodoroActive = isPomodoroActive,
-                        onSelectTaskFilter = controller::selectTaskFilter,
-                        onOpenTask = {
-                            selectedTask = it
-                            currentSheet = OverlaySheet.TASK_ACTIONS
-                        },
-                        onOpenStartPomodoro = { currentSheet = OverlaySheet.START_POMODORO },
-                        onCreateRoutine = { currentSheet = OverlaySheet.CREATE_ROUTINE },
-                        onOpenRoutine = {
-                            selectedRoutine = it
-                            currentSheet = OverlaySheet.ROUTINE_ACTIONS
-                        },
-                        onRunRoutine = { controller.runRoutine(it.id) },
-                    )
-                    AppTab.SETTINGS -> SettingsScreen(state, controller)
-                }
+                AppNavHost(
+                    navController = navController,
+                    state = state,
+                    liveNow = liveNow,
+                    isPomodoroActive = isPomodoroActive,
+                    onSelectTaskFilter = controller::selectTaskFilter,
+                    onOpenTask = {
+                        selectedTask = it
+                        currentSheet = OverlaySheet.TASK_ACTIONS
+                    },
+                    onOpenStartPomodoro = { currentSheet = OverlaySheet.START_POMODORO },
+                    onCreateRoutine = { currentSheet = OverlaySheet.CREATE_ROUTINE },
+                    onOpenRoutine = {
+                        selectedRoutine = it
+                        currentSheet = OverlaySheet.ROUTINE_ACTIONS
+                    },
+                    onRunRoutine = { controller.runRoutine(it.id) },
+                    onUpdateThemePreference = controller::updateThemePreference,
+                    onUpdatePreferences = controller::updatePreferences,
+                    onReopenLogin = controller::reopenLogin,
+                    onLogout = controller::logout,
+                )
             }
         }
 

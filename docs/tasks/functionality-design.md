@@ -7,6 +7,7 @@ This document describes the user-facing behavior of the tasks module. It is the 
 UI implementation note:
 - current shared task surfaces use direct Material 3 components for sheets, forms, segmented selectors, buttons, and app chrome
 - current task surfaces follow the shared editorial Material 3 language: neutral-first color, spacious 8/16/24/32 rhythm, flat outlined cards, muted status tags, and low-noise app chrome
+- top-level shared UI routing now uses Compose Navigation for `Day`, `Tasks`, and `Settings`, while the task subtabs inside `Tasks` remain state-driven
 - the `Tasks` first-level filter selector is compact and icon-first: every option keeps its icon visible, while only the active filter expands to show its text label
 - the task-instance list now sits directly on the shared page surface instead of inside a nested task-list card with duplicate headings
 - this is an implementation detail only; the user-facing workflows below are unchanged by the Material 3 wrapper removal

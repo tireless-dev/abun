@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import dev.tireless.abun.SettingsScreenContent
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.RoutineListItemView
@@ -12,6 +11,7 @@ import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.SettingsScreen
 import dev.tireless.abun.ui.screens.TasksScreen
 
 @Composable
@@ -67,7 +67,7 @@ fun AppNavHost(
             )
         }
         composable(AppRoute.Settings.route) {
-            SettingsScreenContent(
+            SettingsScreen(
                 state = state,
                 onUpdateThemePreference = onUpdateThemePreference,
                 onUpdatePreferences = onUpdatePreferences,
