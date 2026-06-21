@@ -98,6 +98,8 @@ import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialStatusTag
+import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.TaskTopBarSubtabOption
 import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
@@ -249,7 +251,7 @@ fun App() {
                     .verticalScroll(rememberScrollState()),
             ) {
                 when (state.selectedTab) {
-                    AppTab.TODAY -> TodayScreen(
+                    AppTab.TODAY -> DayScreen(
                         state = state,
                         liveNow = liveNow,
                         onOpenTask = {
@@ -394,61 +396,6 @@ fun App() {
 }
 
 @Composable
-internal fun GuideScreenContent(
-    state: AppUiState,
-    onUpdateLoginEmail: (String) -> Unit,
-    onRequestEmailOtp: () -> Unit,
-    onVerifyEmailOtp: (String) -> Unit,
-    onSkipLogin: () -> Unit,
-) {
-    var otpCode by remember(state.auth.prefilledOtp) { mutableStateOf(state.auth.prefilledOtp) }
-    Column(
-        modifier = Modifier
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
-            .fillMaxSize(),
-    ) {
-        EditorialScreen {
-            Panel {
-            Text("abun", style = ThemeTokens.type.title.copy(fontWeight = FontWeight.Bold), color = ThemeTokens.colors.primary)
-            Text("Sign in", style = ThemeTokens.type.display)
-            Text("Login with email OTP to enable cloud sync, or skip for local-only mode.", style = ThemeTokens.type.bodyMuted)
-            OutlinedTextField(
-                value = state.auth.email,
-                onValueChange = onUpdateLoginEmail,
-                label = { Text("Email", style = ThemeTokens.type.label) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = ThemeTokens.type.body,
-                singleLine = true,
-            )
-            Button(onClick = onRequestEmailOtp, enabled = !state.auth.isSubmitting) {
-                Text(if (state.auth.otpRequested) "Resend OTP" else "Send OTP", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-            if (state.auth.otpRequested) {
-                OutlinedTextField(
-                    value = otpCode,
-                    onValueChange = { otpCode = it },
-                    label = { Text("OTP code", style = ThemeTokens.type.label) },
-                    modifier = Modifier.fillMaxWidth(),
-                    textStyle = ThemeTokens.type.body,
-                    singleLine = true,
-                )
-                state.auth.debugOtpHint?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
-                Button(onClick = { onVerifyEmailOtp(otpCode) }, enabled = !state.auth.isSubmitting) {
-                    Text("Verify and login", style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-            Button(onClick = onSkipLogin, enabled = !state.auth.isSubmitting) {
-                Text("Skip for now", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-            state.auth.errorMessage?.let {
-                Text(it, color = ThemeTokens.colors.error, style = ThemeTokens.type.body)
-            }
-        }
-        }
-    }
-}
-
-@Composable
 private fun StatusStrip(state: AppUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         state.syncState.lastSyncedAt?.let { Text("Last synced: $it", style = ThemeTokens.type.bodyMuted) }
@@ -458,58 +405,6 @@ private fun StatusStrip(state: AppUiState) {
         }
     }
 }
-@Composable
-internal fun TodayScreen(
-    state: AppUiState,
-    liveNow: Long,
-    onOpenTask: (TaskListItemView) -> Unit,
-    onStartPomodoro: () -> Unit,
-) {
-    val tasksById = state.taskView.tasks.associateBy(TaskListItemView::id)
-    val openTasks = state.today.currentTasks.mapNotNull { agenda -> tasksById[agenda.taskId] }
-    val runningTasks = openTasks.count { it.status == TaskStatus.IN_PROGRESS }
-    val active = state.activePomodoroSession
-
-    Panel {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column {
-                Text("Daily desk", style = ThemeTokens.type.label)
-                Text("Day", style = ThemeTokens.type.title)
-                Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
-            }
-            Button(onClick = onStartPomodoro) {
-                Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-        MetricRow(
-            listOf(
-                "Open" to openTasks.size.toString(),
-                "Running" to runningTasks.toString(),
-                "Routines" to state.taskView.routines.size.toString(),
-            ),
-        )
-        TaskStack(
-            tasks = openTasks,
-            empty = "No open tasks for this date.",
-            onOpenTask = onOpenTask,
-        )
-    }
-
-    Panel {
-        SectionHeader("Day timeline", "${state.today.journalEntries.size} events")
-        JournalTimeline(state.today.journalEntries)
-    }
-
-    Panel {
-        SectionHeader("Pomodoro", active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "Ready")
-        Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
-    }
-}
-
 @Composable
 internal fun TasksScreen(
     state: AppUiState,
@@ -828,12 +723,12 @@ internal fun SettingsScreenContent(
 }
 
 @Composable
-private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
     EditorialCard(content = content)
 }
 
 @Composable
-private fun SectionHeader(eyebrow: String, title: String) {
+internal fun SectionHeader(eyebrow: String, title: String) {
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         Text(eyebrow, style = ThemeTokens.type.label, color = ThemeTokens.colors.textTertiary)
         Text(title, style = ThemeTokens.type.sectionTitle)
@@ -841,7 +736,7 @@ private fun SectionHeader(eyebrow: String, title: String) {
 }
 
 @Composable
-private fun MetricRow(items: List<Pair<String, String>>) {
+internal fun MetricRow(items: List<Pair<String, String>>) {
     Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
         items.forEach { (label, value) ->
             Column(
@@ -860,7 +755,7 @@ private fun MetricRow(items: List<Pair<String, String>>) {
 }
 
 @Composable
-private fun TaskStack(
+internal fun TaskStack(
     tasks: List<TaskListItemView>,
     empty: String,
     onOpenTask: (TaskListItemView) -> Unit,
@@ -879,7 +774,7 @@ private fun TaskStack(
 }
 
 @Composable
-private fun JournalTimeline(entries: List<JournalEntryView>) {
+internal fun JournalTimeline(entries: List<JournalEntryView>) {
     if (entries.isEmpty()) {
         Text("No history for this date.", style = ThemeTokens.type.body)
         return
@@ -2085,7 +1980,7 @@ private fun themePreferenceFromLabel(label: String): ThemePreference = when (lab
     else -> ThemePreference.SYSTEM
 }
 
-private fun formatRemaining(remainingMillis: Long): String {
+internal fun formatRemaining(remainingMillis: Long): String {
     val safe = if (remainingMillis > 0L) remainingMillis else 0L
     val totalSeconds = safe / 1_000L
     val minutes = totalSeconds / 60L

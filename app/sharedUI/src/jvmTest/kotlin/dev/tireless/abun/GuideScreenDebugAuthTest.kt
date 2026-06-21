@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.AuthViewState
+import dev.tireless.abun.ui.screens.GuideScreenContent
 import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)

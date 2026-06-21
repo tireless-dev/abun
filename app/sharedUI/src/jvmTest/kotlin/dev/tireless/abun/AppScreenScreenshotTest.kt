@@ -18,6 +18,8 @@ import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -46,7 +48,7 @@ class AppScreenScreenshotTest {
     fun today() = captureScreenshot("screens/today") {
         val state = screenshotState(selectedTab = AppTab.TODAY)
         ScreenshotScreenFrame("Day", AppTab.TODAY) {
-            TodayScreen(state, liveNow = ScreenshotNow, onOpenTask = {}, onStartPomodoro = {})
+            DayScreen(state, liveNow = ScreenshotNow, onOpenTask = {}, onStartPomodoro = {})
         }
     }
 
