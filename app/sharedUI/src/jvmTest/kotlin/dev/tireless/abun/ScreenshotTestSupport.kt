@@ -5,11 +5,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
@@ -19,15 +22,25 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.CalendarCheck
+import com.composables.icons.lucide.ListTodo
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Timer
 import com.github.takahirom.roborazzi.RoborazziOptions
 import dev.tireless.abun.app.AppTab
+import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.ui.TaskTopBarSubtabOption
+import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -69,6 +82,7 @@ internal fun captureScreenshot(
 internal fun ScreenshotScreenFrame(
     title: String,
     selectedTab: AppTab,
+    selectedTaskSubTab: TaskSubTab? = null,
     content: @Composable () -> Unit,
 ) {
     MaterialScaffold(
@@ -80,10 +94,36 @@ internal fun ScreenshotScreenFrame(
                     titleContentColor = ThemeTokens.colors.textPrimary,
                 ),
                 title = {
-                    Text(
-                        text = title,
-                        style = ThemeTokens.type.title,
-                    )
+                    if (selectedTab == AppTab.TASKS && selectedTaskSubTab != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = title,
+                                style = ThemeTokens.type.title,
+                            )
+                            TaskTopBarSubtabSelector(
+                                currentLabel = selectedTaskSubTab.labelForScreenshot(),
+                                currentIcon = selectedTaskSubTab.iconForScreenshot(),
+                                expanded = false,
+                                onExpandedChange = {},
+                                options = TaskSubTab.entries.map { taskSubTab ->
+                                    TaskTopBarSubtabOption(
+                                        label = taskSubTab.labelForScreenshot(),
+                                        icon = taskSubTab.iconForScreenshot(),
+                                        onClick = {},
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = title,
+                            style = ThemeTokens.type.title,
+                        )
+                    }
                 },
             )
         },
@@ -111,7 +151,7 @@ internal fun ScreenshotScreenFrame(
             if (selectedTab == AppTab.TODAY || selectedTab == AppTab.TASKS) {
                 ExtendedFloatingActionButton(
                     onClick = {},
-                    icon = { Text("+") },
+                    icon = { Icon(imageVector = Lucide.Plus, contentDescription = null) },
                     text = { Text("Task") },
                 )
             }
@@ -134,4 +174,16 @@ internal fun AppTab.tabLabelForScreenshot(): String = when (this) {
     AppTab.TODAY -> "Day"
     AppTab.TASKS -> "Tasks"
     AppTab.SETTINGS -> "Settings"
+}
+
+private fun TaskSubTab.labelForScreenshot(): String = when (this) {
+    TaskSubTab.TASKS -> "Tasks"
+    TaskSubTab.ROUTINES -> "Routines"
+    TaskSubTab.POMODORO -> "Pomodoro"
+}
+
+private fun TaskSubTab.iconForScreenshot(): ImageVector = when (this) {
+    TaskSubTab.TASKS -> Lucide.ListTodo
+    TaskSubTab.ROUTINES -> Lucide.CalendarCheck
+    TaskSubTab.POMODORO -> Lucide.Timer
 }

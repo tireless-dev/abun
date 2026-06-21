@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
@@ -22,6 +23,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold as MaterialScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.theme.ThemeTokens
@@ -68,7 +71,7 @@ class ComponentScreenshotTest {
             ) {
                 ExtendedFloatingActionButton(
                     onClick = {},
-                    icon = { Text("+") },
+                    icon = { Icon(imageVector = Lucide.Plus, contentDescription = null) },
                     text = { Text("Task", style = ThemeTokens.type.label.withMaterialContentColor()) },
                 )
             }
@@ -130,7 +133,7 @@ class ComponentScreenshotTest {
             floatingActionButton = {
                 ExtendedFloatingActionButton(
                     onClick = {},
-                    icon = { Text("+") },
+                    icon = { Icon(imageVector = Lucide.Plus, contentDescription = null) },
                     text = { Text("Task", style = ThemeTokens.type.label.withMaterialContentColor()) },
                 )
             },

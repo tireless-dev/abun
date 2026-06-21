@@ -8,6 +8,8 @@ This document defines the shared product structure that all Abun modules must fo
 
 Abun is a local-first personal system organized as a set of modules over a shared platform. Each module owns its own domain rules while reusing the same identity, persistence, sync, and ownership model.
 
+The shared presentation language across modules uses a consistent Lucide icon family in `app/sharedUI` so Desktop and Android surfaces keep the same iconography.
+
 Current module status:
 
 - `tasks`: active module

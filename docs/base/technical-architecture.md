@@ -10,6 +10,7 @@ This document defines the shared technical shape used by all modules.
 - SQLDelight-backed local SQLite database
 - shared logic and shared Compose UI
 - shared Compose UI uses Material 3 primitives directly for screens, sheets, buttons, text fields, segmented choices, and app chrome, with a small shared editorial design-language layer for screen padding, section framing, flat outlined surfaces, and muted status tags
+- shared Compose UI uses Lucide through the Compose Icons KMP artifact for app-owned iconography rendered from `commonMain`, while continuing to rely on Material 3 primitives for controls and app chrome
 - Cloudflare Worker with PostgreSQL persistence through Hyperdrive-compatible access
 - local-first sync engine shared across synced resources
 
@@ -127,4 +128,5 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 - `app/sharedUI` is the cross-platform source of truth for the app’s visual system across Desktop and Android.
 - New shared UI work should prefer shared theme tokens plus the minimal editorial primitives before introducing feature-local spacing, surface, or chip styling.
 - The shared layer should stay intentionally small: it exists to enforce consistent layout and surface language, not to wrap every Material 3 control.
+- Shared top app bar chrome may host lightweight shared selectors for screen-scoped sub-navigation when the switched content replaces the main body surface rather than filtering a small local region.
 - Shared appearance mode is preference-driven and must support `System`, `Light`, and `Dark` from the shared settings flow rather than through platform-specific toggles.

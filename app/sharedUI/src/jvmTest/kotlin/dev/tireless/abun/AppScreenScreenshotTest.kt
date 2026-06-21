@@ -56,12 +56,11 @@ class AppScreenScreenshotTest {
             selectedTab = AppTab.TASKS,
             taskView = TaskViewState(),
         )
-        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS, selectedTaskSubTab = state.selectedTaskSubTab) {
             TasksScreen(
                 state = state,
                 liveNow = ScreenshotNow,
                 isPomodoroActive = false,
-                onSelectPanel = {},
                 onSelectTaskFilter = {},
                 onOpenTask = {},
                 onOpenStartPomodoro = {},
@@ -75,12 +74,11 @@ class AppScreenScreenshotTest {
     @Test
     fun tasksPopulated() = captureScreenshot("screens/tasks_populated") {
         val state = screenshotState(selectedTab = AppTab.TASKS)
-        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS, selectedTaskSubTab = state.selectedTaskSubTab) {
             TasksScreen(
                 state = state,
                 liveNow = ScreenshotNow,
                 isPomodoroActive = false,
-                onSelectPanel = {},
                 onSelectTaskFilter = {},
                 onOpenTask = {},
                 onOpenStartPomodoro = {},
@@ -94,12 +92,11 @@ class AppScreenScreenshotTest {
     @Test
     fun pomodoroInactive() = captureScreenshot("screens/pomodoro_inactive") {
         val state = screenshotState(selectedTab = AppTab.TASKS, selectedTaskSubTab = TaskSubTab.POMODORO, activePomodoroSession = null)
-        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS, selectedTaskSubTab = state.selectedTaskSubTab) {
             TasksScreen(
                 state = state,
                 liveNow = ScreenshotNow,
                 isPomodoroActive = false,
-                onSelectPanel = {},
                 onSelectTaskFilter = {},
                 onOpenTask = {},
                 onOpenStartPomodoro = {},
@@ -117,12 +114,11 @@ class AppScreenScreenshotTest {
             selectedTaskSubTab = TaskSubTab.POMODORO,
             activePomodoroSession = activePomodoroSession(),
         )
-        ScreenshotScreenFrame("Tasks", AppTab.TASKS) {
+        ScreenshotScreenFrame("Tasks", AppTab.TASKS, selectedTaskSubTab = state.selectedTaskSubTab) {
             TasksScreen(
                 state = state,
                 liveNow = ScreenshotNow,
                 isPomodoroActive = true,
-                onSelectPanel = {},
                 onSelectTaskFilter = {},
                 onOpenTask = {},
                 onOpenStartPomodoro = {},

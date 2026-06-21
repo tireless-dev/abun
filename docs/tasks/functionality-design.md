@@ -541,7 +541,7 @@ Additional rules:
 - Future dates are forecast views based on current planning state.
 - Task management views show tasks in tree mode.
 - Other views hide hierarchy by default.
-- The `Tasks` tab is split into `Tasks` and `Routines` subtabs.
+- The `Tasks` tab uses a title bar selector to switch between `Tasks`, `Routines`, and `Pomodoro`.
 - Routine execution is manual.
 - A routine-created task remains a routine-derived occurrence for that occurrence only.
 - Routine occurrences expire after a configurable rollover time and are not finished later like normal tasks.

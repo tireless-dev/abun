@@ -25,6 +25,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -50,10 +51,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.CalendarCheck
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.ListTodo
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Timer
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
@@ -83,6 +90,8 @@ import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialStatusTag
+import dev.tireless.abun.ui.TaskTopBarSubtabOption
+import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
@@ -116,6 +125,7 @@ fun App() {
     var selectedTask by remember { mutableStateOf<TaskListItemView?>(null) }
     var selectedRoutine by remember { mutableStateOf<RoutineListItemView?>(null) }
     var createTaskContext by remember { mutableStateOf(taskCreateContextFor(state.selectedTab, state.selectedDate)) }
+    var isTaskTopBarSelectorExpanded by remember { mutableStateOf(false) }
     val selectedTaskHistory = selectedTask?.let { controller.taskHistory(it.id) }.orEmpty()
 
     LaunchedEffect(state.activePomodoroSession?.id, activeRemaining) {
@@ -150,10 +160,36 @@ fun App() {
                         titleContentColor = ThemeTokens.colors.textPrimary,
                     ),
                     title = {
-                        Text(
-                            text = state.selectedTab.tabLabel(),
-                            style = ThemeTokens.type.title,
-                        )
+                        if (state.selectedTab == AppTab.TASKS) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = state.selectedTab.tabLabel(),
+                                    style = ThemeTokens.type.title,
+                                )
+                                TaskTopBarSubtabSelector(
+                                    currentLabel = state.selectedTaskSubTab.label(),
+                                    currentIcon = state.selectedTaskSubTab.icon(),
+                                    expanded = isTaskTopBarSelectorExpanded,
+                                    onExpandedChange = { isTaskTopBarSelectorExpanded = it },
+                                    options = TaskSubTab.entries.map { taskSubTab ->
+                                        TaskTopBarSubtabOption(
+                                            label = taskSubTab.label(),
+                                            icon = taskSubTab.icon(),
+                                            onClick = { controller.selectTaskSubTab(taskSubTab) },
+                                        )
+                                    },
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = state.selectedTab.tabLabel(),
+                                style = ThemeTokens.type.title,
+                            )
+                        }
                     },
                 )
             },
@@ -188,7 +224,12 @@ fun App() {
                         contentColor = ThemeTokens.colors.textPrimary,
                         shape = RoundedCornerShape(ThemeTokens.radii.mediumDp),
                         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
-                        icon = { Text("+") },
+                        icon = {
+                            Icon(
+                                imageVector = Lucide.Plus,
+                                contentDescription = null,
+                            )
+                        },
                         text = { Text(fabLabel, style = ThemeTokens.type.label.withMaterialContentColor()) },
                     )
                 }
@@ -213,7 +254,6 @@ fun App() {
                         state = state,
                         liveNow = liveNow,
                         isPomodoroActive = isPomodoroActive,
-                        onSelectPanel = controller::selectTaskSubTab,
                         onSelectTaskFilter = controller::selectTaskFilter,
                         onOpenTask = {
                             selectedTask = it
@@ -467,7 +507,6 @@ internal fun TasksScreen(
     state: AppUiState,
     liveNow: Long,
     isPomodoroActive: Boolean,
-    onSelectPanel: (TaskSubTab) -> Unit,
     onSelectTaskFilter: (TaskListFilter) -> Unit,
     onOpenTask: (TaskListItemView) -> Unit,
     onOpenStartPomodoro: () -> Unit,
@@ -475,21 +514,6 @@ internal fun TasksScreen(
     onOpenRoutine: (RoutineListItemView) -> Unit,
     onRunRoutine: (RoutineListItemView) -> Unit,
 ) {
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        TaskSubTab.entries.forEachIndexed { index, taskSubTab ->
-            val option = taskSubTab.label()
-            SegmentedButton(
-                selected = option == state.selectedTaskSubTab.label(),
-                onClick = { onSelectPanel(taskSubTabFromLabel(option)) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskSubTab.entries.size),
-            ) {
-                Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-    }
-
     when (state.selectedTaskSubTab) {
         TaskSubTab.TASKS -> TaskListScreen(
             state = state,
@@ -1950,10 +1974,10 @@ private fun TaskSubTab.label(): String = when (this) {
     TaskSubTab.POMODORO -> "Pomodoro"
 }
 
-private fun taskSubTabFromLabel(label: String): TaskSubTab = when (label) {
-    "Routines" -> TaskSubTab.ROUTINES
-    "Pomodoro" -> TaskSubTab.POMODORO
-    else -> TaskSubTab.TASKS
+private fun TaskSubTab.icon(): ImageVector = when (this) {
+    TaskSubTab.TASKS -> Lucide.ListTodo
+    TaskSubTab.ROUTINES -> Lucide.CalendarCheck
+    TaskSubTab.POMODORO -> Lucide.Timer
 }
 
 private fun TaskListFilter.label(): String = when (this) {

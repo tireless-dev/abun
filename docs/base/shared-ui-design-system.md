@@ -14,6 +14,12 @@ This document defines the shared editorial Material 3 language used by `app/shar
 
 The goal is to keep the UI professional, breathable, and information-focused rather than colorful or ornamental.
 
+## Iconography
+
+- use Lucide as the default shared icon family for app-owned iconography in `app/sharedUI`
+- icons should stay simple, editorial, and stroke-led rather than filled or decorative by default
+- shared icons should inherit existing Material 3 content colors and normal component sizing instead of introducing feature-local icon styling
+
 ## Token Rules
 
 ### Theme Mode Support
@@ -94,6 +100,7 @@ Use the shared editorial primitives for repeated structural patterns:
 - section framing and heading rhythm
 - flat outlined cards/panels
 - muted status tags
+- compact top-app-bar dropdown selectors when switching between screen-scoped sub-views
 
 Use raw Material 3 controls directly for:
 
