@@ -436,179 +436,6 @@ private fun StatusStrip(state: AppUiState) {
     }
 }
 @Composable
-private fun SettingsScreen(state: AppUiState, controller: AbunAppController) {
-    SettingsScreenContent(
-        state = state,
-        onUpdateThemePreference = controller::updateThemePreference,
-        onUpdatePreferences = controller::updatePreferences,
-        onReopenLogin = controller::reopenLogin,
-        onLogout = controller::logout,
-    )
-}
-
-@Composable
-internal fun SettingsScreenContent(
-    state: AppUiState,
-    onUpdateThemePreference: (ThemePreference) -> Unit,
-    onUpdatePreferences: (
-        titlePrefix: String,
-        defaultAlarmLeadMinutes: Int,
-        focusMinutes: Int,
-        shortBreakMinutes: Int,
-        longBreakMinutes: Int,
-        timezoneOverride: String,
-        dateFormat: DateFormatPreference,
-        themePreference: ThemePreference,
-        rolloverTime: String,
-    ) -> Unit,
-    onReopenLogin: () -> Unit,
-    onLogout: () -> Unit,
-) {
-    var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
-    var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
-    var shortBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.shortBreakMinutes.toString()) }
-    var longBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.longBreakMinutes.toString()) }
-    var timezoneOverride by remember(state.preferences) { mutableStateOf(state.preferences.timezoneOverride) }
-    var selectedDateFormat by remember(state.preferences) { mutableStateOf(state.preferences.dateFormat) }
-    var selectedThemePreference by remember(state.preferences) { mutableStateOf(state.preferences.themePreference) }
-    var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
-
-    Panel {
-        SectionHeader("Cloud", "Sync status")
-        SyncStatusPanel(state)
-    }
-    Panel {
-        SectionHeader("Defaults", "Task")
-        OutlinedTextField(
-            value = titlePrefix,
-            onValueChange = { titlePrefix = it },
-            label = { Text("Title prefix", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-    }
-    Panel {
-        SectionHeader("Defaults", "Pomodoro")
-        OutlinedTextField(
-            value = focusMinutes,
-            onValueChange = { focusMinutes = it },
-            label = { Text("Pomodoro minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = shortBreakMinutes,
-            onValueChange = { shortBreakMinutes = it },
-            label = { Text("Short break minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = longBreakMinutes,
-            onValueChange = { longBreakMinutes = it },
-            label = { Text("Long break minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-    }
-    Panel {
-        SectionHeader("Appearance", "Theme")
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            ThemePreference.entries.forEachIndexed { index, themePreference ->
-                val option = themePreference.label()
-                SegmentedButton(
-                    modifier = Modifier.testTag("theme-option-${themePreference.name.lowercase()}"),
-                    selected = option == selectedThemePreference.label(),
-                    onClick = {
-                        selectedThemePreference = themePreferenceFromLabel(option)
-                        onUpdateThemePreference(selectedThemePreference)
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
-                ) {
-                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-        }
-    }
-    Panel {
-        SectionHeader("App", "Preferences")
-        OutlinedTextField(
-            value = timezoneOverride,
-            onValueChange = { timezoneOverride = it },
-            label = { Text("Timezone override", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = rolloverTime,
-            onValueChange = { rolloverTime = it },
-            label = { Text("Rollover time (HH:MM)", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            DateFormatPreference.entries.forEachIndexed { index, dateFormatPreference ->
-                val option = dateFormatPreference.label()
-                SegmentedButton(
-                    selected = option == selectedDateFormat.label(),
-                    onClick = { selectedDateFormat = dateFormatFromLabel(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
-                ) {
-                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-        }
-        Button(
-            onClick = {
-                onUpdatePreferences(
-                    titlePrefix,
-                    state.preferences.defaultAlarmLeadMinutes,
-                    focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
-                    shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
-                    longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
-                    timezoneOverride,
-                    selectedDateFormat,
-                    selectedThemePreference,
-                    rolloverTime,
-                )
-            },
-        ) {
-            Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-    }
-    if (state.auth.mode == AuthMode.GUEST) {
-        Panel {
-            SectionHeader("Account", "Login")
-            Text(
-                state.auth.errorMessage ?: "Login anytime to enable cloud sync on this device.",
-                style = ThemeTokens.type.bodyMuted,
-            )
-            Button(onClick = onReopenLogin) {
-                Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-    } else {
-        Panel {
-            SectionHeader("Account", "Session")
-            Text("This device is signed in and can sync with your server account.", style = ThemeTokens.type.bodyMuted)
-            OutlinedButton(onClick = onLogout) {
-                Text("Log out", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-    }
-}
-
-@Composable
 internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
     EditorialCard(content = content)
 }
@@ -1840,26 +1667,26 @@ private fun pomodoroTaskUpdateFromLabel(label: String): PomodoroTaskUpdate = whe
     else -> PomodoroTaskUpdate.NONE
 }
 
-private fun DateFormatPreference.label(): String = when (this) {
+internal fun DateFormatPreference.label(): String = when (this) {
     DateFormatPreference.ISO -> "ISO"
     DateFormatPreference.MONTH_DAY -> "Month day"
     DateFormatPreference.WEEKDAY_MONTH_DAY -> "Weekday"
 }
 
-private fun dateFormatFromLabel(label: String): DateFormatPreference = when (label) {
+internal fun dateFormatFromLabel(label: String): DateFormatPreference = when (label) {
     "ISO" -> DateFormatPreference.ISO
     "Month day" -> DateFormatPreference.MONTH_DAY
     "Weekday" -> DateFormatPreference.WEEKDAY_MONTH_DAY
     else -> DateFormatPreference.ISO
 }
 
-private fun ThemePreference.label(): String = when (this) {
+internal fun ThemePreference.label(): String = when (this) {
     ThemePreference.SYSTEM -> "System"
     ThemePreference.LIGHT -> "Light"
     ThemePreference.DARK -> "Dark"
 }
 
-private fun themePreferenceFromLabel(label: String): ThemePreference = when (label) {
+internal fun themePreferenceFromLabel(label: String): ThemePreference = when (label) {
     "System" -> ThemePreference.SYSTEM
     "Light" -> ThemePreference.LIGHT
     "Dark" -> ThemePreference.DARK

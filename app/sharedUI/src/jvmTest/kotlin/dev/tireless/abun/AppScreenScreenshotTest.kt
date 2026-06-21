@@ -20,6 +20,7 @@ import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.ui.screens.DayScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
+import dev.tireless.abun.ui.screens.SettingsScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens

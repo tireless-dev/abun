@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.ui.screens.SettingsScreenContent
 import dev.tireless.abun.ui.theme.resolveDarkTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
