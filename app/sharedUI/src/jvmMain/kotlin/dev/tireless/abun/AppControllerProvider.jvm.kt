@@ -17,6 +17,9 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
+import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.prefs.Preferences
 
 @Composable
@@ -31,11 +34,34 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = JvmNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            debugAuthPreset = debugAuthPreset(enabled = System.getProperty("abun.debug") == "true"),
+            debugAuthPreset = debugAuthPreset(enabled = isDesktopDebugRuntime()),
             serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
 }
+
+internal fun isDesktopDebugRuntime(
+    debugProperty: String? = System.getProperty("abun.debug"),
+    workingDirectory: String = System.getProperty("user.dir"),
+): Boolean = when (debugProperty?.lowercase()) {
+    "true" -> true
+    "false" -> false
+    else -> findRepoRoot(workingDirectory)?.let(::hasDesktopBuildScript) == true
+}
+
+internal fun findRepoRoot(workingDirectory: String): Path? {
+    var current: Path? = runCatching { Paths.get(workingDirectory).toAbsolutePath() }.getOrNull()
+    while (current != null) {
+        if (File(current.toFile(), "settings.gradle.kts").exists()) {
+            return current
+        }
+        current = current.parent
+    }
+    return null
+}
+
+private fun hasDesktopBuildScript(repoRoot: Path): Boolean =
+    File(repoRoot.toFile(), "app/desktopApp/build.gradle.kts").exists()
 
 private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = if (enabled) {
     DebugAuthPreset(
