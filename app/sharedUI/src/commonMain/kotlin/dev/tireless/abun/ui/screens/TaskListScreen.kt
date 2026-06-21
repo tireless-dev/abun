@@ -22,9 +22,9 @@ import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.filterTasksForSurface
 import dev.tireless.abun.taskListFilterEmptyState
 import dev.tireless.abun.taskListFilterFromLabel
-import dev.tireless.abun.TaskStack
 import dev.tireless.abun.label
 import dev.tireless.abun.icon
+import dev.tireless.abun.ui.components.TaskStack
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 

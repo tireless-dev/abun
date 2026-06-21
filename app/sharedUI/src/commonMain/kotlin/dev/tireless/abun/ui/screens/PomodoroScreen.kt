@@ -3,12 +3,12 @@ package dev.tireless.abun.ui.screens
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import dev.tireless.abun.Panel
-import dev.tireless.abun.PomodoroRow
-import dev.tireless.abun.SectionHeader
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.formatRemaining
 import dev.tireless.abun.label
+import dev.tireless.abun.ui.components.Panel
+import dev.tireless.abun.ui.components.PomodoroRow
+import dev.tireless.abun.ui.components.SectionHeader
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 

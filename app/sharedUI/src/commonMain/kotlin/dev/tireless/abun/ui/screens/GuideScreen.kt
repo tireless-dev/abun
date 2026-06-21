@@ -18,9 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import dev.tireless.abun.Panel
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.ui.EditorialScreen
+import dev.tireless.abun.ui.components.Panel
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 

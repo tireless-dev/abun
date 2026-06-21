@@ -9,15 +9,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import dev.tireless.abun.JournalTimeline
-import dev.tireless.abun.MetricRow
-import dev.tireless.abun.Panel
-import dev.tireless.abun.SectionHeader
-import dev.tireless.abun.TaskStack
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.formatRemaining
 import dev.tireless.abun.sync.TaskStatus
+import dev.tireless.abun.ui.components.JournalTimeline
+import dev.tireless.abun.ui.components.MetricRow
+import dev.tireless.abun.ui.components.Panel
+import dev.tireless.abun.ui.components.SectionHeader
+import dev.tireless.abun.ui.components.TaskStack
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 

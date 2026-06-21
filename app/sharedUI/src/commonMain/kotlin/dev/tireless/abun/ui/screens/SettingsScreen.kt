@@ -15,8 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import dev.tireless.abun.Panel
-import dev.tireless.abun.SectionHeader
 import dev.tireless.abun.SyncStatusPanel
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
@@ -24,6 +22,8 @@ import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.dateFormatFromLabel
 import dev.tireless.abun.label
 import dev.tireless.abun.themePreferenceFromLabel
+import dev.tireless.abun.ui.components.Panel
+import dev.tireless.abun.ui.components.SectionHeader
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 

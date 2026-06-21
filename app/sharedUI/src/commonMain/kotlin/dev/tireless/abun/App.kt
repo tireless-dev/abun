@@ -100,6 +100,8 @@ import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.EditorialScreen
 import dev.tireless.abun.ui.EditorialStatusTag
+import dev.tireless.abun.ui.components.JournalTimeline
+import dev.tireless.abun.ui.components.StatusPill
 import dev.tireless.abun.ui.navigation.AppNavHost
 import dev.tireless.abun.ui.navigation.appTabForRoute
 import dev.tireless.abun.ui.navigation.routeForTab
@@ -436,144 +438,6 @@ private fun StatusStrip(state: AppUiState) {
     }
 }
 @Composable
-internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    EditorialCard(content = content)
-}
-
-@Composable
-internal fun SectionHeader(eyebrow: String, title: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-        Text(eyebrow, style = ThemeTokens.type.label, color = ThemeTokens.colors.textTertiary)
-        Text(title, style = ThemeTokens.type.sectionTitle)
-    }
-}
-
-@Composable
-internal fun MetricRow(items: List<Pair<String, String>>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp), modifier = Modifier.fillMaxWidth()) {
-        items.forEach { (label, value) ->
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(ThemeTokens.colors.surfaceMuted, RoundedCornerShape(ThemeTokens.radii.mediumDp))
-                    .border(1.dp, ThemeTokens.colors.border, RoundedCornerShape(ThemeTokens.radii.mediumDp))
-                    .padding(ThemeTokens.spacing.mdDp),
-                verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-            ) {
-                Text(value, style = ThemeTokens.type.cardTitle)
-                Text(label, style = ThemeTokens.type.bodyMuted)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun TaskStack(
-    tasks: List<TaskListItemView>,
-    empty: String,
-    onOpenTask: (TaskListItemView) -> Unit,
-    disabled: Boolean = false,
-    compact: Boolean = false,
-) {
-    if (tasks.isEmpty()) {
-        Text(empty, style = ThemeTokens.type.body)
-        return
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-        tasks.forEach { task ->
-            TaskRow(task = task, compact = compact, disabled = disabled, onOpenTask = onOpenTask)
-        }
-    }
-}
-
-@Composable
-internal fun JournalTimeline(entries: List<JournalEntryView>) {
-    if (entries.isEmpty()) {
-        Text("No history for this date.", style = ThemeTokens.type.body)
-        return
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-        entries.forEach { entry ->
-            EditorialCard {
-                Text(entry.title, style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold))
-                Text("${taskEventLabel(entry.eventType)} • ${entry.eventTimeLabel}", style = ThemeTokens.type.bodyMuted)
-                entry.content?.takeIf(String::isNotBlank)?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TaskRow(
-    task: TaskListItemView,
-    compact: Boolean,
-    disabled: Boolean,
-    onOpenTask: (TaskListItemView) -> Unit,
-) {
-    EditorialCard {
-        Text(task.title, style = ThemeTokens.type.cardTitle)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
-        ) {
-            StatusPill(task.status)
-            task.routineId?.let { Text("Routine", style = ThemeTokens.type.bodyMuted) }
-        }
-        if (!compact) {
-            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text(if (disabled) "Pomodoro active" else "Manage", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        } else {
-            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text("Open", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusPill(status: TaskStatus) {
-    EditorialStatusTag(status = status)
-}
-
-@Composable
-internal fun RoutineRow(
-    routine: RoutineListItemView,
-    onOpen: (RoutineListItemView) -> Unit,
-    onRun: (RoutineListItemView) -> Unit,
-) {
-    EditorialCard {
-        Text(routine.templateTitle, style = ThemeTokens.type.cardTitle)
-        routine.templateDetail?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
-        Text(describeRecurrenceRule(routine.recurrenceRule), style = ThemeTokens.type.bodyMuted)
-        routine.defaultStartNotBefore?.let { Text("Default start: $it", style = ThemeTokens.type.label) }
-        routine.defaultEstimatedDuration?.let { Text("Default duration: $it", style = ThemeTokens.type.label) }
-        Text(if (routine.isActive) "Active" else "Paused", style = ThemeTokens.type.label)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-        ) {
-            Button(onClick = { onRun(routine) }, enabled = routine.isActive) {
-                Text("Run today", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-            Button(onClick = { onOpen(routine) }) {
-                Text("Manage", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PomodoroRow(session: PomodoroSessionView) {
-    EditorialCard {
-        Text(session.phase.label(), style = ThemeTokens.type.cardTitle)
-        Text(session.taskTitle ?: "Standalone timer", style = ThemeTokens.type.bodyMuted)
-        Text("${session.state.name.lowercase()} • ${session.durationMinutes}m", style = ThemeTokens.type.label)
-        session.note?.let { Text(it, style = ThemeTokens.type.bodyMuted) }
-    }
-}
-
-@Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun CreateTaskSheet(
     context: TaskCreateContext,
@@ -832,7 +696,7 @@ internal fun TaskActionsSheet(
         ) {
         Text(if (isRoutineDerived) "Routine: ${task.title}" else task.title, style = ThemeTokens.type.sectionTitle)
         if (isRoutineDerived) {
-            Text("Routine: ${routine?.templateTitle}", style = ThemeTokens.type.bodyMuted)
+            Text("Routine: ${routine.templateTitle}", style = ThemeTokens.type.bodyMuted)
             nextOccurrence?.let {
                 Text("Next occurrence: $it", style = ThemeTokens.type.bodyMuted)
             }
