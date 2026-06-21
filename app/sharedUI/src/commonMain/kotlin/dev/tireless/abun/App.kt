@@ -1,6 +1,7 @@
 package dev.tireless.abun
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,10 +55,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarCheck
+import com.composables.icons.lucide.CalendarClock
+import com.composables.icons.lucide.CheckCheck
+import com.composables.icons.lucide.Clock9
+import com.composables.icons.lucide.Diamond
+import com.composables.icons.lucide.Inbox
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.ListTodo
 import com.composables.icons.lucide.Plus
@@ -539,19 +547,46 @@ private fun TaskListScreen(
     onOpenTask: (TaskListItemView) -> Unit,
 ) {
     val filteredTasks = filterTasksForSurface(state.taskView.tasks, state.selectedTaskFilter)
-    Panel {
-        SectionHeader("Task list", taskListFilterTitle(state.selectedTaskFilter))
-        SingleChoiceSegmentedButtonRow(
+    Column(
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+    ) {
+        Row(
             modifier = Modifier.fillMaxWidth(),
         ) {
             TaskListFilter.entries.forEachIndexed { index, filter ->
                 val option = filter.label()
-                SegmentedButton(
-                    selected = option == state.selectedTaskFilter.label(),
+                val isSelected = filter == state.selectedTaskFilter
+                OutlinedButton(
+                    modifier = if (isSelected) Modifier.weight(1f) else Modifier,
                     onClick = { onSelectTaskFilter(taskListFilterFromLabel(option)) },
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isSelected) ThemeTokens.colors.borderStrong else ThemeTokens.colors.border,
+                    ),
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = TaskListFilter.entries.size),
+                    contentPadding = PaddingValues(
+                        horizontal = if (isSelected) ThemeTokens.spacing.mdDp else ThemeTokens.spacing.smDp,
+                        vertical = ThemeTokens.spacing.smDp,
+                    ),
                 ) {
-                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = filter.icon(),
+                            contentDescription = option,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        if (isSelected) {
+                            Text(
+                                option,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = ThemeTokens.type.body.withMaterialContentColor(),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1946,14 +1981,6 @@ private fun weekdayLabel(code: String): String? = when (code) {
     else -> null
 }
 
-private fun taskListFilterTitle(filter: TaskListFilter): String = when (filter) {
-    TaskListFilter.ALL_ACTIVE -> "All active"
-    TaskListFilter.BACKLOG -> "Backlog"
-    TaskListFilter.SCHEDULED -> "Scheduled"
-    TaskListFilter.ROUTINE_DERIVED -> "Routine-derived"
-    TaskListFilter.COMPLETED -> "Completed"
-}
-
 private fun taskListFilterEmptyState(filter: TaskListFilter): String = when (filter) {
     TaskListFilter.ALL_ACTIVE -> "No active tasks."
     TaskListFilter.BACKLOG -> "No backlog tasks."
@@ -1986,6 +2013,14 @@ private fun TaskListFilter.label(): String = when (this) {
     TaskListFilter.SCHEDULED -> "Scheduled"
     TaskListFilter.ROUTINE_DERIVED -> "Routine-derived"
     TaskListFilter.COMPLETED -> "Completed"
+}
+
+private fun TaskListFilter.icon(): ImageVector = when (this) {
+    TaskListFilter.ALL_ACTIVE -> Lucide.Diamond
+    TaskListFilter.BACKLOG -> Lucide.Inbox
+    TaskListFilter.SCHEDULED -> Lucide.CalendarClock
+    TaskListFilter.ROUTINE_DERIVED -> Lucide.Clock9
+    TaskListFilter.COMPLETED -> Lucide.CheckCheck
 }
 
 private fun taskListFilterFromLabel(label: String): TaskListFilter = when (label) {

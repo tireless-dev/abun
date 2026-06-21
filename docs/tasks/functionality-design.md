@@ -7,6 +7,8 @@ This document describes the user-facing behavior of the tasks module. It is the 
 UI implementation note:
 - current shared task surfaces use direct Material 3 components for sheets, forms, segmented selectors, buttons, and app chrome
 - current task surfaces follow the shared editorial Material 3 language: neutral-first color, spacious 8/16/24/32 rhythm, flat outlined cards, muted status tags, and low-noise app chrome
+- the `Tasks` first-level filter selector is compact and icon-first: every option keeps its icon visible, while only the active filter expands to show its text label
+- the task-instance list now sits directly on the shared page surface instead of inside a nested task-list card with duplicate headings
 - this is an implementation detail only; the user-facing workflows below are unchanged by the Material 3 wrapper removal
 
 ## Primary User Jobs
@@ -39,6 +41,7 @@ This surface replaces the idea of a purely live “today dashboard.” It is a d
 - hierarchy is visible here in tree mode
 - backlog lives here
 - shared visual language: task/routine rows appear as flat outlined cards with muted metadata and action buttons kept secondary to the record content
+- first-level filter chrome stays lightweight: inactive filters shrink to icon-only pills, and the active filter expands to icon plus label for orientation without repeating a separate state heading
 
 Default behavior:
 
