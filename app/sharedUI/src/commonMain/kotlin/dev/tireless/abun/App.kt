@@ -108,6 +108,11 @@ import dev.tireless.abun.ui.navigation.routeForTab
 import dev.tireless.abun.ui.screens.DayScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
+import dev.tireless.abun.ui.sheets.CreateTaskSheet
+import dev.tireless.abun.ui.sheets.TaskCreateContext
+import dev.tireless.abun.ui.sheets.TaskSaveDraft
+import dev.tireless.abun.ui.sheets.normalizeTaskSaveDraft
+import dev.tireless.abun.ui.sheets.taskCreateContextFor
 import dev.tireless.abun.ui.TaskTopBarSubtabOption
 import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
@@ -437,133 +442,6 @@ private fun StatusStrip(state: AppUiState) {
         }
     }
 }
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-internal fun CreateTaskSheet(
-    context: TaskCreateContext,
-    onDismiss: () -> Unit,
-    onCreate: (TaskSaveDraft) -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(ThemeTokens.spacing.lgDp),
-            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
-        ) {
-        CreateTaskSheetContent(
-            context = context,
-            onCreate = onCreate,
-            onDismiss = onDismiss,
-        )
-        }
-    }
-}
-
-@Composable
-internal fun CreateTaskSheetContent(
-    context: TaskCreateContext,
-    onCreate: (TaskSaveDraft) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var draft by remember(context) { mutableStateOf(defaultTaskCreateDraft(context)) }
-    val dateOptions = remember(context) { taskCreateDateOptions(context) }
-    val selectedDateLabel = dateOptions.firstOrNull { it.date == draft.startDate }?.label ?: dateOptions.first().label
-    val createEnabled = draft.title.isNotBlank() &&
-        (!draft.hasSchedule || !draft.startDate.isNullOrBlank()) &&
-        (draft.durationPreset != DurationPreset.CUSTOM || draft.customDurationMinutes.trim().toIntOrNull()?.let { it > 0 } == true)
-    Text("Create task", style = ThemeTokens.type.sectionTitle)
-    OutlinedTextField(
-        value = draft.title,
-        onValueChange = { draft = draft.copy(title = it) },
-        label = { Text("Task title", style = ThemeTokens.type.label) },
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = ThemeTokens.type.body,
-        singleLine = true,
-    )
-    OutlinedTextField(
-        value = draft.detail,
-        onValueChange = { draft = draft.copy(detail = it) },
-        label = { Text("Detail", style = ThemeTokens.type.label) },
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = ThemeTokens.type.body,
-        singleLine = true,
-    )
-    if (draft.hasSchedule) {
-        Text("Starts on", style = ThemeTokens.type.label)
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            dateOptions.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = option.label == selectedDateLabel,
-                    onClick = { draft = draft.copy(startDate = option.date) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = dateOptions.size),
-                ) {
-                    Text(option.label, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-        }
-        Text(draft.startDate.orEmpty(), style = ThemeTokens.type.bodyMuted)
-        Text("Estimated duration", style = ThemeTokens.type.label)
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            DurationPreset.entries.forEachIndexed { index, preset ->
-                SegmentedButton(
-                    selected = preset.label == draft.durationPreset.label,
-                    onClick = {
-                        draft = draft.copy(
-                            durationPreset = preset,
-                            customDurationMinutes = if (preset == DurationPreset.CUSTOM) draft.customDurationMinutes else "",
-                        )
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DurationPreset.entries.size),
-                ) {
-                    Text(preset.label, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-        }
-        if (draft.durationPreset == DurationPreset.CUSTOM) {
-            OutlinedTextField(
-                value = draft.customDurationMinutes,
-                onValueChange = { draft = draft.copy(customDurationMinutes = it) },
-                label = { Text("Custom minutes", style = ThemeTokens.type.label) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = ThemeTokens.type.body,
-                singleLine = true,
-            )
-        }
-        OutlinedButton(
-            onClick = { draft = draft.copy(hasSchedule = false, startDate = null, durationPreset = DurationPreset.NONE, customDurationMinutes = "") },
-        ) {
-            Text("Clear schedule", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-    } else {
-        Text("This task will go to backlog.", style = ThemeTokens.type.bodyMuted)
-        OutlinedButton(
-            onClick = {
-                draft = draft.copy(
-                    hasSchedule = true,
-                    startDate = draft.startDate ?: context.selectedDate,
-                )
-            },
-        ) {
-            Text("Add schedule", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-    }
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-    ) {
-        OutlinedButton(onClick = onDismiss) {
-            Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-        Button(
-            onClick = { onCreate(normalizeTaskCreateDraft(draft)) },
-            enabled = createEnabled,
-        ) {
-            Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-    }
-}
-
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun CreateRoutineSheet(
@@ -1139,51 +1017,6 @@ internal fun taskDetailActionLabels(task: TaskListItemView): List<String> =
         listOf("Delete task")
     }
 
-internal data class TaskSaveDraft(
-    val title: String,
-    val detail: String?,
-    val parentId: String?,
-    val startNotBefore: String?,
-    val endNotAfter: String?,
-    val estimatedDuration: String?,
-)
-
-internal enum class TaskCreateSource {
-    TASKS,
-    DAY,
-}
-
-internal data class TaskCreateContext(
-    val source: TaskCreateSource,
-    val selectedDate: String,
-)
-
-internal data class TaskCreateDateOption(
-    val label: String,
-    val date: String,
-)
-
-internal enum class DurationPreset(
-    val label: String,
-    val isoDuration: String?,
-) {
-    NONE("No estimate", null),
-    MINUTES_15("15m", "PT15M"),
-    MINUTES_30("30m", "PT30M"),
-    HOUR_1("1h", "PT1H"),
-    HOUR_2("2h", "PT2H"),
-    CUSTOM("Custom", null),
-}
-
-internal data class TaskCreateDraft(
-    val title: String = "",
-    val detail: String = "",
-    val hasSchedule: Boolean,
-    val startDate: String?,
-    val durationPreset: DurationPreset,
-    val customDurationMinutes: String = "",
-)
-
 internal data class RoutineSaveDraft(
     val id: String,
     val title: String,
@@ -1271,74 +1104,6 @@ private fun recurrencePresetFromLabel(label: String): RoutineRecurrencePreset = 
     "Weekdays" -> RoutineRecurrencePreset.WEEKDAYS
     else -> RoutineRecurrencePreset.CUSTOM
 }
-
-internal fun normalizeTaskSaveDraft(
-    title: String,
-    detail: String,
-    parentId: String?,
-    startNotBefore: String,
-    endNotAfter: String,
-    estimatedDuration: String,
-): TaskSaveDraft = TaskSaveDraft(
-    title = title.trim(),
-    detail = detail.ifBlank { null },
-    parentId = parentId,
-    startNotBefore = startNotBefore.ifBlank { null },
-    endNotAfter = endNotAfter.ifBlank { null },
-    estimatedDuration = estimatedDuration.ifBlank { null },
-)
-
-internal fun taskCreateContextFor(selectedTab: AppTab, selectedDate: String): TaskCreateContext = TaskCreateContext(
-    source = if (selectedTab == AppTab.TODAY) TaskCreateSource.DAY else TaskCreateSource.TASKS,
-    selectedDate = selectedDate,
-)
-
-internal fun defaultTaskCreateDraft(context: TaskCreateContext): TaskCreateDraft = TaskCreateDraft(
-    hasSchedule = context.source == TaskCreateSource.DAY,
-    startDate = if (context.source == TaskCreateSource.DAY) context.selectedDate else null,
-    durationPreset = DurationPreset.NONE,
-)
-
-internal fun taskCreateDateOptions(context: TaskCreateContext): List<TaskCreateDateOption> {
-    val anchor = LocalDate.parse(context.selectedDate)
-    return when (context.source) {
-        TaskCreateSource.DAY -> listOf(
-            TaskCreateDateOption("Selected day", context.selectedDate),
-            TaskCreateDateOption("Next day", anchor.plus(1, DateTimeUnit.DAY).toString()),
-            TaskCreateDateOption("In 1 week", anchor.plus(7, DateTimeUnit.DAY).toString()),
-        )
-        TaskCreateSource.TASKS -> listOf(
-            TaskCreateDateOption("Today", context.selectedDate),
-            TaskCreateDateOption("Tomorrow", anchor.plus(1, DateTimeUnit.DAY).toString()),
-            TaskCreateDateOption("In 1 week", anchor.plus(7, DateTimeUnit.DAY).toString()),
-        )
-    }
-}
-
-internal fun normalizeTaskCreateDraft(draft: TaskCreateDraft): TaskSaveDraft {
-    val normalizedStartDate = draft.startDate?.takeIf { draft.hasSchedule && it.isNotBlank() }
-    return TaskSaveDraft(
-        title = draft.title.trim(),
-        detail = draft.detail.ifBlank { null },
-        parentId = null,
-        startNotBefore = normalizedStartDate?.let(::taskCreateStartOfDayIso),
-        endNotAfter = null,
-        estimatedDuration = normalizedStartDate?.let {
-            when (draft.durationPreset) {
-                DurationPreset.NONE -> null
-                DurationPreset.CUSTOM -> draft.customDurationMinutes
-                    .trim()
-                    .toIntOrNull()
-                    ?.takeIf { minutes -> minutes > 0 }
-                    ?.let { minutes -> "PT${minutes}M" }
-                else -> draft.durationPreset.isoDuration
-            }
-        },
-    )
-}
-
-internal fun taskCreateStartOfDayIso(date: String): String =
-    LocalDate.parse(date).atStartOfDayIn(TimeZone.currentSystemDefault()).toString()
 
 internal fun normalizeRoutineSaveDraft(
     id: String,
