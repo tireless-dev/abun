@@ -62,7 +62,7 @@ Current auth/session endpoints:
 
 OTP email is the only supported auth method today, but it is carried behind the generic auth contract with `method = "otp_email"`.
 
-Debug login presets may prefill the shared test-account email and OTP in development builds, but they must still exchange a real server session before sync begins rather than persisting placeholder refresh tokens. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and then enters the normal shared sync path.
+Debug login presets may prefill the shared test-account email and OTP in development builds, but they must still exchange a real server session before sync begins rather than persisting placeholder refresh tokens. Desktop local development should enable the same shared debug-auth preset path as Android and iOS debug builds so the login guide starts from the same OTP-requested state during routine validation. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and then enters the normal shared sync path.
 
 ## Resource Categories
 
@@ -120,6 +120,7 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 - The Desktop target is the primary fast validation surface for shared mobile UI behavior.
 - The Desktop app should launch in a portrait phone-like window by default and apply a desktop-specific minimum size guardrail so responsive mobile layouts can be checked without starting the Android target.
 - The Desktop runtime should include an SLF4J backend so JVM dependencies such as Ktor/CIO emit normal logs instead of falling back to the no-op logger.
+- The Desktop runtime should resolve `ThemePreference.SYSTEM` through a JVM platform adapter that matches the host OS appearance, rather than assuming Compose Desktop’s generic dark-theme signal is correct on every platform.
 
 ## Shared UI Boundary
 

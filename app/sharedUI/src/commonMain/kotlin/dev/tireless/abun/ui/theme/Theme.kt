@@ -1,6 +1,5 @@
 package dev.tireless.abun.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
@@ -41,7 +40,7 @@ fun AppTheme(
     themePreference: ThemePreference = ThemePreference.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val darkTheme = resolveDarkTheme(themePreference, isSystemInDarkTheme())
+    val darkTheme = resolveDarkTheme(themePreference, platformSystemDarkTheme())
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val shapes = Shapes(
         small = RoundedCornerShape(DefaultRadii.smallDp),
