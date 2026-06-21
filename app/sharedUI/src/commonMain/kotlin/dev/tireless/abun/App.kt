@@ -166,13 +166,6 @@ fun App() {
         }
     }
 
-    LaunchedEffect(currentRoute) {
-        val routeTab = appTabForRoute(currentRoute)
-        if (routeTab != state.selectedTab) {
-            controller.selectTab(routeTab)
-        }
-    }
-
     LaunchedEffect(state.selectedTab, currentRoute) {
         val targetRoute = routeForTab(state.selectedTab)
         if (currentRoute != null && currentRoute != targetRoute) {
@@ -255,15 +248,7 @@ fun App() {
                         AppTab.entries.forEach { tab ->
                             Tab(
                                 selected = state.selectedTab == tab,
-                                onClick = {
-                                    navController.navigate(routeForTab(tab)) {
-                                        launchSingleTop = true
-                                        restoreState = true
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
-                                        }
-                                    }
-                                },
+                                onClick = { controller.selectTab(tab) },
                                 selectedContentColor = ThemeTokens.colors.textPrimary,
                                 unselectedContentColor = ThemeTokens.colors.textSecondary,
                                 text = { Text(tab.tabLabel(), style = ThemeTokens.type.label) },
@@ -433,6 +418,170 @@ fun App() {
                 },
             )
             null -> Unit
+        }
+    }
+}
+
+@Composable
+internal fun AppContent(
+    state: AppUiState,
+    liveNow: Long,
+    selectedTaskHistory: List<JournalEntryView>,
+    onSelectTab: (AppTab) -> Unit,
+    onSelectTaskSubTab: (TaskSubTab) -> Unit,
+    onSelectTaskFilter: (TaskListFilter) -> Unit,
+    onOpenTask: (TaskListItemView) -> Unit,
+    onOpenStartPomodoro: () -> Unit,
+    onCreateRoutine: () -> Unit,
+    onOpenRoutine: (RoutineListItemView) -> Unit,
+    onRunRoutine: (RoutineListItemView) -> Unit,
+    onUpdateThemePreference: (ThemePreference) -> Unit,
+    onUpdatePreferences: (
+        String,
+        Int,
+        Int,
+        Int,
+        Int,
+        String,
+        DateFormatPreference,
+        ThemePreference,
+        String,
+    ) -> Unit,
+    onReopenLogin: () -> Unit,
+    onLogout: () -> Unit,
+    onRequestEmailOtp: () -> Unit,
+    onVerifyEmailOtp: (String) -> Unit,
+    onSkipLogin: () -> Unit,
+    onUpdateLoginEmail: (String) -> Unit,
+    taskHistoryFor: (String) -> List<JournalEntryView>,
+    onCreateTask: (String, String?, String?, String?, String?, String?) -> Unit,
+    onCreateRoutineConfirm: (String, String?, String, String?, String?) -> Unit,
+    onSaveTask: (String, String, String?, String?, String?, String?, String?) -> Unit,
+    onProgressTask: (String, String?) -> Unit,
+    onCompleteTask: (String, String?) -> Unit,
+    onSkipTask: (String, String?) -> Unit,
+    onPostponeTask: (String, String?, String?, String?, String?) -> Unit,
+    onDeleteTask: (String) -> Unit,
+    onSaveRoutine: (String, String, String?, String, String?, String?) -> Unit,
+    onToggleRoutine: (String) -> Unit,
+    onDeleteRoutine: (String) -> Unit,
+    onStartPomodoro: (String?, PomodoroPhase) -> Unit,
+    onCompletePomodoro: (String, PomodoroTaskUpdate) -> Unit,
+    onStopPomodoro: (String) -> Unit,
+) {
+    val navController = rememberNavController()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    var isTaskTopBarSelectorExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.selectedTab, currentRoute) {
+        val targetRoute = routeForTab(state.selectedTab)
+        if (currentRoute != null && currentRoute != targetRoute) {
+            navController.navigate(targetRoute) {
+                launchSingleTop = true
+                restoreState = true
+                popUpTo(navController.graph.startDestinationId) {
+                    saveState = true
+                }
+            }
+        }
+    }
+
+    if (state.auth.showGuide) {
+        GuideScreenContent(
+            state = state,
+            onUpdateLoginEmail = onUpdateLoginEmail,
+            onRequestEmailOtp = onRequestEmailOtp,
+            onVerifyEmailOtp = onVerifyEmailOtp,
+            onSkipLogin = onSkipLogin,
+        )
+        return
+    }
+
+    MaterialScaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = ThemeTokens.colors.background,
+                    titleContentColor = ThemeTokens.colors.textPrimary,
+                ),
+                title = {
+                    if (state.selectedTab == AppTab.TASKS) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = state.selectedTab.tabLabel(),
+                                style = ThemeTokens.type.title,
+                            )
+                            TaskTopBarSubtabSelector(
+                                currentLabel = state.selectedTaskSubTab.label(),
+                                currentIcon = state.selectedTaskSubTab.icon(),
+                                expanded = isTaskTopBarSelectorExpanded,
+                                onExpandedChange = { isTaskTopBarSelectorExpanded = it },
+                                options = TaskSubTab.entries.map { taskSubTab ->
+                                    TaskTopBarSubtabOption(
+                                        label = taskSubTab.label(),
+                                        icon = taskSubTab.icon(),
+                                        onClick = { onSelectTaskSubTab(taskSubTab) },
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = state.selectedTab.tabLabel(),
+                            style = ThemeTokens.type.title,
+                        )
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            Surface(color = ThemeTokens.colors.surface, contentColor = ThemeTokens.colors.textSecondary) {
+                SecondaryTabRow(
+                    selectedTabIndex = AppTab.entries.indexOf(state.selectedTab).coerceAtLeast(0),
+                    containerColor = ThemeTokens.colors.surface,
+                    contentColor = ThemeTokens.colors.textSecondary,
+                    divider = { HorizontalDivider(color = ThemeTokens.colors.border) },
+                ) {
+                    AppTab.entries.forEach { tab ->
+                        Tab(
+                            selected = state.selectedTab == tab,
+                            onClick = { onSelectTab(tab) },
+                            selectedContentColor = ThemeTokens.colors.textPrimary,
+                            unselectedContentColor = ThemeTokens.colors.textSecondary,
+                            text = { Text(tab.tabLabel(), style = ThemeTokens.type.label) },
+                        )
+                    }
+                }
+            }
+        },
+    ) { padding: PaddingValues ->
+        EditorialScreen(
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            AppNavHost(
+                navController = navController,
+                state = state,
+                liveNow = liveNow,
+                isPomodoroActive = false,
+                onSelectTaskFilter = onSelectTaskFilter,
+                onOpenTask = onOpenTask,
+                onOpenStartPomodoro = onOpenStartPomodoro,
+                onCreateRoutine = onCreateRoutine,
+                onOpenRoutine = onOpenRoutine,
+                onRunRoutine = onRunRoutine,
+                onUpdateThemePreference = onUpdateThemePreference,
+                onUpdatePreferences = onUpdatePreferences,
+                onReopenLogin = onReopenLogin,
+                onLogout = onLogout,
+            )
         }
     }
 }

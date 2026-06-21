@@ -81,136 +81,140 @@ internal fun SettingsScreenContent(
     var selectedThemePreference by remember(state.preferences) { mutableStateOf(state.preferences.themePreference) }
     var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
-    Panel {
-        SectionHeader("Cloud", "Sync status")
-        SyncStatusPanel(state)
-    }
-    Panel {
-        SectionHeader("Defaults", "Task")
-        OutlinedTextField(
-            value = titlePrefix,
-            onValueChange = { titlePrefix = it },
-            label = { Text("Title prefix", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-    }
-    Panel {
-        SectionHeader("Defaults", "Pomodoro")
-        OutlinedTextField(
-            value = focusMinutes,
-            onValueChange = { focusMinutes = it },
-            label = { Text("Pomodoro minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = shortBreakMinutes,
-            onValueChange = { shortBreakMinutes = it },
-            label = { Text("Short break minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = longBreakMinutes,
-            onValueChange = { longBreakMinutes = it },
-            label = { Text("Long break minutes", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-    }
-    Panel {
-        SectionHeader("Appearance", "Theme")
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            ThemePreference.entries.forEachIndexed { index, themePreference ->
-                val option = themePreference.label()
-                SegmentedButton(
-                    modifier = Modifier.testTag("theme-option-${themePreference.name.lowercase()}"),
-                    selected = option == selectedThemePreference.label(),
-                    onClick = {
-                        selectedThemePreference = themePreferenceFromLabel(option)
-                        onUpdateThemePreference(selectedThemePreference)
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
-                ) {
-                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
+    androidx.compose.foundation.layout.Column(
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
+    ) {
+        Panel(testTag = "settings-panel-cloud") {
+            SectionHeader("Cloud", "Sync status")
+            SyncStatusPanel(state)
         }
-    }
-    Panel {
-        SectionHeader("App", "Preferences")
-        OutlinedTextField(
-            value = timezoneOverride,
-            onValueChange = { timezoneOverride = it },
-            label = { Text("Timezone override", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = rolloverTime,
-            onValueChange = { rolloverTime = it },
-            label = { Text("Rollover time (HH:MM)", style = ThemeTokens.type.label) },
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = ThemeTokens.type.body,
-            singleLine = true,
-        )
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            DateFormatPreference.entries.forEachIndexed { index, dateFormatPreference ->
-                val option = dateFormatPreference.label()
-                SegmentedButton(
-                    selected = option == selectedDateFormat.label(),
-                    onClick = { selectedDateFormat = dateFormatFromLabel(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
-                ) {
-                    Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
-                }
-            }
-        }
-        Button(
-            onClick = {
-                onUpdatePreferences(
-                    titlePrefix,
-                    state.preferences.defaultAlarmLeadMinutes,
-                    focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
-                    shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
-                    longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
-                    timezoneOverride,
-                    selectedDateFormat,
-                    selectedThemePreference,
-                    rolloverTime,
-                )
-            },
-        ) {
-            Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
-        }
-    }
-    if (state.auth.mode == dev.tireless.abun.app.AuthMode.GUEST) {
-        Panel {
-            SectionHeader("Account", "Login")
-            Text(
-                state.auth.errorMessage ?: "Login anytime to enable cloud sync on this device.",
-                style = ThemeTokens.type.bodyMuted,
+        Panel(testTag = "settings-panel-task-defaults") {
+            SectionHeader("Defaults", "Task")
+            OutlinedTextField(
+                value = titlePrefix,
+                onValueChange = { titlePrefix = it },
+                label = { Text("Title prefix", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
             )
-            Button(onClick = onReopenLogin) {
-                Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
+        }
+        Panel(testTag = "settings-panel-pomodoro-defaults") {
+            SectionHeader("Defaults", "Pomodoro")
+            OutlinedTextField(
+                value = focusMinutes,
+                onValueChange = { focusMinutes = it },
+                label = { Text("Pomodoro minutes", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = shortBreakMinutes,
+                onValueChange = { shortBreakMinutes = it },
+                label = { Text("Short break minutes", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = longBreakMinutes,
+                onValueChange = { longBreakMinutes = it },
+                label = { Text("Long break minutes", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+        }
+        Panel(testTag = "settings-panel-theme") {
+            SectionHeader("Appearance", "Theme")
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                ThemePreference.entries.forEachIndexed { index, themePreference ->
+                    val option = themePreference.label()
+                    SegmentedButton(
+                        modifier = Modifier.testTag("theme-option-${themePreference.name.lowercase()}"),
+                        selected = option == selectedThemePreference.label(),
+                        onClick = {
+                            selectedThemePreference = themePreferenceFromLabel(option)
+                            onUpdateThemePreference(selectedThemePreference)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
+                    ) {
+                        Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                }
             }
         }
-    } else {
-        Panel {
-            SectionHeader("Account", "Session")
-            Text("This device is signed in and can sync with your server account.", style = ThemeTokens.type.bodyMuted)
-            OutlinedButton(onClick = onLogout) {
-                Text("Log out", style = ThemeTokens.type.body.withMaterialContentColor())
+        Panel(testTag = "settings-panel-preferences") {
+            SectionHeader("App", "Preferences")
+            OutlinedTextField(
+                value = timezoneOverride,
+                onValueChange = { timezoneOverride = it },
+                label = { Text("Timezone override", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = rolloverTime,
+                onValueChange = { rolloverTime = it },
+                label = { Text("Rollover time (HH:MM)", style = ThemeTokens.type.label) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = ThemeTokens.type.body,
+                singleLine = true,
+            )
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DateFormatPreference.entries.forEachIndexed { index, dateFormatPreference ->
+                    val option = dateFormatPreference.label()
+                    SegmentedButton(
+                        selected = option == selectedDateFormat.label(),
+                        onClick = { selectedDateFormat = dateFormatFromLabel(option) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
+                    ) {
+                        Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    onUpdatePreferences(
+                        titlePrefix,
+                        state.preferences.defaultAlarmLeadMinutes,
+                        focusMinutes.toIntOrNull() ?: state.preferences.focusMinutes,
+                        shortBreakMinutes.toIntOrNull() ?: state.preferences.shortBreakMinutes,
+                        longBreakMinutes.toIntOrNull() ?: state.preferences.longBreakMinutes,
+                        timezoneOverride,
+                        selectedDateFormat,
+                        selectedThemePreference,
+                        rolloverTime,
+                    )
+                },
+            ) {
+                Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
+            }
+        }
+        if (state.auth.mode == dev.tireless.abun.app.AuthMode.GUEST) {
+            Panel(testTag = "settings-panel-login") {
+                SectionHeader("Account", "Login")
+                Text(
+                    state.auth.errorMessage ?: "Login anytime to enable cloud sync on this device.",
+                    style = ThemeTokens.type.bodyMuted,
+                )
+                Button(onClick = onReopenLogin) {
+                    Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
+                }
+            }
+        } else {
+            Panel(testTag = "settings-panel-session") {
+                SectionHeader("Account", "Session")
+                Text("This device is signed in and can sync with your server account.", style = ThemeTokens.type.bodyMuted)
+                OutlinedButton(onClick = onLogout) {
+                    Text("Log out", style = ThemeTokens.type.body.withMaterialContentColor())
+                }
             }
         }
     }

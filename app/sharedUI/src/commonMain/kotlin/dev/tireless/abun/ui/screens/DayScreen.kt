@@ -33,42 +33,46 @@ internal fun DayScreen(
     val runningTasks = openTasks.count { it.status == TaskStatus.IN_PROGRESS }
     val active = state.activePomodoroSession
 
-    Panel {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column {
-                Text("Daily desk", style = ThemeTokens.type.label)
-                Text("Day", style = ThemeTokens.type.title)
-                Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
+    ) {
+        Panel(testTag = "day-panel-summary") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text("Daily desk", style = ThemeTokens.type.label)
+                    Text("Day", style = ThemeTokens.type.title)
+                    Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
+                }
+                Button(onClick = onStartPomodoro) {
+                    Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body.withMaterialContentColor())
+                }
             }
-            Button(onClick = onStartPomodoro) {
-                Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body.withMaterialContentColor())
-            }
+            MetricRow(
+                listOf(
+                    "Open" to openTasks.size.toString(),
+                    "Running" to runningTasks.toString(),
+                    "Routines" to state.taskView.routines.size.toString(),
+                ),
+            )
+            TaskStack(
+                tasks = openTasks,
+                empty = "No open tasks for this date.",
+                onOpenTask = onOpenTask,
+            )
         }
-        MetricRow(
-            listOf(
-                "Open" to openTasks.size.toString(),
-                "Running" to runningTasks.toString(),
-                "Routines" to state.taskView.routines.size.toString(),
-            ),
-        )
-        TaskStack(
-            tasks = openTasks,
-            empty = "No open tasks for this date.",
-            onOpenTask = onOpenTask,
-        )
-    }
 
-    Panel {
-        SectionHeader("Day timeline", "${state.today.journalEntries.size} events")
-        JournalTimeline(state.today.journalEntries)
-    }
+        Panel(testTag = "day-panel-timeline") {
+            SectionHeader("Day timeline", "${state.today.journalEntries.size} events")
+            JournalTimeline(state.today.journalEntries)
+        }
 
-    Panel {
-        SectionHeader("Pomodoro", active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "Ready")
-        Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
+        Panel(testTag = "day-panel-pomodoro") {
+            SectionHeader("Pomodoro", active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "Ready")
+            Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
+        }
     }
 }

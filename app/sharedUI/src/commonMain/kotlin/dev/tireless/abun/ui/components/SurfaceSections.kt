@@ -17,8 +17,11 @@ import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
-internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    EditorialCard(content = content)
+internal fun Panel(
+    testTag: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    EditorialCard(testTag = testTag, content = content)
 }
 
 @Composable
