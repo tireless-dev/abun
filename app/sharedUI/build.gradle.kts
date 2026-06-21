@@ -54,6 +54,7 @@ kotlin {
             implementation(libs.compose.icons.lucide.cmp)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.androidx.navigation.compose)
             implementation(libs.serialization.json)
             implementation(libs.ktor.clientContentNegotiationCommon)
             implementation(libs.ktor.serializationKotlinxJsonCommon)
