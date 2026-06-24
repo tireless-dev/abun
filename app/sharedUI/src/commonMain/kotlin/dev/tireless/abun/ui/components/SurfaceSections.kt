@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.theme.ThemeTokens
@@ -19,9 +20,15 @@ import dev.tireless.abun.ui.theme.ThemeTokens
 @Composable
 internal fun Panel(
     testTag: String? = null,
+    compact: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    EditorialCard(testTag = testTag, content = content)
+    EditorialCard(
+        testTag = testTag,
+        contentPadding = if (compact) PaddingValues(ThemeTokens.spacing.mdDp) else PaddingValues(ThemeTokens.spacing.lgDp),
+        contentSpacing = if (compact) ThemeTokens.spacing.smDp else ThemeTokens.spacing.mdDp,
+        content = content,
+    )
 }
 
 @Composable

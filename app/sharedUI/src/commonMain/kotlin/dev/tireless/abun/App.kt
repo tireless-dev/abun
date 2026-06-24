@@ -105,7 +105,7 @@ import dev.tireless.abun.ui.components.StatusPill
 import dev.tireless.abun.ui.navigation.AppNavHost
 import dev.tireless.abun.ui.navigation.appTabForRoute
 import dev.tireless.abun.ui.navigation.routeForTab
-import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
 import dev.tireless.abun.ui.sheets.CompletePomodoroSheet
@@ -283,6 +283,13 @@ fun App() {
                 modifier = Modifier
                     .padding(padding)
                     .verticalScroll(rememberScrollState()),
+                contentPadding = PaddingValues(
+                    start = ThemeTokens.spacing.mdDp,
+                    top = ThemeTokens.spacing.mdDp,
+                    end = ThemeTokens.spacing.mdDp,
+                    bottom = ThemeTokens.spacing.mdDp,
+                ),
+                verticalSpacing = if (state.selectedTab == AppTab.TODAY) ThemeTokens.spacing.mdDp else ThemeTokens.spacing.lgDp,
             ) {
                 AppNavHost(
                     navController = navController,
@@ -674,7 +681,7 @@ internal fun taskListFilterEmptyState(filter: TaskListFilter): String = when (fi
 }
 
 private fun AppTab.tabLabel(): String = when (this) {
-    AppTab.TODAY -> "Day"
+    AppTab.TODAY -> "Dashboard"
     AppTab.TASKS -> "Tasks"
     AppTab.SETTINGS -> "Settings"
 }

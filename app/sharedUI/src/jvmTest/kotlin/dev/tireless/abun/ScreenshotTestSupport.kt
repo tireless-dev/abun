@@ -162,7 +162,12 @@ internal fun ScreenshotScreenFrame(
                 .fillMaxSize()
                 .background(ThemeTokens.colors.background)
                 .padding(padding)
-                .padding(ThemeTokens.spacing.screenPaddingDp),
+                .padding(
+                    start = ThemeTokens.spacing.mdDp,
+                    top = ThemeTokens.spacing.mdDp,
+                    end = ThemeTokens.spacing.mdDp,
+                    bottom = ThemeTokens.spacing.mdDp,
+                ),
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
         ) {
             content()
@@ -171,7 +176,7 @@ internal fun ScreenshotScreenFrame(
 }
 
 internal fun AppTab.tabLabelForScreenshot(): String = when (this) {
-    AppTab.TODAY -> "Day"
+    AppTab.TODAY -> "Dashboard"
     AppTab.TASKS -> "Tasks"
     AppTab.SETTINGS -> "Settings"
 }

@@ -3,6 +3,7 @@ package dev.tireless.abun.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ internal fun TaskStack(
     onOpenTask: (TaskListItemView) -> Unit,
     disabled: Boolean = false,
     compact: Boolean = false,
+    cardCompact: Boolean = false,
 ) {
     if (tasks.isEmpty()) {
         Text(empty, style = ThemeTokens.type.body)
@@ -27,7 +29,7 @@ internal fun TaskStack(
     }
     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
         tasks.forEach { task ->
-            TaskRow(task = task, compact = compact, disabled = disabled, onOpenTask = onOpenTask)
+            TaskRow(task = task, compact = compact, cardCompact = cardCompact, disabled = disabled, onOpenTask = onOpenTask)
         }
     }
 }
@@ -36,10 +38,14 @@ internal fun TaskStack(
 private fun TaskRow(
     task: TaskListItemView,
     compact: Boolean,
+    cardCompact: Boolean,
     disabled: Boolean,
     onOpenTask: (TaskListItemView) -> Unit,
 ) {
-    EditorialCard {
+    EditorialCard(
+        contentPadding = if (cardCompact) PaddingValues(ThemeTokens.spacing.mdDp) else PaddingValues(ThemeTokens.spacing.lgDp),
+        contentSpacing = if (cardCompact) ThemeTokens.spacing.smDp else ThemeTokens.spacing.mdDp,
+    ) {
         Text(task.title, style = ThemeTokens.type.cardTitle)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),

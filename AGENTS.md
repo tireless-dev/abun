@@ -6,7 +6,7 @@
 - **Cross-Platform Alignment**: Ensure all changes align with the Kotlin Multiplatform (KMP) architecture and the server-side implementation.
 - **Architecture & Product Design Alignment**: After every implementation, update the relevant architecture and product design documents so they match the implemented behavior.
 - **Design System Alignment**: Treat the shared editorial Material 3 design system in `docs/base/shared-ui-design-system.md` and `app/sharedUI` as the source of truth for future UI work. New or modified shared UI should use the shared theme tokens and minimal editorial primitives rather than introducing feature-local styling, decorative effects, or one-off spacing/radius/color rules.
-- **TDD (Test-Driven Development)**: Follow TDD for every step of development. Write failing tests before implementing logic.
+- **Pragmatic Test Coverage**: Add or update focused unit and component tests for behavior changes when they provide useful protection, but do not require strict TDD or failing-test-first flow for every task.
 - **Target Support**: Ensure changes work for both Desktop and Android targets.
 - **No Integration Tests**: Automated integration tests are not required for AI agents (they will be executed manually by the user). Focus on unit and component tests.
 

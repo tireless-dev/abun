@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -33,14 +34,16 @@ data class EditorialStatusColors(
 @Composable
 fun EditorialScreen(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(ThemeTokens.spacing.screenPaddingDp),
+    verticalSpacing: androidx.compose.ui.unit.Dp = ThemeTokens.spacing.lgDp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(ThemeTokens.colors.background)
-            .padding(ThemeTokens.spacing.screenPaddingDp),
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
+            .padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         content = content,
     )
 }
@@ -49,6 +52,8 @@ fun EditorialScreen(
 fun EditorialCard(
     modifier: Modifier = Modifier,
     testTag: String? = null,
+    contentPadding: PaddingValues = PaddingValues(ThemeTokens.spacing.lgDp),
+    contentSpacing: androidx.compose.ui.unit.Dp = ThemeTokens.spacing.mdDp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val cardModifier = if (testTag == null) modifier else modifier.testTag(testTag)
@@ -62,8 +67,8 @@ fun EditorialCard(
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(ThemeTokens.spacing.lgDp),
-            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(contentSpacing),
             content = content,
         )
     }

@@ -24,14 +24,16 @@ UI implementation note:
 
 ## Product Surfaces
 
-### Day
+### Dashboard
 
-`Day` is the primary execution surface for the tasks module.
+`Dashboard` is the primary execution surface for the tasks module.
 
 - default selected date: today
 - alternate selected dates: past and future days
 - purpose: show what is open for that day and what happened on that day
-- visual treatment: calm editorial workspace with sectioned panels for open work, timeline history, and pomodoro state
+- visual treatment: calm editorial workspace with compact sectioned panels for open work, timeline history, and pomodoro state
+- header treatment: the selected date is the primary title, without a separate subtitle or duplicate surface heading
+- pomodoro treatment: the pomodoro panel owns the timer action instead of the summary card, and an active session keeps that action separate from the countdown label
 
 This surface replaces the idea of a purely live “today dashboard.” It is a date-scoped workspace.
 
@@ -77,9 +79,9 @@ Subtab structure:
 - purpose: review completed work, missed routine occurrences, and pomodoro history
 - pomodoro history belongs here rather than on the core task-management surface
 
-## Day Workspace Model
+## Dashboard Workspace Model
 
-For any selected date, the `Day` surface contains two lists:
+For any selected date, the `Dashboard` surface contains two lists:
 
 ### Open tasks
 
@@ -120,7 +122,7 @@ Visible timeline event set:
 
 ### Selected date behavior
 
-The `Day` workspace supports three modes of use:
+The `Dashboard` workspace supports three modes of use:
 
 - past-date reconstruction
 - current-day execution
@@ -169,7 +171,7 @@ Backlog rule:
 
 - a task with neither `start_not_before` nor `end_not_after` is a backlog task
 - backlog tasks belong to the `Tasks` management surface
-- backlog tasks do not appear in any `Day` view until scheduled
+- backlog tasks do not appear in any `Dashboard` view until scheduled
 
 No explicit priority field is required.
 

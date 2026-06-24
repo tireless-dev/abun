@@ -12,9 +12,7 @@ import androidx.compose.ui.Modifier
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.formatRemaining
-import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.components.JournalTimeline
-import dev.tireless.abun.ui.components.MetricRow
 import dev.tireless.abun.ui.components.Panel
 import dev.tireless.abun.ui.components.SectionHeader
 import dev.tireless.abun.ui.components.TaskStack
@@ -22,7 +20,7 @@ import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 
 @Composable
-internal fun DayScreen(
+internal fun HomeScreen(
     state: AppUiState,
     liveNow: Long,
     onOpenTask: (TaskListItemView) -> Unit,
@@ -30,49 +28,49 @@ internal fun DayScreen(
 ) {
     val tasksById = state.taskView.tasks.associateBy(TaskListItemView::id)
     val openTasks = state.today.currentTasks.mapNotNull { agenda -> tasksById[agenda.taskId] }
-    val runningTasks = openTasks.count { it.status == TaskStatus.IN_PROGRESS }
     val active = state.activePomodoroSession
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
     ) {
-        Panel(testTag = "day-panel-summary") {
+        Panel(testTag = "day-panel-summary", compact = true) {
+            Text(state.selectedDate, style = ThemeTokens.type.title)
+            TaskStack(
+                tasks = openTasks,
+                empty = "No open tasks for this date.",
+                onOpenTask = onOpenTask,
+                cardCompact = true,
+            )
+        }
+
+        Panel(testTag = "day-panel-timeline", compact = true) {
+            SectionHeader("Day timeline", "${state.today.journalEntries.size} events")
+            JournalTimeline(state.today.journalEntries)
+        }
+
+        Panel(testTag = "day-panel-pomodoro", compact = true) {
+            SectionHeader("Pomodoro", active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "Ready")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                Column {
-                    Text("Daily desk", style = ThemeTokens.type.label)
-                    Text("Day", style = ThemeTokens.type.title)
-                    Text(state.selectedDate, style = ThemeTokens.type.bodyMuted)
+                Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
+                    Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
+                    active?.let {
+                        Text("${it.phase.name.lowercase().replace('_', ' ').replaceFirstChar(Char::titlecase)} • ${it.durationMinutes}m", style = ThemeTokens.type.label)
+                    }
                 }
-                Button(onClick = onStartPomodoro) {
-                    Text(if (active == null) "Start" else formatRemaining(active.endsAtEpochMillis - liveNow), style = ThemeTokens.type.body.withMaterialContentColor())
+                if (active == null) {
+                    Button(onClick = onStartPomodoro) {
+                        Text("Start", style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                } else {
+                    Button(onClick = onStartPomodoro) {
+                        Text("Complete or stop", style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
                 }
             }
-            MetricRow(
-                listOf(
-                    "Open" to openTasks.size.toString(),
-                    "Running" to runningTasks.toString(),
-                    "Routines" to state.taskView.routines.size.toString(),
-                ),
-            )
-            TaskStack(
-                tasks = openTasks,
-                empty = "No open tasks for this date.",
-                onOpenTask = onOpenTask,
-            )
-        }
-
-        Panel(testTag = "day-panel-timeline") {
-            SectionHeader("Day timeline", "${state.today.journalEntries.size} events")
-            JournalTimeline(state.today.journalEntries)
-        }
-
-        Panel(testTag = "day-panel-pomodoro") {
-            SectionHeader("Pomodoro", active?.let { formatRemaining(it.endsAtEpochMillis - liveNow) } ?: "Ready")
-            Text(active?.taskTitle ?: "No active timer", style = ThemeTokens.type.bodyMuted)
         }
     }
 }

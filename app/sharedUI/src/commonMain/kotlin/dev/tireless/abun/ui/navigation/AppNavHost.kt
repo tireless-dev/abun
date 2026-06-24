@@ -10,7 +10,7 @@ import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.ThemePreference
-import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.SettingsScreen
 import dev.tireless.abun.ui.screens.TasksScreen
 
@@ -46,7 +46,7 @@ fun AppNavHost(
         startDestination = routeForTab(state.selectedTab),
     ) {
         composable(AppRoute.Day.route) {
-            DayScreen(
+            HomeScreen(
                 state = state,
                 liveNow = liveNow,
                 onOpenTask = onOpenTask,

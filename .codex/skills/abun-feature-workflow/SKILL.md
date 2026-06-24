@@ -1,6 +1,6 @@
 ---
 name: abun-feature-workflow
-description: Use when working on a new Abun feature or behavior change that should go through feature detailing, docs, planning, TDD, validation, and completion gates
+description: Use when working on a new Abun feature or behavior change that should go through feature detailing, docs, planning, validation, and completion gates
 ---
 
 # Abun Feature Workflow
@@ -43,7 +43,6 @@ Do not ask whether users would like the feature. This workflow is for building A
 
 - no implementation before the feature is detailed enough
 - no implementation before a written spec or doc update exists
-- no implementation slice without a failing test first
 - no completion claim without verification evidence
 - no completion claim without documentation alignment
 - no `app/webApp` detour unless explicitly requested
@@ -76,29 +75,28 @@ Rules:
 
 ### 3. Implementation planning
 
-Break the feature into small slices that are easy to implement with TDD.
+Break the feature into small slices that are easy to implement and verify.
 
 Each slice should identify:
 
 - behavior being added
 - shared/domain code to touch
 - UI or platform wiring to touch
-- failing tests to write first
+- tests or manual checks to run for the slice
 - docs to update at completion
 
 When a spec is approved and implementation is next, use the plan workflow and save the plan under `docs/superpowers/plans/`.
 
-### 4. TDD implementation
+### 4. Implementation
+Implement each slice with the lightest process that still leaves the change well-covered and easy to verify.
 
-Follow strict red-green-refactor for every slice:
+Typical flow:
 
-1. write or update a failing test
-2. run it and confirm the failure is for the intended missing behavior
-3. implement the minimal code to pass
-4. re-run the targeted tests
-5. refactor while staying green
-
-No production code before a failing test.
+1. identify the smallest meaningful implementation slice
+2. add or update targeted automated tests when they provide useful protection
+3. implement the minimal shared logic or UI behavior
+4. run the relevant checks for that slice
+5. refactor while keeping verification green
 
 ### 5. Validation
 
@@ -136,6 +134,7 @@ Follow `AGENTS.md` and keep the workflow aligned with the repo:
 - support Desktop and Android targets
 - keep server-side alignment in mind for sync or API-facing changes
 - prefer unit and component tests over integration tests
+- use pragmatic verification depth based on the change size and risk
 
 ## Communication Style
 

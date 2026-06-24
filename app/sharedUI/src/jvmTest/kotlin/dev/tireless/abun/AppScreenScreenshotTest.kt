@@ -18,7 +18,7 @@ import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.app.TaskViewState
 import dev.tireless.abun.app.ThemePreference
-import dev.tireless.abun.ui.screens.DayScreen
+import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.screens.SettingsScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
@@ -56,8 +56,8 @@ class AppScreenScreenshotTest {
     @Test
     fun today() = captureScreenshot("screens/today") {
         val state = screenshotState(selectedTab = AppTab.TODAY)
-        ScreenshotScreenFrame("Day", AppTab.TODAY) {
-            DayScreen(state, liveNow = ScreenshotNow, onOpenTask = {}, onStartPomodoro = {})
+        ScreenshotScreenFrame("Dashboard", AppTab.TODAY) {
+            HomeScreen(state, liveNow = ScreenshotNow, onOpenTask = {}, onStartPomodoro = {})
         }
     }
 

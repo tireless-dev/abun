@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Define a repo-specific Codex skill that guides feature work for Abun from feature definition through planning, TDD implementation, validation, and documentation alignment.
+Define a repo-specific Codex skill that guides feature work for Abun from feature definition through planning, implementation, validation, and documentation alignment.
 
-This skill exists to support self-directed product development for Abun. It is not a user-discovery workflow and does not optimize for market validation. It optimizes for turning a personally desired feature into a well-specified, well-tested, cross-platform implementation with low process drift.
+This skill exists to support self-directed product development for Abun. It is not a user-discovery workflow and does not optimize for market validation. It optimizes for turning a personally desired feature into a well-specified, well-verified, cross-platform implementation with low process drift.
 
 ## Goals
 
 - Turn feature requests into a consistent implementation workflow.
 - Keep feature work aligned with Abun's Kotlin Multiplatform architecture.
-- Enforce spec-first and TDD-first behavior before implementation.
+- Enforce spec-first behavior before implementation.
 - Use the desktop app as the primary interaction-validation surface.
 - Require architecture and product-doc updates before a feature is considered complete.
 - Keep momentum high by default, only pausing for meaningful forks.
@@ -78,23 +78,25 @@ The workflow may create a dedicated spec document when the feature is substantia
 
 ### 3. Implementation planning
 
-Break the feature into implementation slices that are small enough for TDD and easy verification.
+Break the feature into implementation slices that are small enough for reliable implementation and easy verification.
 
 Each slice should identify:
 
 - the behavior being added
 - the shared/domain code to touch
 - the UI or platform wiring to touch
-- the tests that should fail first
+- the tests or manual checks that should cover the slice
 - the docs affected at completion
 
-### 4. TDD implementation
+### 4. Implementation
 
-Each implementation slice follows a strict red-green-refactor loop:
+Each implementation slice should use the lightest process that still leaves the behavior well-covered and easy to verify:
 
-1. write or update a failing test
-2. implement the minimal shared logic or UI behavior
-3. refactor while preserving the passing state
+1. identify the smallest meaningful slice
+2. add or update targeted automated tests when they provide useful protection
+3. implement the minimal shared logic or UI behavior
+4. run the relevant checks for the slice
+5. refactor while preserving the passing state
 
 Test emphasis:
 
@@ -136,7 +138,6 @@ The skill must enforce these rules:
 
 - no implementation before the feature is detailed enough
 - no implementation before a written spec or doc update exists
-- no implementation slice without a failing test first
 - no completion claim without verification evidence
 - no completion claim without documentation alignment
 - no `app/webApp` detour unless explicitly requested
@@ -175,7 +176,7 @@ The skill is successful if, when the user introduces a new feature, Codex reliab
 
 1. details the feature instead of jumping to code
 2. updates or writes the right docs before implementation
-3. creates an implementation plan with test-first slices
-4. implements via TDD in the KMP/shared-first architecture
+3. creates an implementation plan with clear verification for each slice
+4. implements in the KMP/shared-first architecture with pragmatic testing
 5. validates through tests and desktop checks
 6. updates docs before declaring the work complete

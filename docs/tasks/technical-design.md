@@ -120,7 +120,6 @@ Generated occurrence shape:
 3. if the task is updated, do so through task-event insertion rather than direct task status mutation
 
 Pomodoro is separate from the task-event schema. Starting a pomodoro may create `Progressed` only when the linked task is still a valid open task at that moment.
-
 ## Query Rules
 
 ### Current task status
@@ -213,7 +212,10 @@ The current codebase already contains:
 - task-oriented view models in [DomainModels.kt](/Users/jerry/Workspace/_tools/abun/app/sharedLogic/src/commonMain/kotlin/dev/tireless/abun/app/DomainModels.kt)
 - local persistence and merge behavior in shared logic
 - shared task UI still uses direct Material 3 primitives, but the top-level shell in [App.kt](/Users/jerry/Workspace/_tools/abun/app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/App.kt) now delegates route content to Compose Navigation, screen implementations under `app/sharedUI/src/commonMain/kotlin/dev/tireless/abun/ui/screens`, reusable task presentation under `ui/components`, and modal flows plus sheet-only normalization helpers under `ui/sheets`
-- top-level shared UI routes use Compose Navigation for `Day`, `Tasks`, and `Settings`, while the `Tasks` subtab selector remains state-driven through `AppUiState.selectedTaskSubTab`
+- top-level shared UI routes use Compose Navigation for the `Dashboard`, `Tasks`, and `Settings` tabs, while the `Tasks` subtab selector remains state-driven through `AppUiState.selectedTaskSubTab`
+- reviewed on 2026-06-21: the `Dashboard` shared surface now lives in `ui/screens/HomeScreen.kt`, keeps the existing day-scoped route semantics, and uses tighter screen/card padding plus a date-only header instead of the older summary-metric header
+- reviewed on 2026-06-21: the shared shell now uses the same compact screen inset below the title bar and around the content for `Dashboard`, `Tasks`, and `Settings`
+- reviewed on 2026-06-21: the dashboard pomodoro action moved out of the summary card into the pomodoro card so the timer control stays with the pomodoro section instead of the date summary
 - the `Tasks` task-instance filter selector is implemented as a custom icon-first segmented control in `ui/screens/TaskListScreen.kt`: the active filter expands to absorb remaining width and show its label, inactive filters collapse to icon-only buttons, and the list content renders directly in the screen column instead of a nested `Panel`
 - reviewed on 2026-06-21: `App.kt` is now limited to app-shell orchestration, navigation wiring, and cross-screen helpers instead of owning the screen, component, and sheet implementations directly
 - Worker/PostgreSQL APIs and database schema for synced task resources in `workers/api`
