@@ -45,6 +45,7 @@ This surface replaces the idea of a purely live “today dashboard.” It is a d
 - hierarchy is visible here in tree mode
 - backlog lives here
 - shared visual language: task/routine rows appear as flat outlined cards with muted metadata and action buttons kept secondary to the record content
+- task rows use a lightweight state indicator and a low-emphasis detail affordance instead of a large primary manage button
 - first-level filter chrome stays lightweight: inactive filters shrink to icon-only pills, and the active filter expands to icon plus label for orientation without repeating a separate state heading
 
 Default behavior:
@@ -53,6 +54,10 @@ Default behavior:
 - includes backlog tasks and scheduled tasks in the same management surface
 - hides completed tasks by default
 - clicking a task row opens task detail
+- task detail opens in read-only mode first
+- read-only task detail does not show execution buttons
+- editing is an explicit in-place mode entered from the top-right edit affordance
+- delete is available from edit mode and requires confirmation before execution
 - tree expand/collapse uses a separate affordance
 
 Primary filters:

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
@@ -67,5 +68,44 @@ class TaskListScreenTest {
 
         onAllNodesWithText("Backlog").assertCountEquals(1)
         onNodeWithText("Inbox cleanup").fetchSemanticsNode()
+    }
+
+    @Test
+    fun `task list opens detail from clickable card without status text or cta copy`() = runDesktopComposeUiTest {
+        var openedTaskId: String? = null
+
+        setContent {
+            AppTheme {
+                TasksScreen(
+                    state = screenshotState(
+                        selectedTab = AppTab.TASKS,
+                        selectedTaskSubTab = TaskSubTab.TASKS,
+                        taskView = TaskViewState(
+                            tasks = listOf(
+                                TaskListItemView(
+                                    id = "task-1",
+                                    title = "Inbox cleanup",
+                                    status = TaskStatus.PENDING,
+                                ),
+                            ),
+                        ),
+                    ),
+                    liveNow = ScreenshotNow,
+                    isPomodoroActive = false,
+                    onSelectTaskFilter = {},
+                    onOpenTask = { openedTaskId = it.id },
+                    onOpenStartPomodoro = {},
+                    onCreateRoutine = {},
+                    onOpenRoutine = {},
+                    onRunRoutine = {},
+                )
+            }
+        }
+
+        onNodeWithTag("task-row-task-1").performClick()
+        onAllNodesWithText("Click to open detail").assertCountEquals(0)
+        onAllNodesWithText("Manage").assertCountEquals(0)
+        onAllNodesWithText("Pending").assertCountEquals(0)
+        kotlin.test.assertEquals("task-1", openedTaskId)
     }
 }

@@ -1,18 +1,27 @@
 package dev.tireless.abun.ui.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.ui.EditorialCard
-import dev.tireless.abun.ui.EditorialStatusTag
+import dev.tireless.abun.ui.editorialStatusColors
 import dev.tireless.abun.ui.theme.ThemeTokens
-import dev.tireless.abun.ui.theme.withMaterialContentColor
 
 @Composable
 internal fun TaskStack(
@@ -43,6 +52,9 @@ private fun TaskRow(
     onOpenTask: (TaskListItemView) -> Unit,
 ) {
     EditorialCard(
+        modifier = Modifier
+            .testTag("task-row-${task.id}")
+            .clickable(enabled = !disabled) { onOpenTask(task) },
         contentPadding = if (cardCompact) PaddingValues(ThemeTokens.spacing.mdDp) else PaddingValues(ThemeTokens.spacing.lgDp),
         contentSpacing = if (cardCompact) ThemeTokens.spacing.smDp else ThemeTokens.spacing.mdDp,
     ) {
@@ -51,22 +63,26 @@ private fun TaskRow(
             horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
             verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
         ) {
-            StatusPill(task.status)
+            TaskStateIndicator(task.status)
             task.routineId?.let { Text("Routine", style = ThemeTokens.type.bodyMuted) }
         }
-        if (!compact) {
-            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text(if (disabled) "Pomodoro active" else "Manage", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
-        } else {
-            Button(onClick = { onOpenTask(task) }, enabled = !disabled) {
-                Text("Open", style = ThemeTokens.type.body.withMaterialContentColor())
-            }
+        if (disabled) {
+            Text("Pomodoro active", style = ThemeTokens.type.bodyMuted)
         }
     }
 }
 
 @Composable
+private fun TaskStateIndicator(status: TaskStatus) {
+    val colors = editorialStatusColors(status, ThemeTokens.colors)
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(colors.content, CircleShape),
+    )
+}
+
+@Composable
 internal fun StatusPill(status: TaskStatus) {
-    EditorialStatusTag(status = status)
+    TaskStateIndicator(status = status)
 }
