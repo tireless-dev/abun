@@ -13,4 +13,14 @@ class AppRouteMappingTest {
         assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.Tasks.route))
         assertEquals(AppTab.SETTINGS, appTabForRoute(AppRoute.Settings.route))
     }
+
+    @Test
+    fun `sheet and detail routes remain attached to tasks tab`() {
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.CreateTask.route))
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.CreateRoutine.route))
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.StartPomodoro.route))
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.CompletePomodoro.route))
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.TaskDetail.create("task-1")))
+        assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.RoutineDetail.create("routine-1")))
+    }
 }

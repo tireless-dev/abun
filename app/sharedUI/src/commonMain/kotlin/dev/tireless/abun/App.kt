@@ -29,7 +29,6 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
@@ -103,36 +102,18 @@ import dev.tireless.abun.ui.EditorialStatusTag
 import dev.tireless.abun.ui.components.JournalTimeline
 import dev.tireless.abun.ui.components.StatusPill
 import dev.tireless.abun.ui.navigation.AppNavHost
+import dev.tireless.abun.ui.navigation.AppRoute
 import dev.tireless.abun.ui.navigation.appTabForRoute
 import dev.tireless.abun.ui.navigation.routeForTab
 import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.GuideScreenContent
 import dev.tireless.abun.ui.screens.TasksScreen
-import dev.tireless.abun.ui.sheets.CompletePomodoroSheet
-import dev.tireless.abun.ui.sheets.CreateRoutineSheet
-import dev.tireless.abun.ui.sheets.CreateTaskSheet
-import dev.tireless.abun.ui.sheets.RoutineActionsSheet
-import dev.tireless.abun.ui.sheets.StartPomodoroSheet
-import dev.tireless.abun.ui.sheets.TaskActionsSheet
-import dev.tireless.abun.ui.sheets.TaskCreateContext
-import dev.tireless.abun.ui.sheets.TaskSaveDraft
-import dev.tireless.abun.ui.sheets.normalizeTaskSaveDraft
-import dev.tireless.abun.ui.sheets.taskCreateContextFor
 import dev.tireless.abun.ui.TaskTopBarSubtabOption
 import dev.tireless.abun.ui.TaskTopBarSubtabSelector
 import dev.tireless.abun.ui.theme.AppTheme
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 import kotlinx.coroutines.delay
-
-private enum class OverlaySheet {
-    CREATE_TASK,
-    CREATE_ROUTINE,
-    TASK_ACTIONS,
-    ROUTINE_ACTIONS,
-    START_POMODORO,
-    COMPLETE_POMODORO,
-}
 
 internal data class TaskSurfaceGroups(
     val backlog: List<TaskListItemView>,
@@ -152,16 +133,13 @@ fun App() {
     val activeSession = state.activePomodoroSession
     val activeRemaining = activeSession?.let { it.endsAtEpochMillis - liveNow } ?: 0L
     val isPomodoroActive = activeSession != null && activeRemaining > 0
-    var currentSheet by remember { mutableStateOf<OverlaySheet?>(null) }
-    var selectedTask by remember { mutableStateOf<TaskListItemView?>(null) }
-    var selectedRoutine by remember { mutableStateOf<RoutineListItemView?>(null) }
-    var createTaskContext by remember { mutableStateOf(taskCreateContextFor(state.selectedTab, state.selectedDate)) }
     var isTaskTopBarSelectorExpanded by remember { mutableStateOf(false) }
-    val selectedTaskHistory = selectedTask?.let { controller.taskHistory(it.id) }.orEmpty()
 
     LaunchedEffect(state.activePomodoroSession?.id, activeRemaining) {
         if (state.activePomodoroSession != null && activeRemaining <= 0) {
-            currentSheet = OverlaySheet.COMPLETE_POMODORO
+            navController.navigate(AppRoute.CompletePomodoro.route) {
+                launchSingleTop = true
+            }
             controller.selectTaskSubTab(TaskSubTab.POMODORO)
         }
     }
@@ -260,10 +238,7 @@ fun App() {
             floatingActionButton = {
                 if (fabLabel != null && !isPomodoroActive) {
                     ExtendedFloatingActionButton(
-                        onClick = {
-                            createTaskContext = taskCreateContextFor(state.selectedTab, state.selectedDate)
-                            currentSheet = OverlaySheet.CREATE_TASK
-                        },
+                        onClick = { navController.navigate(AppRoute.CreateTask.route) },
                         containerColor = ThemeTokens.colors.surface,
                         contentColor = ThemeTokens.colors.textPrimary,
                         shape = RoundedCornerShape(ThemeTokens.radii.mediumDp),
@@ -296,135 +271,41 @@ fun App() {
                     state = state,
                     liveNow = liveNow,
                     isPomodoroActive = isPomodoroActive,
+                    taskHistoryFor = controller::taskHistory,
                     onSelectTaskFilter = controller::selectTaskFilter,
-                    onOpenTask = {
-                        selectedTask = it
-                        currentSheet = OverlaySheet.TASK_ACTIONS
-                    },
-                    onOpenStartPomodoro = { currentSheet = OverlaySheet.START_POMODORO },
-                    onCreateRoutine = { currentSheet = OverlaySheet.CREATE_ROUTINE },
-                    onOpenRoutine = {
-                        selectedRoutine = it
-                        currentSheet = OverlaySheet.ROUTINE_ACTIONS
-                    },
+                    onOpenTask = { navController.navigate(AppRoute.TaskDetail.create(it.id)) },
+                    onOpenStartPomodoro = { navController.navigate(AppRoute.StartPomodoro.route) },
+                    onCreateTask = { navController.navigate(AppRoute.CreateTask.route) },
+                    onCreateRoutine = { navController.navigate(AppRoute.CreateRoutine.route) },
+                    onOpenRoutine = { navController.navigate(AppRoute.RoutineDetail.create(it.id)) },
                     onRunRoutine = { controller.runRoutine(it.id) },
                     onUpdateThemePreference = controller::updateThemePreference,
                     onUpdatePreferences = controller::updatePreferences,
                     onReopenLogin = controller::reopenLogin,
                     onLogout = controller::logout,
+                    onCreateTaskConfirm = controller::createTask,
+                    onCreateRoutineConfirm = controller::createRoutine,
+                    onSaveTask = controller::updateTask,
+                    onProgressTask = controller::progressTask,
+                    onCompleteTask = controller::completeTask,
+                    onSkipTask = controller::skipTask,
+                    onPostponeTask = controller::postponeTask,
+                    onDeleteTask = controller::deleteTask,
+                    onSaveRoutine = controller::updateRoutine,
+                    onToggleRoutine = controller::toggleRoutineActive,
+                    onDeleteRoutine = controller::deleteRoutine,
+                    onStartPomodoro = { taskId, phase ->
+                        controller.startPomodoro(taskId, phase)
+                        controller.selectTaskSubTab(TaskSubTab.POMODORO)
+                    },
+                    onCompletePomodoro = { note, update ->
+                        state.activePomodoroSession?.let { controller.completePomodoro(it.id, note.ifBlank { null }, update) }
+                    },
+                    onStopPomodoro = { note ->
+                        state.activePomodoroSession?.let { controller.cancelPomodoro(it.id, note.ifBlank { null }) }
+                    },
                 )
             }
-        }
-
-        when (currentSheet) {
-            OverlaySheet.CREATE_TASK -> CreateTaskSheet(
-                context = createTaskContext,
-                onDismiss = { currentSheet = null },
-                onCreate = { draft ->
-                    controller.createTask(
-                        draft.title,
-                        draft.detail,
-                        draft.parentId,
-                        draft.startNotBefore,
-                        draft.endNotAfter,
-                        draft.estimatedDuration,
-                    )
-                    currentSheet = null
-                },
-            )
-            OverlaySheet.CREATE_ROUTINE -> CreateRoutineSheet(
-                onDismiss = { currentSheet = null },
-                onCreate = { title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration ->
-                    controller.createRoutine(title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration)
-                    currentSheet = null
-                },
-            )
-            OverlaySheet.TASK_ACTIONS -> TaskActionsSheet(
-                task = selectedTask,
-                history = selectedTaskHistory,
-                availableParents = state.taskView.tasks.filter { candidate ->
-                    candidate.id != selectedTask?.id && candidate.routineId == null
-                },
-                availableRoutines = state.taskView.routines,
-                isPomodoroActive = isPomodoroActive,
-                onDismiss = { currentSheet = null },
-                onSaveTask = { taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration ->
-                    controller.updateTask(taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
-                    currentSheet = null
-                },
-                onProgress = { note ->
-                    selectedTask?.let { controller.progressTask(it.id, note.ifBlank { null }) }
-                    currentSheet = null
-                },
-                onComplete = { note ->
-                    selectedTask?.let { controller.completeTask(it.id, note.ifBlank { null }) }
-                    currentSheet = null
-                },
-                onSkip = { note ->
-                    selectedTask?.let { controller.skipTask(it.id, note.ifBlank { null }) }
-                    currentSheet = null
-                },
-                onPostpone = { taskId, startNotBefore, endNotAfter, estimatedDuration, note ->
-                    controller.postponeTask(taskId, startNotBefore, endNotAfter, estimatedDuration, note)
-                    currentSheet = null
-                },
-                onDelete = {
-                    selectedTask?.let { controller.deleteTask(it.id) }
-                    currentSheet = null
-                },
-                onStartPomodoro = {
-                    selectedTask?.let { controller.startPomodoro(it.id, PomodoroPhase.FOCUS) }
-                    controller.selectTaskSubTab(TaskSubTab.POMODORO)
-                    currentSheet = null
-                },
-            )
-            OverlaySheet.ROUTINE_ACTIONS -> RoutineActionsSheet(
-                routine = selectedRoutine,
-                onDismiss = { currentSheet = null },
-                onSave = { routineId, title, detail, recurrenceRule, defaultStartNotBefore, defaultEstimatedDuration ->
-                    controller.updateRoutine(
-                        routineId = routineId,
-                        templateTitle = title,
-                        templateDetail = detail,
-                        recurrenceRule = recurrenceRule,
-                        defaultStartNotBefore = defaultStartNotBefore,
-                        defaultEstimatedDuration = defaultEstimatedDuration,
-                    )
-                    currentSheet = null
-                },
-                onToggle = {
-                    selectedRoutine?.let { controller.toggleRoutineActive(it.id) }
-                    currentSheet = null
-                },
-                onDelete = {
-                    selectedRoutine?.let { controller.deleteRoutine(it.id) }
-                    currentSheet = null
-                },
-            )
-            OverlaySheet.START_POMODORO -> StartPomodoroSheet(
-                state = state,
-                hasActive = activeSession != null && activeRemaining > 0,
-                onDismiss = { currentSheet = null },
-                onStart = { taskId, phase ->
-                    controller.startPomodoro(taskId, phase)
-                    controller.selectTaskSubTab(TaskSubTab.POMODORO)
-                    currentSheet = null
-                },
-            )
-            OverlaySheet.COMPLETE_POMODORO -> CompletePomodoroSheet(
-                state = state,
-                liveNow = liveNow,
-                onDismiss = { currentSheet = null },
-                onSave = { note, update ->
-                    state.activePomodoroSession?.let { controller.completePomodoro(it.id, note.ifBlank { null }, update) }
-                    currentSheet = null
-                },
-                onStop = { note ->
-                    state.activePomodoroSession?.let { controller.cancelPomodoro(it.id, note.ifBlank { null }) }
-                    currentSheet = null
-                },
-            )
-            null -> Unit
         }
     }
 }
@@ -578,9 +459,11 @@ internal fun AppContent(
                 state = state,
                 liveNow = liveNow,
                 isPomodoroActive = false,
+                taskHistoryFor = taskHistoryFor,
                 onSelectTaskFilter = onSelectTaskFilter,
                 onOpenTask = onOpenTask,
                 onOpenStartPomodoro = onOpenStartPomodoro,
+                onCreateTask = { },
                 onCreateRoutine = onCreateRoutine,
                 onOpenRoutine = onOpenRoutine,
                 onRunRoutine = onRunRoutine,
@@ -588,6 +471,20 @@ internal fun AppContent(
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,
+                onCreateTaskConfirm = onCreateTask,
+                onCreateRoutineConfirm = onCreateRoutineConfirm,
+                onSaveTask = onSaveTask,
+                onProgressTask = onProgressTask,
+                onCompleteTask = onCompleteTask,
+                onSkipTask = onSkipTask,
+                onPostponeTask = onPostponeTask,
+                onDeleteTask = { onDeleteTask(it) },
+                onSaveRoutine = onSaveRoutine,
+                onToggleRoutine = { onToggleRoutine(it) },
+                onDeleteRoutine = { onDeleteRoutine(it) },
+                onStartPomodoro = onStartPomodoro,
+                onCompletePomodoro = onCompletePomodoro,
+                onStopPomodoro = onStopPomodoro,
             )
         }
     }

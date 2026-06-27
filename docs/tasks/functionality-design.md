@@ -242,6 +242,7 @@ User outcome:
 Quick list behavior:
 
 - opening a task row enters task detail
+- task detail opens as a bottom sheet routed through shared Compose Navigation, rather than through feature-local overlay state
 - list rows are not the place for completion
 - deliberate scheduling changes belong in task detail
 
@@ -270,8 +271,10 @@ History section:
 
 Interaction rules:
 
+- task detail opens read-only first and switches into in-place edit mode from a compact edit affordance
 - `complete` is a deliberate detail action, not a quick list action
 - `delete` is a secondary danger action and uses soft delete behavior underneath
+- delete requires an explicit confirmation step before the destructive callback executes
 - changing parent is allowed from task detail through explicit selection, not inline editing in the list
 
 ### View routine-derived task detail
