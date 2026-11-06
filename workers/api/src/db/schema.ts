@@ -172,6 +172,155 @@ const SCHEMA_STATEMENTS = [
       updated_at text not null
     )
   `,
+  `
+    create table if not exists finance_account (
+      id text primary key,
+      user_id text not null,
+      path text not null,
+      name text not null,
+      category text not null,
+      currency text not null default 'CNY',
+      include_in_net_worth boolean not null default true,
+      is_pass_through boolean not null default false,
+      pass_through_expense_account_id text,
+      liquid_tier text not null default 'None',
+      statement_day integer,
+      due_day integer,
+      is_archived boolean not null default false,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_exchange_rate (
+      id text primary key,
+      user_id text not null,
+      base_currency text not null,
+      quote_currency text not null,
+      rate_date text not null,
+      rate_micros bigint not null,
+      source text not null default 'Manual',
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_transaction (
+      id text primary key,
+      user_id text not null,
+      tx_date text not null,
+      tx_time text,
+      payee text,
+      summary text not null,
+      status text not null default 'Cleared',
+      source_plan_id text,
+      period_index integer,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_split (
+      id text primary key,
+      user_id text not null,
+      transaction_id text not null,
+      account_id text not null,
+      amount_minor bigint not null,
+      currency text not null default 'CNY',
+      weight_amount_minor bigint not null,
+      weight_currency text not null default 'CNY',
+      narration text not null default '',
+      sort_order integer not null default 0,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_clearing_group (
+      id text primary key,
+      user_id text not null,
+      name text not null,
+      group_type text not null,
+      anchor_currency text not null default 'CNY',
+      target_account_id text,
+      statement_cycle text,
+      due_date text,
+      status text not null default 'Active',
+      settled_at text,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_split_clearing_group (
+      id text primary key,
+      user_id text not null,
+      split_id text not null,
+      clearing_group_id text not null,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_amortization_plan (
+      id text primary key,
+      user_id text not null,
+      name text not null,
+      principal_minor bigint not null,
+      currency text not null default 'CNY',
+      total_periods integer not null,
+      repayment_method text not null,
+      annual_rate_bps integer not null default 0,
+      fee_per_period_minor bigint not null default 0,
+      start_date text not null,
+      repayment_day integer not null,
+      liability_account_id text not null,
+      funding_account_id text,
+      interest_account_id text not null,
+      lifecycle_clearing_group_id text not null,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
+  `
+    create table if not exists finance_budget_rule (
+      id text primary key,
+      user_id text not null,
+      name text not null,
+      scope_type text not null,
+      account_prefix text not null default 'Expenses:',
+      excluded_prefixes_json text not null default '[]',
+      monthly_limit_minor bigint not null,
+      currency text not null default 'CNY',
+      include_in_runway boolean not null default true,
+      is_deleted boolean not null default false,
+      hlc_map text not null,
+      server_version bigint not null,
+      server_updated_at text not null,
+      created_at text not null
+    )
+  `,
 ] as const;
 
 export async function bootstrapSchema(client: DbClient): Promise<void> {

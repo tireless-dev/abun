@@ -287,3 +287,460 @@ INSERT OR REPLACE INTO pomodoro_session(
     created_at,
     updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- ====================================================================
+-- FINANCE MODULE TABLES & QUERIES
+-- ====================================================================
+
+CREATE TABLE finance_account (
+    id TEXT NOT NULL PRIMARY KEY,
+    path TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    include_in_net_worth INTEGER NOT NULL DEFAULT 1,
+    is_pass_through INTEGER NOT NULL DEFAULT 0,
+    pass_through_expense_account_id TEXT,
+    liquid_tier TEXT NOT NULL DEFAULT 'Liquid',
+    statement_day INTEGER,
+    due_day INTEGER,
+    is_archived INTEGER NOT NULL DEFAULT 0,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE finance_exchange_rate (
+    id TEXT NOT NULL PRIMARY KEY,
+    base_currency TEXT NOT NULL,
+    quote_currency TEXT NOT NULL,
+    rate_date TEXT NOT NULL,
+    rate_micros INTEGER NOT NULL,
+    source TEXT NOT NULL DEFAULT 'Manual',
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE finance_transaction (
+    id TEXT NOT NULL PRIMARY KEY,
+    tx_date TEXT NOT NULL,
+    tx_time TEXT,
+    payee TEXT,
+    summary TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'Cleared',
+    source_plan_id TEXT,
+    period_index INTEGER,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE finance_split (
+    id TEXT NOT NULL PRIMARY KEY,
+    transaction_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    weight_amount_minor INTEGER NOT NULL,
+    weight_currency TEXT NOT NULL DEFAULT 'CNY',
+    narration TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE finance_clearing_group (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    group_type TEXT NOT NULL,
+    anchor_currency TEXT NOT NULL DEFAULT 'CNY',
+    target_account_id TEXT,
+    statement_cycle TEXT,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Active',
+    settled_at TEXT,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE finance_split_clearing_group (
+    id TEXT NOT NULL PRIMARY KEY,
+    split_id TEXT NOT NULL,
+    clearing_group_id TEXT NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Finance Account Queries
+selectAllFinanceAccounts:
+SELECT * FROM finance_account
+WHERE is_deleted = 0
+ORDER BY path ASC;
+
+selectFinanceAccountById:
+SELECT * FROM finance_account
+WHERE id = ?;
+
+selectDirtyFinanceAccounts:
+SELECT * FROM finance_account
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceAccount:
+INSERT OR REPLACE INTO finance_account(
+    id,
+    path,
+    name,
+    category,
+    currency,
+    include_in_net_worth,
+    is_pass_through,
+    pass_through_expense_account_id,
+    liquid_tier,
+    statement_day,
+    due_day,
+    is_archived,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Exchange Rate Queries
+selectFinanceExchangeRateById:
+SELECT * FROM finance_exchange_rate
+WHERE id = ?;
+
+selectLatestExchangeRate:
+SELECT * FROM finance_exchange_rate
+WHERE base_currency = ? AND quote_currency = ? AND rate_date <= ? AND is_deleted = 0
+ORDER BY rate_date DESC, updated_at DESC
+LIMIT 1;
+
+selectDirtyFinanceExchangeRates:
+SELECT * FROM finance_exchange_rate
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceExchangeRate:
+INSERT OR REPLACE INTO finance_exchange_rate(
+    id,
+    base_currency,
+    quote_currency,
+    rate_date,
+    rate_micros,
+    source,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Transaction Queries
+selectAllFinanceTransactions:
+SELECT * FROM finance_transaction
+WHERE is_deleted = 0
+ORDER BY tx_date DESC, created_at DESC;
+
+selectFinanceTransactionById:
+SELECT * FROM finance_transaction
+WHERE id = ?;
+
+selectDirtyFinanceTransactions:
+SELECT * FROM finance_transaction
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceTransaction:
+INSERT OR REPLACE INTO finance_transaction(
+    id,
+    tx_date,
+    tx_time,
+    payee,
+    summary,
+    status,
+    source_plan_id,
+    period_index,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Split Queries
+selectFinanceSplitsForTransaction:
+SELECT * FROM finance_split
+WHERE transaction_id = ? AND is_deleted = 0
+ORDER BY sort_order ASC, created_at ASC;
+
+selectFinanceSplitsForAccount:
+SELECT * FROM finance_split
+WHERE account_id = ? AND is_deleted = 0
+ORDER BY created_at DESC;
+
+selectFinanceSplitsForClearingGroup:
+SELECT s.* FROM finance_split s
+JOIN finance_split_clearing_group scg ON scg.split_id = s.id AND scg.is_deleted = 0
+WHERE scg.clearing_group_id = ? AND s.is_deleted = 0
+ORDER BY s.created_at ASC;
+
+selectAllActiveFinanceSplits:
+SELECT * FROM finance_split
+WHERE is_deleted = 0
+ORDER BY sort_order ASC, created_at ASC;
+
+selectFinanceSplitById:
+SELECT * FROM finance_split
+WHERE id = ?;
+
+selectDirtyFinanceSplits:
+SELECT * FROM finance_split
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceSplit:
+INSERT OR REPLACE INTO finance_split(
+    id,
+    transaction_id,
+    account_id,
+    amount_minor,
+    currency,
+    weight_amount_minor,
+    weight_currency,
+    narration,
+    sort_order,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Clearing Group Queries
+selectAllFinanceClearingGroups:
+SELECT * FROM finance_clearing_group
+WHERE is_deleted = 0
+ORDER BY updated_at DESC, created_at DESC;
+
+selectFinanceClearingGroupById:
+SELECT * FROM finance_clearing_group
+WHERE id = ?;
+
+selectDirtyFinanceClearingGroups:
+SELECT * FROM finance_clearing_group
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceClearingGroup:
+INSERT OR REPLACE INTO finance_clearing_group(
+    id,
+    name,
+    group_type,
+    anchor_currency,
+    target_account_id,
+    statement_cycle,
+    due_date,
+    status,
+    settled_at,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Split Clearing Group Link Queries
+selectClearingGroupsForSplit:
+SELECT cg.* FROM finance_clearing_group cg
+JOIN finance_split_clearing_group scg ON scg.clearing_group_id = cg.id AND scg.is_deleted = 0
+WHERE scg.split_id = ? AND cg.is_deleted = 0;
+
+selectAllActiveFinanceSplitClearingGroups:
+SELECT * FROM finance_split_clearing_group
+WHERE is_deleted = 0;
+
+selectFinanceSplitClearingGroupById:
+SELECT * FROM finance_split_clearing_group
+WHERE id = ?;
+
+selectDirtyFinanceSplitClearingGroups:
+SELECT * FROM finance_split_clearing_group
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceSplitClearingGroup:
+INSERT OR REPLACE INTO finance_split_clearing_group(
+    id,
+    split_id,
+    clearing_group_id,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Amortization Plan Table
+CREATE TABLE finance_amortization_plan (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    principal_minor INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    total_periods INTEGER NOT NULL,
+    repayment_method TEXT NOT NULL,
+    annual_rate_bps INTEGER NOT NULL DEFAULT 0,
+    fee_per_period_minor INTEGER NOT NULL DEFAULT 0,
+    start_date TEXT NOT NULL,
+    repayment_day INTEGER NOT NULL,
+    liability_account_id TEXT NOT NULL,
+    funding_account_id TEXT,
+    interest_account_id TEXT NOT NULL,
+    lifecycle_clearing_group_id TEXT NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_finance_amortization_plan_liability ON finance_amortization_plan(liability_account_id);
+
+-- Finance Amortization Plan Queries
+selectAllFinanceAmortizationPlans:
+SELECT * FROM finance_amortization_plan
+WHERE is_deleted = 0
+ORDER BY created_at DESC;
+
+selectFinanceAmortizationPlanById:
+SELECT * FROM finance_amortization_plan
+WHERE id = ?;
+
+selectDirtyFinanceAmortizationPlans:
+SELECT * FROM finance_amortization_plan
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceAmortizationPlan:
+INSERT OR REPLACE INTO finance_amortization_plan(
+    id,
+    name,
+    principal_minor,
+    currency,
+    total_periods,
+    repayment_method,
+    annual_rate_bps,
+    fee_per_period_minor,
+    start_date,
+    repayment_day,
+    liability_account_id,
+    funding_account_id,
+    interest_account_id,
+    lifecycle_clearing_group_id,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Finance Budget Rule Table
+CREATE TABLE finance_budget_rule (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    scope_type TEXT NOT NULL,
+    account_prefix TEXT NOT NULL DEFAULT 'Expenses:',
+    excluded_prefixes_json TEXT NOT NULL DEFAULT '[]',
+    monthly_limit_minor INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    include_in_runway INTEGER NOT NULL DEFAULT 1,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    hlc_map TEXT NOT NULL DEFAULT '{}',
+    dirty_fields TEXT NOT NULL DEFAULT '[]',
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Finance Budget Rule Queries
+selectAllFinanceBudgetRules:
+SELECT * FROM finance_budget_rule
+WHERE is_deleted = 0
+ORDER BY created_at ASC;
+
+selectFinanceBudgetRuleById:
+SELECT * FROM finance_budget_rule
+WHERE id = ?;
+
+selectDirtyFinanceBudgetRules:
+SELECT * FROM finance_budget_rule
+WHERE is_dirty = 1
+ORDER BY updated_at ASC, created_at ASC;
+
+upsertFinanceBudgetRule:
+INSERT OR REPLACE INTO finance_budget_rule(
+    id,
+    name,
+    scope_type,
+    account_prefix,
+    excluded_prefixes_json,
+    monthly_limit_minor,
+    currency,
+    include_in_runway,
+    is_deleted,
+    hlc_map,
+    dirty_fields,
+    is_dirty,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+

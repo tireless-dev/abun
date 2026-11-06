@@ -171,6 +171,7 @@ fun App() {
 
         val fabLabel = when (state.selectedTab) {
             AppTab.TODAY, AppTab.TASKS -> "Task"
+            AppTab.FINANCE -> "Entry"
             else -> null
         }
         MaterialScaffold(
@@ -238,7 +239,13 @@ fun App() {
             floatingActionButton = {
                 if (fabLabel != null && !isPomodoroActive) {
                     ExtendedFloatingActionButton(
-                        onClick = { navController.navigate(AppRoute.CreateTask.route) },
+                        onClick = {
+                            if (state.selectedTab == AppTab.FINANCE) {
+                                navController.navigate(AppRoute.CreateFinanceTransaction.route)
+                            } else {
+                                navController.navigate(AppRoute.CreateTask.route)
+                            }
+                        },
                         containerColor = ThemeTokens.colors.surface,
                         contentColor = ThemeTokens.colors.textPrimary,
                         shape = RoundedCornerShape(ThemeTokens.radii.mediumDp),
@@ -304,6 +311,63 @@ fun App() {
                     onStopPomodoro = { note ->
                         state.activePomodoroSession?.let { controller.cancelPomodoro(it.id, note.ifBlank { null }) }
                     },
+                    onSelectFinanceFilter = controller::selectFinanceFilter,
+                    onToggleFinanceViewMode = controller::toggleFinanceLedgerViewMode,
+                    onCreateFinanceTransaction = { txDate, summary, payee, status, splits ->
+                        controller.createFinanceTransaction(
+                            txDate = txDate,
+                            summary = summary,
+                            payee = payee,
+                            status = status,
+                            splits = splits,
+                        )
+                    },
+                    onDeleteFinanceTransaction = controller::deleteFinanceTransaction,
+                    onAutoPadAccountBalance = controller::autoPadAccountBalance,
+                    onCreateFinanceAccount = { path, name, category, currency, includeInNetWorth, isPassThrough, liquidTier ->
+                        controller.createFinanceAccount(
+                            path = path,
+                            name = name,
+                            category = category,
+                            currency = currency,
+                            includeInNetWorth = includeInNetWorth,
+                            isPassThrough = isPassThrough,
+                            liquidTier = liquidTier,
+                        )
+                    },
+                    onDeleteFinanceAccount = controller::deleteFinanceAccount,
+                    onRepayCreditStatement = controller::repayCreditStatement,
+                    onRepayLoanTranche = controller::executeLoanTrancheRepayment,
+                    onCreateAmortizationPlan = { name, principalMinor, currency, totalPeriods, repaymentMethod, annualRateBps, feePerPeriodMinor, startDate, repaymentDay, liabilityAccountId, fundingAccountId, interestAccountId, recordInitialDisbursement ->
+                        controller.createFinanceAmortizationPlan(
+                            name = name,
+                            principalMinor = principalMinor,
+                            currency = currency,
+                            totalPeriods = totalPeriods,
+                            repaymentMethod = repaymentMethod,
+                            annualRateBps = annualRateBps,
+                            feePerPeriodMinor = feePerPeriodMinor,
+                            startDate = startDate,
+                            repaymentDay = repaymentDay,
+                            liabilityAccountId = liabilityAccountId,
+                            fundingAccountId = fundingAccountId,
+                            interestAccountId = interestAccountId,
+                            recordInitialDisbursement = recordInitialDisbursement,
+                        )
+                    },
+                    onDeleteAmortizationPlan = controller::deleteFinanceAmortizationPlan,
+                    onSelectFinanceRunwayHorizon = controller::setFinanceRunwayHorizon,
+                    onCreateBudgetRule = { name, scopeType, accountPrefix, monthlyLimitMinor, currency, includeInRunway ->
+                        controller.createBudgetRule(
+                            name = name,
+                            scopeType = scopeType,
+                            accountPrefix = accountPrefix,
+                            monthlyLimitMinor = monthlyLimitMinor,
+                            currency = currency,
+                            includeInRunway = includeInRunway,
+                        )
+                    },
+                    onDeleteBudgetRule = controller::deleteBudgetRule,
                 )
             }
         }
@@ -580,6 +644,7 @@ internal fun taskListFilterEmptyState(filter: TaskListFilter): String = when (fi
 private fun AppTab.tabLabel(): String = when (this) {
     AppTab.TODAY -> "Dashboard"
     AppTab.TASKS -> "Tasks"
+    AppTab.FINANCE -> "Finance"
     AppTab.SETTINGS -> "Settings"
 }
 

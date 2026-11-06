@@ -35,18 +35,19 @@ private const val PREF_APP_THEME_PREFERENCE = "app.theme_preference"
 val PREF_APP_ROLLOVER_TIME = "app.rollover_time"
 
 class LocalStore(
-    private val database: AbunDatabase,
-    private val timeProvider: TimeProvider,
-    private val idGenerator: IdGenerator,
-    private val clock: dev.tireless.abun.sync.HybridLogicalClock,
+    internal val database: AbunDatabase,
+    internal val timeProvider: TimeProvider,
+    internal val idGenerator: IdGenerator,
+    internal val clock: dev.tireless.abun.sync.HybridLogicalClock,
 ) {
-    private val queries = database.abunDatabaseQueries
+    internal val queries = database.abunDatabaseQueries
 
     init {
         SyncScope.entries.forEach { queries.upsertSyncState(it.wireName, 0) }
         if (queries.selectAllPreferences(::mapPreferenceRow).executeAsList().isEmpty()) {
             migrateLegacyPreferences()
         }
+        seedDefaultFinanceAccountsIfEmpty()
     }
 
     fun allTasks(selectedDate: String? = null): List<TaskListItemView> =

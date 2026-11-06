@@ -10,6 +10,8 @@ import androidx.navigation.navArgument
 import androidx.savedstate.read
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
+import dev.tireless.abun.app.FinanceLedgerFilter
+import dev.tireless.abun.app.FinanceSplitDraft
 import dev.tireless.abun.app.JournalEntryView
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
@@ -17,12 +19,25 @@ import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
 import dev.tireless.abun.app.ThemePreference
+import dev.tireless.abun.finance.AccountCategory
+import dev.tireless.abun.finance.AmortizationMethod
+import dev.tireless.abun.finance.BudgetScopeType
+import dev.tireless.abun.finance.LiquidTier
+import dev.tireless.abun.finance.TransactionStatus
+import dev.tireless.abun.ui.screens.ClearingHubScreen
+import dev.tireless.abun.ui.screens.FinanceCockpitScreen
+import dev.tireless.abun.ui.screens.FinanceLedgerScreen
 import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.SettingsScreen
 import dev.tireless.abun.ui.screens.TasksScreen
+import dev.tireless.abun.ui.sheets.AmortizationWizardSheet
+import dev.tireless.abun.ui.sheets.BudgetRuleSheet
+import dev.tireless.abun.ui.sheets.CombinedRepaymentSheet
 import dev.tireless.abun.ui.sheets.CompletePomodoroSheet
+import dev.tireless.abun.ui.sheets.CreateFinanceTransactionSheet
 import dev.tireless.abun.ui.sheets.CreateRoutineSheet
 import dev.tireless.abun.ui.sheets.CreateTaskSheet
+import dev.tireless.abun.ui.sheets.FinanceAccountsSheet
 import dev.tireless.abun.ui.sheets.RoutineActionsSheet
 import dev.tireless.abun.ui.sheets.StartPomodoroSheet
 import dev.tireless.abun.ui.sheets.TaskActionsSheet
@@ -70,6 +85,34 @@ fun AppNavHost(
     onStartPomodoro: (String?, PomodoroPhase) -> Unit,
     onCompletePomodoro: (String, PomodoroTaskUpdate) -> Unit,
     onStopPomodoro: (String) -> Unit,
+    onSelectFinanceFilter: (FinanceLedgerFilter, String?, String?) -> Unit = { _, _, _ -> },
+    onToggleFinanceViewMode: () -> Unit = {},
+    onCreateFinanceTransaction: (String, String, String?, TransactionStatus, List<FinanceSplitDraft>) -> Unit = { _, _, _, _, _ -> },
+    onDeleteFinanceTransaction: (String) -> Unit = {},
+    onAutoPadAccountBalance: (String, Long) -> Unit = { _, _ -> },
+    onCreateFinanceAccount: (String, String, AccountCategory, String, Boolean, Boolean, LiquidTier) -> Unit = { _, _, _, _, _, _, _ -> },
+    onDeleteFinanceAccount: (String) -> Unit = {},
+    onRepayCreditStatement: (clearingGroupId: String, fundingAccountId: String, date: String) -> Unit = { _, _, _ -> },
+    onRepayLoanTranche: (transactionId: String) -> Unit = {},
+    onCreateAmortizationPlan: (
+        name: String,
+        principalMinor: Long,
+        currency: String,
+        totalPeriods: Int,
+        repaymentMethod: AmortizationMethod,
+        annualRateBps: Int,
+        feePerPeriodMinor: Long,
+        startDate: String,
+        repaymentDay: Int,
+        liabilityAccountId: String,
+        fundingAccountId: String?,
+        interestAccountId: String,
+        recordInitialDisbursement: Boolean,
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onDeleteAmortizationPlan: (String) -> Unit = {},
+    onSelectFinanceRunwayHorizon: (Int) -> Unit = {},
+    onCreateBudgetRule: (String, BudgetScopeType, String, Long, String, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onDeleteBudgetRule: (String) -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -103,6 +146,86 @@ fun AppNavHost(
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,
+            )
+        }
+        composable(AppRoute.FinanceCockpit.route) {
+            FinanceCockpitScreen(
+                state = state,
+                onOpenLedger = { navController.navigate(AppRoute.Finance.route) },
+                onOpenClearingHub = { navController.navigate(AppRoute.DebtClearingHub.route) },
+                onOpenCreateTransaction = { navController.navigate(AppRoute.CreateFinanceTransaction.route) },
+                onOpenCreateBudgetRule = { navController.navigate(AppRoute.CreateBudgetRule.route) },
+                onSelectHorizon = onSelectFinanceRunwayHorizon,
+                onDeleteBudgetRule = onDeleteBudgetRule,
+            )
+        }
+        composable(AppRoute.Finance.route) {
+            FinanceLedgerScreen(
+                state = state,
+                onSelectFilter = onSelectFinanceFilter,
+                onToggleViewMode = onToggleFinanceViewMode,
+                onOpenCreateTransaction = { navController.navigate(AppRoute.CreateFinanceTransaction.route) },
+                onOpenAccounts = { navController.navigate(AppRoute.FinanceAccounts.route) },
+                onOpenCockpit = { navController.navigate(AppRoute.FinanceCockpit.route) },
+                onOpenClearingHub = { navController.navigate(AppRoute.DebtClearingHub.route) },
+                onDeleteTransaction = onDeleteFinanceTransaction,
+            )
+        }
+        composable(AppRoute.DebtClearingHub.route) {
+            ClearingHubScreen(
+                state = state,
+                onOpenLedger = { navController.navigate(AppRoute.Finance.route) },
+                onOpenCockpit = { navController.navigate(AppRoute.FinanceCockpit.route) },
+                onOpenCombinedRepayment = { navController.navigate(AppRoute.CombinedRepayment.route) },
+                onOpenAmortizationWizard = { navController.navigate(AppRoute.AmortizationWizard.route) },
+                onRepayStatement = { clearingGroupId ->
+                    navController.navigate(AppRoute.CombinedRepayment.route)
+                },
+                onRepayLoanTranche = onRepayLoanTranche,
+                onDeleteAmortizationPlan = onDeleteAmortizationPlan,
+            )
+        }
+        composable(AppRoute.CreateBudgetRule.route) {
+            BudgetRuleSheet(
+                state = state,
+                onDismiss = { navController.popBackStack() },
+                onCreate = { name, scopeType, accountPrefix, monthlyLimitMinor, currency, includeInRunway ->
+                    onCreateBudgetRule(name, scopeType, accountPrefix, monthlyLimitMinor, currency, includeInRunway)
+                    navController.popBackStack()
+                },
+            )
+        }
+        composable(AppRoute.CombinedRepayment.route) {
+            CombinedRepaymentSheet(
+                state = state,
+                onDismiss = { navController.popBackStack() },
+                onRepayStatement = onRepayCreditStatement,
+                onRepayLoanTranche = onRepayLoanTranche,
+            )
+        }
+        composable(AppRoute.AmortizationWizard.route) {
+            AmortizationWizardSheet(
+                state = state,
+                onDismiss = { navController.popBackStack() },
+                onCreate = onCreateAmortizationPlan,
+            )
+        }
+        composable(AppRoute.CreateFinanceTransaction.route) {
+            CreateFinanceTransactionSheet(
+                state = state,
+                onDismiss = { navController.popBackStack() },
+                onCreate = { txDate, summary, payee, status, splits ->
+                    onCreateFinanceTransaction(txDate, summary, payee, status, splits)
+                },
+            )
+        }
+        composable(AppRoute.FinanceAccounts.route) {
+            FinanceAccountsSheet(
+                state = state,
+                onDismiss = { navController.popBackStack() },
+                onAutoPad = onAutoPadAccountBalance,
+                onCreateAccount = onCreateFinanceAccount,
+                onDeleteAccount = onDeleteFinanceAccount,
             )
         }
         composable(AppRoute.CreateTask.route) {

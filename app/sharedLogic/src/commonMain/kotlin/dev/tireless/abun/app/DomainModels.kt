@@ -7,6 +7,7 @@ import dev.tireless.abun.sync.TaskStatus
 enum class AppTab {
     TODAY,
     TASKS,
+    FINANCE,
     SETTINGS,
 }
 
@@ -189,6 +190,7 @@ data class AppUiState(
     val preferences: PreferencesViewState = PreferencesViewState(),
     val syncState: SyncStateView = SyncStateView(),
     val auth: AuthViewState = AuthViewState(),
+    val financeView: FinanceViewState = FinanceViewState(),
 )
 
 enum class SyncScope(val wireName: String) {
@@ -198,4 +200,12 @@ enum class SyncScope(val wireName: String) {
     ALARMS("alarms"),
     TASK_EVENTS("task_events"),
     POMODORO_SESSIONS("pomodoro_sessions"),
+    FINANCE_ACCOUNTS("finance_accounts"),
+    FINANCE_EXCHANGE_RATES("finance_exchange_rates"),
+    FINANCE_CLEARING_GROUPS("finance_clearing_groups"),
+    FINANCE_TRANSACTIONS("finance_transactions"),
+    FINANCE_SPLITS("finance_splits"),
+    FINANCE_SPLIT_CLEARING_GROUPS("finance_split_clearing_groups"),
+    FINANCE_AMORTIZATION_PLANS("finance_amortization_plans"),
+    FINANCE_BUDGET_RULES("finance_budget_rules"),
 }

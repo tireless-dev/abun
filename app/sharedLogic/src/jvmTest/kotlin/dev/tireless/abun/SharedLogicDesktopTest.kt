@@ -985,7 +985,15 @@ class SharedLogicDesktopTest {
                     } else {
                         AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>()))
                     }
-                    else -> error("Unexpected path ${request.url.encodedPath}")
+                    else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
+                        if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<String>()))
+                        }
+                    } else {
+                        error("Unexpected path ${request.url.encodedPath}")
+                    }
                 }
                 respond(
                     content = body,
@@ -1014,6 +1022,14 @@ class SharedLogicDesktopTest {
                 "GET /api/sync/alarms",
                 "GET /api/sync/task-events",
                 "GET /api/sync/pomodoro-sessions",
+                "GET /api/sync/finance-accounts",
+                "GET /api/sync/finance-exchange-rates",
+                "GET /api/sync/finance-clearing-groups",
+                "GET /api/sync/finance-transactions",
+                "GET /api/sync/finance-splits",
+                "GET /api/sync/finance-split-clearing-groups",
+                "GET /api/sync/finance-amortization-plans",
+                "GET /api/sync/finance-budget-rules",
                 "POST /api/sync/tasks",
                 "POST /api/sync/task-events",
             ),
@@ -1046,7 +1062,11 @@ class SharedLogicDesktopTest {
                             "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
                             "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
                             "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                            else -> error("Unexpected path ${request.url.encodedPath}")
+                            else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
+                                AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            } else {
+                                error("Unexpected path ${request.url.encodedPath}")
+                            }
                         }
                         respond(
                             content = body,
@@ -1124,7 +1144,11 @@ class SharedLogicDesktopTest {
                             "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
                             "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
                             "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                            else -> error("Unexpected path ${request.url.encodedPath}")
+                            else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
+                                AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            } else {
+                                error("Unexpected path ${request.url.encodedPath}")
+                            }
                         }
                         respond(
                             content = body,
@@ -1380,7 +1404,11 @@ class SharedLogicDesktopTest {
                             "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
                             "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
                             "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                            else -> error("Unexpected path ${request.url.encodedPath}")
+                            else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
+                                AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            } else {
+                                error("Unexpected path ${request.url.encodedPath}")
+                            }
                         }
                         respond(
                             content = body,
@@ -1494,7 +1522,15 @@ class SharedLogicDesktopTest {
                         "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
                         "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
                         "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
-                        else -> error("Unexpected path ${request.url.encodedPath}")
+                        else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
+                            if (request.method.value == "GET") {
+                                AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                            } else {
+                                AppJson.encodeToString(BatchRequest(items = emptyList<String>()))
+                            }
+                        } else {
+                            error("Unexpected path ${request.url.encodedPath}")
+                        }
                     }
                     respond(
                         content = body,

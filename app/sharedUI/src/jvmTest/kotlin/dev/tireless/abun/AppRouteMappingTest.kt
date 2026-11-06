@@ -11,6 +11,7 @@ class AppRouteMappingTest {
     fun `route mapping matches top level tabs`() {
         assertEquals(AppTab.TODAY, appTabForRoute(AppRoute.Day.route))
         assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.Tasks.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.Finance.route))
         assertEquals(AppTab.SETTINGS, appTabForRoute(AppRoute.Settings.route))
     }
 
@@ -22,5 +23,16 @@ class AppRouteMappingTest {
         assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.CompletePomodoro.route))
         assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.TaskDetail.create("task-1")))
         assertEquals(AppTab.TASKS, appTabForRoute(AppRoute.RoutineDetail.create("routine-1")))
+    }
+
+    @Test
+    fun `sheet routes remain attached to finance tab`() {
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.CreateFinanceTransaction.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.FinanceAccounts.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.DebtClearingHub.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.CombinedRepayment.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.AmortizationWizard.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.FinanceCockpit.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.CreateBudgetRule.route))
     }
 }

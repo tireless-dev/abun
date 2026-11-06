@@ -49,7 +49,26 @@ import {
   resolveTaskSyncService,
   type SyncTask,
 } from "../services/task-sync-service";
-import type { BatchRequest } from "../services/sync-service-types";
+import type { BatchRequest, MutableSyncEntity, MutableSyncService } from "../services/sync-service-types";
+import type { DbClient } from "../db/transaction";
+import {
+  resolveFinanceAccountSyncService,
+  resolveFinanceExchangeRateSyncService,
+  resolveFinanceClearingGroupSyncService,
+  resolveFinanceTransactionSyncService,
+  resolveFinanceSplitSyncService,
+  resolveFinanceSplitClearingGroupSyncService,
+  resolveFinanceAmortizationPlanSyncService,
+  resolveFinanceBudgetRuleSyncService,
+  type SyncFinanceAccount,
+  type SyncFinanceExchangeRate,
+  type SyncFinanceClearingGroup,
+  type SyncFinanceTransaction,
+  type SyncFinanceSplit,
+  type SyncFinanceSplitClearingGroup,
+  type SyncFinanceAmortizationPlan,
+  type SyncFinanceBudgetRule,
+} from "../services/finance-sync-services";
 
 export async function routeRequest(
   request: Request,
@@ -272,6 +291,38 @@ export async function routeRequest(
     });
   }
 
+  if (url.pathname === "/api/sync/finance-accounts") {
+    return handleEntitySyncRoute<SyncFinanceAccount>(request, url, method, env, resolveFinanceAccountSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-exchange-rates") {
+    return handleEntitySyncRoute<SyncFinanceExchangeRate>(request, url, method, env, resolveFinanceExchangeRateSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-clearing-groups") {
+    return handleEntitySyncRoute<SyncFinanceClearingGroup>(request, url, method, env, resolveFinanceClearingGroupSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-transactions") {
+    return handleEntitySyncRoute<SyncFinanceTransaction>(request, url, method, env, resolveFinanceTransactionSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-splits") {
+    return handleEntitySyncRoute<SyncFinanceSplit>(request, url, method, env, resolveFinanceSplitSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-split-clearing-groups") {
+    return handleEntitySyncRoute<SyncFinanceSplitClearingGroup>(request, url, method, env, resolveFinanceSplitClearingGroupSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-amortization-plans") {
+    return handleEntitySyncRoute<SyncFinanceAmortizationPlan>(request, url, method, env, resolveFinanceAmortizationPlanSyncService);
+  }
+
+  if (url.pathname === "/api/sync/finance-budget-rules") {
+    return handleEntitySyncRoute<SyncFinanceBudgetRule>(request, url, method, env, resolveFinanceBudgetRuleSyncService);
+  }
+
   if (url.pathname.startsWith("/api")) {
     return withOptionalDbClient(env, async (dbClient) => {
       const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
@@ -301,6 +352,35 @@ function serveAppAsset(request: Request, env: Partial<WorkerEnv>): Promise<Respo
     : assetUrl.pathname.slice("/app".length) || "/";
 
   return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+}
+
+async function handleEntitySyncRoute<T extends MutableSyncEntity>(
+  request: Request,
+  url: URL,
+  method: string,
+  env: Partial<WorkerEnv>,
+  resolveService: (env: Record<string, unknown>, dbClient?: DbClient) => MutableSyncService<T>,
+): Promise<Response> {
+  return withOptionalDbClient(env, async (dbClient) => {
+    const auth = resolveAuthService(env as Record<string, unknown>, dbClient ?? undefined);
+    const userId = await resolveUserId(request, env, auth);
+    const service = resolveService(env as Record<string, unknown>, dbClient ?? undefined);
+
+    if (method === "GET") {
+      const cursor = Number(url.searchParams.get("cursor") ?? "0");
+      const limit = clampLimit(Number(url.searchParams.get("limit") ?? "500"));
+      return json(await service.list(userId, Number.isFinite(cursor) ? cursor : 0, limit));
+    }
+
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      return json({
+        items: await service.push(userId, readBatchItems<T>(body)),
+      } satisfies BatchRequest<T>);
+    }
+
+    throw new HttpError(404, "Not found");
+  });
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown>> {

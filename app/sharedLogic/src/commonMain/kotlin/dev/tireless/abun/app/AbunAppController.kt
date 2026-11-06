@@ -1,6 +1,12 @@
 package dev.tireless.abun.app
 
 import dev.tireless.abun.TestSharedAccount
+import dev.tireless.abun.finance.AccountCategory
+import dev.tireless.abun.finance.AmortizationMethod
+import dev.tireless.abun.finance.BudgetScopeType
+import dev.tireless.abun.finance.ClearingGroupType
+import dev.tireless.abun.finance.LiquidTier
+import dev.tireless.abun.finance.TransactionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -508,7 +514,282 @@ class AbunAppController(
             },
             preferences = preferences,
             syncState = _state.value.syncState.copy(isSyncing = false, lastSyncedAt = lastSyncedAt),
+            financeView = store.deriveFinanceViewState(
+                selectedFilter = _state.value.financeView.selectedFilter,
+                filterAccountId = _state.value.financeView.filterAccountId,
+                filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
+                viewMode = _state.value.financeView.viewMode,
+                runwayHorizonDays = _state.value.financeView.runwayHorizonDays,
+            ),
         )
+    }
+
+    fun selectFinanceFilter(
+        filter: FinanceLedgerFilter,
+        accountId: String? = null,
+        clearingGroupId: String? = null,
+    ) {
+        _state.value = _state.value.copy(
+            financeView = store.deriveFinanceViewState(
+                selectedFilter = filter,
+                filterAccountId = accountId,
+                filterClearingGroupId = clearingGroupId,
+                viewMode = _state.value.financeView.viewMode,
+                runwayHorizonDays = _state.value.financeView.runwayHorizonDays,
+            ),
+        )
+    }
+
+    fun toggleFinanceLedgerViewMode() {
+        val nextMode = if (_state.value.financeView.viewMode == FinanceLedgerViewMode.STANDARD) {
+            FinanceLedgerViewMode.BEANCOUNT
+        } else {
+            FinanceLedgerViewMode.STANDARD
+        }
+        _state.value = _state.value.copy(
+            financeView = _state.value.financeView.copy(viewMode = nextMode),
+        )
+    }
+
+    fun createFinanceTransaction(
+        txDate: String,
+        summary: String = "",
+        payee: String? = null,
+        txTime: String? = null,
+        status: TransactionStatus = TransactionStatus.CLEARED,
+        splits: List<FinanceSplitDraft>,
+    ) {
+        store.createFinanceTransaction(
+            txDate = txDate,
+            summary = summary,
+            payee = payee,
+            txTime = txTime,
+            status = status,
+            splits = splits,
+        )
+        refresh()
+    }
+
+    fun deleteFinanceTransaction(id: String) {
+        store.deleteFinanceTransaction(id)
+        refresh()
+    }
+
+    fun createFinanceAccount(
+        path: String,
+        name: String,
+        category: AccountCategory,
+        currency: String = "CNY",
+        includeInNetWorth: Boolean = true,
+        isPassThrough: Boolean = false,
+        passThroughExpenseAccountId: String? = null,
+        liquidTier: LiquidTier = LiquidTier.LIQUID,
+        statementDay: Int? = null,
+        dueDay: Int? = null,
+    ) {
+        store.createFinanceAccount(
+            path = path,
+            name = name,
+            category = category,
+            currency = currency,
+            includeInNetWorth = includeInNetWorth,
+            isPassThrough = isPassThrough,
+            passThroughExpenseAccountId = passThroughExpenseAccountId,
+            liquidTier = liquidTier,
+            statementDay = statementDay,
+            dueDay = dueDay,
+        )
+        refresh()
+    }
+
+    fun deleteFinanceAccount(id: String) {
+        store.deleteFinanceAccount(id)
+        refresh()
+    }
+
+    fun autoPadAccountBalance(
+        accountId: String,
+        actualBalanceMinor: Long,
+        adjustmentDate: String = _state.value.selectedDate,
+    ) {
+        store.autoPadAccountBalance(
+            accountId = accountId,
+            actualBalanceMinor = actualBalanceMinor,
+            adjustmentDate = adjustmentDate,
+        )
+        refresh()
+    }
+
+    fun createFinanceClearingGroup(
+        name: String,
+        groupType: ClearingGroupType,
+        anchorCurrency: String = "CNY",
+        targetAccountId: String? = null,
+        statementCycle: String? = null,
+        dueDate: String? = null,
+    ) {
+        store.createFinanceClearingGroup(
+            name = name,
+            groupType = groupType,
+            anchorCurrency = anchorCurrency,
+            targetAccountId = targetAccountId,
+            statementCycle = statementCycle,
+            dueDate = dueDate,
+        )
+        refresh()
+    }
+
+    fun createFinanceAmortizationPlan(
+        name: String,
+        principalMinor: Long,
+        currency: String = "CNY",
+        totalPeriods: Int,
+        repaymentMethod: AmortizationMethod = AmortizationMethod.EQUAL_INSTALLMENT,
+        annualRateBps: Int = 0,
+        feePerPeriodMinor: Long = 0L,
+        startDate: String,
+        repaymentDay: Int,
+        liabilityAccountId: String,
+        fundingAccountId: String? = null,
+        interestAccountId: String,
+        recordInitialDisbursement: Boolean = false,
+        existingDisbursementSplitId: String? = null,
+    ): String {
+        val planId = store.createFinanceAmortizationPlan(
+            name = name,
+            principalMinor = principalMinor,
+            currency = currency,
+            totalPeriods = totalPeriods,
+            repaymentMethod = repaymentMethod,
+            annualRateBps = annualRateBps,
+            feePerPeriodMinor = feePerPeriodMinor,
+            startDate = startDate,
+            repaymentDay = repaymentDay,
+            liabilityAccountId = liabilityAccountId,
+            fundingAccountId = fundingAccountId,
+            interestAccountId = interestAccountId,
+            recordInitialDisbursement = recordInitialDisbursement,
+            existingDisbursementSplitId = existingDisbursementSplitId,
+        )
+        refresh()
+        return planId
+    }
+
+    fun deleteFinanceAmortizationPlan(id: String) {
+        store.deleteFinanceAmortizationPlan(id)
+        refresh()
+    }
+
+    fun repayCreditStatement(
+        clearingGroupId: String,
+        fundingAccountId: String,
+        repaymentDate: String = _state.value.selectedDate,
+        amountMinor: Long? = null,
+    ) {
+        val cg = store.financeClearingGroup(clearingGroupId) ?: return
+        val targetAccId = cg.targetAccountId ?: return
+        val viewState = _state.value.financeView
+        val cgItem = viewState.clearingGroups.find { it.group.id == clearingGroupId }
+        val debtMinor = -(cgItem?.evaluation?.realizedBalance ?: 0L)
+        val repayAmt = amountMinor ?: debtMinor
+        if (repayAmt <= 0L) return
+
+        store.createFinanceTransaction(
+            txDate = repaymentDate,
+            summary = "${cg.name} 还款",
+            status = TransactionStatus.CLEARED,
+            splits = listOf(
+                FinanceSplitDraft(
+                    accountId = fundingAccountId,
+                    amountMinor = -repayAmt,
+                    currency = cg.anchorCurrency,
+                    narration = "信用卡还款支出",
+                ),
+                FinanceSplitDraft(
+                    accountId = targetAccId,
+                    amountMinor = repayAmt,
+                    currency = cg.anchorCurrency,
+                    narration = "账单还款",
+                    clearingGroupIds = listOf(clearingGroupId),
+                ),
+            ),
+        )
+        refresh()
+    }
+
+    fun executeLoanTrancheRepayment(transactionId: String) {
+        val tx = store.financeTransaction(transactionId) ?: return
+        if (tx.status != TransactionStatus.SCHEDULED) return
+        val now = timeProvider.nowEpochMillis()
+        val hlc = store.clock.next()
+        store.queries.upsertFinanceTransaction(
+            id = tx.id,
+            tx_date = tx.txDate,
+            tx_time = tx.txTime,
+            payee = tx.payee,
+            summary = tx.summary,
+            status = TransactionStatus.CLEARED.name,
+            source_plan_id = tx.sourcePlanId,
+            period_index = tx.periodIndex?.toLong(),
+            is_deleted = 0L,
+            hlc_map = "{\"core\":\"$hlc\"}",
+            dirty_fields = "[\"status\"]",
+            is_dirty = 1L,
+            server_version = 0L,
+            created_at = now,
+            updated_at = now,
+        )
+        val sourcePlanId = tx.sourcePlanId
+        if (sourcePlanId != null) {
+            val plan = store.financeAmortizationPlan(sourcePlanId)
+            if (plan != null) {
+                store.refreshClearingGroupStatus(plan.lifecycleClearingGroupId, now)
+            }
+        }
+        refresh()
+    }
+
+    fun reassignSplitClearingGroup(splitId: String, oldGroupId: String, newGroupId: String) {
+        store.reassignSplitClearingGroup(splitId, oldGroupId, newGroupId)
+        refresh()
+    }
+
+    fun setFinanceRunwayHorizon(horizonDays: Int) {
+        _state.value = _state.value.copy(
+            financeView = store.deriveFinanceViewState(
+                selectedFilter = _state.value.financeView.selectedFilter,
+                filterAccountId = _state.value.financeView.filterAccountId,
+                filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
+                viewMode = _state.value.financeView.viewMode,
+                runwayHorizonDays = horizonDays,
+            ),
+        )
+    }
+
+    fun createBudgetRule(
+        name: String,
+        scopeType: BudgetScopeType,
+        accountPrefix: String = "Expenses:",
+        excludedPrefixesJson: String = "[]",
+        monthlyLimitMinor: Long,
+        currency: String = "CNY",
+        includeInRunway: Boolean = true,
+    ) {
+        store.createBudgetRule(
+            name = name,
+            scopeType = scopeType,
+            accountPrefix = accountPrefix,
+            excludedPrefixesJson = excludedPrefixesJson,
+            monthlyLimitMinor = monthlyLimitMinor,
+            currency = currency,
+            includeInRunway = includeInRunway,
+        )
+        refresh()
+    }
+
+    fun deleteBudgetRule(id: String) {
+        store.deleteBudgetRule(id)
+        refresh()
     }
 
     companion object {

@@ -8,6 +8,14 @@ import dev.tireless.abun.sync.SyncPreference
 import dev.tireless.abun.sync.SyncRoutine
 import dev.tireless.abun.sync.SyncTask
 import dev.tireless.abun.sync.SyncTaskEvent
+import dev.tireless.abun.sync.SyncFinanceAccount
+import dev.tireless.abun.sync.SyncFinanceExchangeRate
+import dev.tireless.abun.sync.SyncFinanceClearingGroup
+import dev.tireless.abun.sync.SyncFinanceTransaction
+import dev.tireless.abun.sync.SyncFinanceSplit
+import dev.tireless.abun.sync.SyncFinanceSplitClearingGroup
+import dev.tireless.abun.sync.SyncFinanceAmortizationPlan
+import dev.tireless.abun.sync.SyncFinanceBudgetRule
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -130,6 +138,14 @@ class SyncRemoteApi(
     suspend fun pullAlarms(cursor: Long, limit: Int): PullResponse<SyncAlarm> = pull("alarms", cursor, limit)
     suspend fun pullTaskEvents(cursor: Long, limit: Int): PullResponse<SyncTaskEvent> = pull("task-events", cursor, limit)
     suspend fun pullPomodoroSessions(cursor: Long, limit: Int): PullResponse<SyncPomodoroSession> = pull("pomodoro-sessions", cursor, limit)
+    suspend fun pullFinanceAccounts(cursor: Long, limit: Int): PullResponse<SyncFinanceAccount> = pull("finance-accounts", cursor, limit)
+    suspend fun pullFinanceExchangeRates(cursor: Long, limit: Int): PullResponse<SyncFinanceExchangeRate> = pull("finance-exchange-rates", cursor, limit)
+    suspend fun pullFinanceClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceClearingGroup> = pull("finance-clearing-groups", cursor, limit)
+    suspend fun pullFinanceTransactions(cursor: Long, limit: Int): PullResponse<SyncFinanceTransaction> = pull("finance-transactions", cursor, limit)
+    suspend fun pullFinanceSplits(cursor: Long, limit: Int): PullResponse<SyncFinanceSplit> = pull("finance-splits", cursor, limit)
+    suspend fun pullFinanceSplitClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceSplitClearingGroup> = pull("finance-split-clearing-groups", cursor, limit)
+    suspend fun pullFinanceAmortizationPlans(cursor: Long, limit: Int): PullResponse<SyncFinanceAmortizationPlan> = pull("finance-amortization-plans", cursor, limit)
+    suspend fun pullFinanceBudgetRules(cursor: Long, limit: Int): PullResponse<SyncFinanceBudgetRule> = pull("finance-budget-rules", cursor, limit)
 
     suspend fun pushPreferences(items: List<SyncPreference>): List<SyncPreference> = push("preferences", items)
     suspend fun pushRoutines(items: List<SyncRoutine>): List<SyncRoutine> = push("routines", items)
@@ -137,6 +153,14 @@ class SyncRemoteApi(
     suspend fun pushAlarms(items: List<SyncAlarm>): List<SyncAlarm> = push("alarms", items)
     suspend fun pushTaskEvents(items: List<SyncTaskEvent>): List<SyncTaskEvent> = push("task-events", items)
     suspend fun pushPomodoroSessions(items: List<SyncPomodoroSession>): List<SyncPomodoroSession> = push("pomodoro-sessions", items)
+    suspend fun pushFinanceAccounts(items: List<SyncFinanceAccount>): List<SyncFinanceAccount> = push("finance-accounts", items)
+    suspend fun pushFinanceExchangeRates(items: List<SyncFinanceExchangeRate>): List<SyncFinanceExchangeRate> = push("finance-exchange-rates", items)
+    suspend fun pushFinanceClearingGroups(items: List<SyncFinanceClearingGroup>): List<SyncFinanceClearingGroup> = push("finance-clearing-groups", items)
+    suspend fun pushFinanceTransactions(items: List<SyncFinanceTransaction>): List<SyncFinanceTransaction> = push("finance-transactions", items)
+    suspend fun pushFinanceSplits(items: List<SyncFinanceSplit>): List<SyncFinanceSplit> = push("finance-splits", items)
+    suspend fun pushFinanceSplitClearingGroups(items: List<SyncFinanceSplitClearingGroup>): List<SyncFinanceSplitClearingGroup> = push("finance-split-clearing-groups", items)
+    suspend fun pushFinanceAmortizationPlans(items: List<SyncFinanceAmortizationPlan>): List<SyncFinanceAmortizationPlan> = push("finance-amortization-plans", items)
+    suspend fun pushFinanceBudgetRules(items: List<SyncFinanceBudgetRule>): List<SyncFinanceBudgetRule> = push("finance-budget-rules", items)
 
     private suspend inline fun <reified T> pull(resource: String, cursor: Long, limit: Int): PullResponse<T> =
         executeAuthorizedRequest {

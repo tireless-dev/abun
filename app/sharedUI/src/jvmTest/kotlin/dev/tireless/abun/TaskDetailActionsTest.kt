@@ -189,6 +189,32 @@ class TaskDetailActionsTest {
         assertTrue(sheetHeight <= rootHeight * 0.82f, "sheetHeight=$sheetHeight rootHeight=$rootHeight")
         assertTrue(sheetBounds.bottom >= rootHeight - 1f, "sheetBottom=${sheetBounds.bottom} rootHeight=$rootHeight")
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `task detail sheet shows built in drag handle`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme {
+                TaskActionsSheet(
+                    task = sampleTask(),
+                    history = sampleHistory(),
+                    availableParents = emptyList(),
+                    availableRoutines = emptyList(),
+                    isPomodoroActive = false,
+                    onDismiss = {},
+                    onSaveTask = { _, _, _, _, _, _, _ -> },
+                    onProgress = {},
+                    onComplete = {},
+                    onSkip = {},
+                    onPostpone = { _, _, _, _, _ -> },
+                    onDelete = {},
+                    onStartPomodoro = {},
+                )
+            }
+        }
+
+        onNodeWithTag("task-detail-drag-handle", useUnmergedTree = true).assertExists()
+    }
 }
 
 private fun sampleTask() = TaskListItemView(

@@ -13,7 +13,7 @@ The shared presentation language across modules uses a consistent Lucide icon fa
 Current module status:
 
 - `tasks`: active module
-- `finance`: placeholder
+- `finance`: active module (double-entry core, clearing groups, statements, installments, pacing budget, runway cockpit, and local-first sync)
 - `notes`: placeholder
 
 ## Shared Concepts

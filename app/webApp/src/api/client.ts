@@ -35,6 +35,10 @@ export interface TaskResponse {
   parent_id?: string | null;
   routine_id?: string | null;
   title: string;
+  detail?: string | null;
+  start_not_before?: string | null;
+  end_not_after?: string | null;
+  estimated_duration?: string | null;
   is_deleted: boolean;
   server_version: number;
 }
@@ -57,16 +61,24 @@ export interface TaskEventResponse {
 export interface TaskUpsertRequest {
   id?: string;
   title: string;
+  detail?: string | null;
   parent_id?: string | null;
   routine_id?: string | null;
+  start_not_before?: string | null;
+  end_not_after?: string | null;
+  estimated_duration?: string | null;
   journal_date?: string | null;
   event_time?: string | null;
 }
 
 export interface TaskPatchRequest {
   title?: string;
+  detail?: string | null;
   parent_id?: string | null;
   routine_id?: string | null;
+  start_not_before?: string | null;
+  end_not_after?: string | null;
+  estimated_duration?: string | null;
 }
 
 export interface TaskEventCreateRequest {

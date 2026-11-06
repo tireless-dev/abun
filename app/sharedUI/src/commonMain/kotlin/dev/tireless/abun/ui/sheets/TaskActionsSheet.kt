@@ -1,48 +1,42 @@
 package dev.tireless.abun.ui.sheets
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import dev.tireless.abun.app.JournalEntryView
@@ -58,6 +52,7 @@ import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TaskActionsSheet(
     task: TaskListItemView?,
@@ -114,151 +109,135 @@ internal fun TaskActionsSheet(
 
     val density = LocalDensity.current
     val windowHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
-    Dialog(
+    val defaultSheetHeight = windowHeight * 0.8f
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(task.id) {
+        sheetState.show()
+    }
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-        ),
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss,
-                    ),
+        sheetState = sheetState,
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                modifier = Modifier.testTag("task-detail-drag-handle"),
             )
-            Surface(
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(defaultSheetHeight)
+                .testTag("task-detail-sheet")
+                .verticalScroll(rememberScrollState())
+                .padding(ThemeTokens.spacing.lgDp),
+            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+        ) {
+            Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(windowHeight * 0.8f)
-                    .testTag("task-detail-sheet"),
-                shape = RoundedCornerShape(
-                    topStart = ThemeTokens.radii.largeDp,
-                    topEnd = ThemeTokens.radii.largeDp,
-                ),
-                color = ThemeTokens.colors.surface,
-                contentColor = ThemeTokens.colors.textPrimary,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
+                    .testTag("task-detail-sheet-header"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()
-                        .testTag("task-detail-sheet-content")
-                        .verticalScroll(rememberScrollState())
-                        .padding(ThemeTokens.spacing.lgDp),
-                    verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
+                    verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
-                            StatusPill(task.status)
-                            routine?.let {
-                                Text("Routine: ${it.templateTitle}", style = ThemeTokens.type.bodyMuted)
-                            }
-                            nextOccurrence?.let {
-                                Text("Next occurrence: $it", style = ThemeTokens.type.bodyMuted)
-                            }
-                        }
-                        if (!isEditing && canEdit) {
-                            IconButton(
-                                modifier = Modifier.testTag("task-detail-edit-button"),
-                                onClick = { isEditing = true },
-                            ) {
-                                Icon(
-                                    imageVector = Lucide.Pencil,
-                                    contentDescription = "Edit task",
-                                    modifier = Modifier.padding(6.dp),
-                                    tint = ThemeTokens.colors.textPrimary,
-                                )
-                            }
-                        }
+                    StatusPill(task.status)
+                    routine?.let {
+                        Text("Routine: ${it.templateTitle}", style = ThemeTokens.type.bodyMuted)
                     }
-
-                    if (isEditing) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-                            verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    resetDraft()
-                                    isEditing = false
-                                },
-                            ) {
-                                Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor())
-                            }
-                            Button(
-                                onClick = {
-                                    val draft = normalizeTaskSaveDraft(
-                                        title = title,
-                                        detail = detail,
-                                        parentId = parentId,
-                                        startNotBefore = startNotBefore,
-                                        endNotAfter = endNotAfter,
-                                        estimatedDuration = estimatedDuration,
-                                    )
-                                    onSaveTask(
-                                        task.id,
-                                        draft.title,
-                                        draft.detail,
-                                        draft.parentId,
-                                        draft.startNotBefore,
-                                        draft.endNotAfter,
-                                        draft.estimatedDuration,
-                                    )
-                                    isEditing = false
-                                },
-                                enabled = !isPomodoroActive && title.isNotBlank(),
-                            ) {
-                                Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
-                            }
-                            Button(
-                                onClick = { showDeleteConfirmation = true },
-                                enabled = !isPomodoroActive,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = ThemeTokens.colors.error,
-                                    contentColor = Color.White,
-                                ),
-                            ) {
-                                Text("Delete", style = ThemeTokens.type.body.withMaterialContentColor())
-                            }
-                        }
-                        EditableTaskDetailFields(
-                            title = title,
-                            onTitleChange = { title = it },
-                            detail = detail,
-                            onDetailChange = { detail = it },
-                            availableParents = availableParents,
-                            parentId = parentId,
-                            onParentChange = { parentId = it },
-                            startNotBefore = startNotBefore,
-                            onStartNotBeforeChange = { startNotBefore = it },
-                            endNotAfter = endNotAfter,
-                            onEndNotAfterChange = { endNotAfter = it },
-                            estimatedDuration = estimatedDuration,
-                            onEstimatedDurationChange = { estimatedDuration = it },
-                        )
-                    } else {
-                        ReadOnlyTaskDetailFields(
-                            task = task,
-                            parentTitle = availableParents.firstOrNull { it.id == task.parentId }?.title,
-                        )
-                        Text("History", style = ThemeTokens.type.label)
-                        JournalTimeline(history)
+                    nextOccurrence?.let {
+                        Text("Next occurrence: $it", style = ThemeTokens.type.bodyMuted)
                     }
                 }
+                if (!isEditing && canEdit) {
+                    IconButton(
+                        modifier = Modifier.testTag("task-detail-edit-button"),
+                        onClick = { isEditing = true },
+                    ) {
+                        Icon(
+                            imageVector = Lucide.Pencil,
+                            contentDescription = "Edit task",
+                            modifier = Modifier.padding(6.dp),
+                            tint = ThemeTokens.colors.textPrimary,
+                        )
+                    }
+                }
+            }
+
+            if (isEditing) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                    verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            resetDraft()
+                            isEditing = false
+                        },
+                    ) {
+                        Text("Cancel", style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                    Button(
+                        onClick = {
+                            val draft = normalizeTaskSaveDraft(
+                                title = title,
+                                detail = detail,
+                                parentId = parentId,
+                                startNotBefore = startNotBefore,
+                                endNotAfter = endNotAfter,
+                                estimatedDuration = estimatedDuration,
+                            )
+                            onSaveTask(
+                                task.id,
+                                draft.title,
+                                draft.detail,
+                                draft.parentId,
+                                draft.startNotBefore,
+                                draft.endNotAfter,
+                                draft.estimatedDuration,
+                            )
+                            isEditing = false
+                        },
+                        enabled = !isPomodoroActive && title.isNotBlank(),
+                    ) {
+                        Text("Save", style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                    Button(
+                        onClick = { showDeleteConfirmation = true },
+                        enabled = !isPomodoroActive,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ThemeTokens.colors.error,
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Text("Delete", style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                }
+                EditableTaskDetailFields(
+                    title = title,
+                    onTitleChange = { title = it },
+                    detail = detail,
+                    onDetailChange = { detail = it },
+                    availableParents = availableParents,
+                    parentId = parentId,
+                    onParentChange = { parentId = it },
+                    startNotBefore = startNotBefore,
+                    onStartNotBeforeChange = { startNotBefore = it },
+                    endNotAfter = endNotAfter,
+                    onEndNotAfterChange = { endNotAfter = it },
+                    estimatedDuration = estimatedDuration,
+                    onEstimatedDurationChange = { estimatedDuration = it },
+                )
+            } else {
+                ReadOnlyTaskDetailFields(
+                    task = task,
+                    parentTitle = availableParents.firstOrNull { it.id == task.parentId }?.title,
+                )
+                Text("History", style = ThemeTokens.type.label)
+                JournalTimeline(history)
             }
         }
     }

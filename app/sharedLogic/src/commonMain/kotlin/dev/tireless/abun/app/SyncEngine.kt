@@ -13,12 +13,28 @@ class SyncEngine(
         pullAlarms()
         pullTaskEvents()
         pullPomodoroSessions()
+        pullFinanceAccounts()
+        pullFinanceExchangeRates()
+        pullFinanceClearingGroups()
+        pullFinanceTransactions()
+        pullFinanceSplits()
+        pullFinanceSplitClearingGroups()
+        pullFinanceAmortizationPlans()
+        pullFinanceBudgetRules()
         pushPreferences()
         pushRoutines()
         pushTasks()
         pushAlarms()
         pushTaskEvents()
         pushPomodoroSessions()
+        pushFinanceAccounts()
+        pushFinanceExchangeRates()
+        pushFinanceClearingGroups()
+        pushFinanceTransactions()
+        pushFinanceSplits()
+        pushFinanceSplitClearingGroups()
+        pushFinanceAmortizationPlans()
+        pushFinanceBudgetRules()
         logger.info(message = "sync.completed")
     }
 
@@ -28,6 +44,14 @@ class SyncEngine(
     private suspend fun pullAlarms() = pullPaged(SyncScope.ALARMS, remoteApi::pullAlarms, localStore::mergeRemoteAlarms)
     private suspend fun pullTaskEvents() = pullPaged(SyncScope.TASK_EVENTS, remoteApi::pullTaskEvents, localStore::mergeRemoteTaskEvents)
     private suspend fun pullPomodoroSessions() = pullPaged(SyncScope.POMODORO_SESSIONS, remoteApi::pullPomodoroSessions, localStore::mergeRemotePomodoroSessions)
+    private suspend fun pullFinanceAccounts() = pullPaged(SyncScope.FINANCE_ACCOUNTS, remoteApi::pullFinanceAccounts, localStore::mergeRemoteFinanceAccounts)
+    private suspend fun pullFinanceExchangeRates() = pullPaged(SyncScope.FINANCE_EXCHANGE_RATES, remoteApi::pullFinanceExchangeRates, localStore::mergeRemoteFinanceExchangeRates)
+    private suspend fun pullFinanceClearingGroups() = pullPaged(SyncScope.FINANCE_CLEARING_GROUPS, remoteApi::pullFinanceClearingGroups, localStore::mergeRemoteFinanceClearingGroups)
+    private suspend fun pullFinanceTransactions() = pullPaged(SyncScope.FINANCE_TRANSACTIONS, remoteApi::pullFinanceTransactions, localStore::mergeRemoteFinanceTransactions)
+    private suspend fun pullFinanceSplits() = pullPaged(SyncScope.FINANCE_SPLITS, remoteApi::pullFinanceSplits, localStore::mergeRemoteFinanceSplits)
+    private suspend fun pullFinanceSplitClearingGroups() = pullPaged(SyncScope.FINANCE_SPLIT_CLEARING_GROUPS, remoteApi::pullFinanceSplitClearingGroups, localStore::mergeRemoteFinanceSplitClearingGroups)
+    private suspend fun pullFinanceAmortizationPlans() = pullPaged(SyncScope.FINANCE_AMORTIZATION_PLANS, remoteApi::pullFinanceAmortizationPlans, localStore::mergeRemoteFinanceAmortizationPlans)
+    private suspend fun pullFinanceBudgetRules() = pullPaged(SyncScope.FINANCE_BUDGET_RULES, remoteApi::pullFinanceBudgetRules, localStore::mergeRemoteFinanceBudgetRules)
 
     private suspend fun pushPreferences() {
         val local = localStore.dirtyPreferences()
@@ -74,6 +98,70 @@ class SyncEngine(
         if (local.isNotEmpty()) {
             logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.POMODORO_SESSIONS.wireName, "itemCount" to local.size.toString()))
             localStore.mergeRemotePomodoroSessions(runSyncStep("pushing", SyncScope.POMODORO_SESSIONS) { remoteApi.pushPomodoroSessions(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceAccounts() {
+        val local = localStore.dirtyFinanceAccounts()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_ACCOUNTS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceAccounts(runSyncStep("pushing", SyncScope.FINANCE_ACCOUNTS) { remoteApi.pushFinanceAccounts(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceExchangeRates() {
+        val local = localStore.dirtyFinanceExchangeRates()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_EXCHANGE_RATES.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceExchangeRates(runSyncStep("pushing", SyncScope.FINANCE_EXCHANGE_RATES) { remoteApi.pushFinanceExchangeRates(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceClearingGroups() {
+        val local = localStore.dirtyFinanceClearingGroups()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_CLEARING_GROUPS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceClearingGroups(runSyncStep("pushing", SyncScope.FINANCE_CLEARING_GROUPS) { remoteApi.pushFinanceClearingGroups(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceTransactions() {
+        val local = localStore.dirtyFinanceTransactions()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_TRANSACTIONS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceTransactions(runSyncStep("pushing", SyncScope.FINANCE_TRANSACTIONS) { remoteApi.pushFinanceTransactions(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceSplits() {
+        val local = localStore.dirtyFinanceSplits()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_SPLITS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceSplits(runSyncStep("pushing", SyncScope.FINANCE_SPLITS) { remoteApi.pushFinanceSplits(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceSplitClearingGroups() {
+        val local = localStore.dirtyFinanceSplitClearingGroups()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_SPLIT_CLEARING_GROUPS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceSplitClearingGroups(runSyncStep("pushing", SyncScope.FINANCE_SPLIT_CLEARING_GROUPS) { remoteApi.pushFinanceSplitClearingGroups(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceAmortizationPlans() {
+        val local = localStore.dirtyFinanceAmortizationPlans()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_AMORTIZATION_PLANS.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceAmortizationPlans(runSyncStep("pushing", SyncScope.FINANCE_AMORTIZATION_PLANS) { remoteApi.pushFinanceAmortizationPlans(local) }, clearAccepted = true)
+        }
+    }
+
+    private suspend fun pushFinanceBudgetRules() {
+        val local = localStore.dirtyFinanceBudgetRules()
+        if (local.isNotEmpty()) {
+            logger.info(message = "sync.push.started", context = mapOf("scope" to SyncScope.FINANCE_BUDGET_RULES.wireName, "itemCount" to local.size.toString()))
+            localStore.mergeRemoteFinanceBudgetRules(runSyncStep("pushing", SyncScope.FINANCE_BUDGET_RULES) { remoteApi.pushFinanceBudgetRules(local) }, clearAccepted = true)
         }
     }
 

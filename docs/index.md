@@ -6,7 +6,7 @@ This documentation set is the working product and architecture reference for Abu
 
 - [Base architecture](./base/information-architecture.md)
 - [Tasks module](./tasks/model-design.md)
-- [Finance placeholder](./finance/README.md)
+- [Finance module](./finance/README.md)
 - [Notes placeholder](./notes/README.md)
 - [Prioritized backlog](./backlog.md)
 
@@ -18,7 +18,11 @@ This documentation set is the working product and architecture reference for Abu
 4. [Tasks model design](./tasks/model-design.md)
 5. [Tasks functionality design](./tasks/functionality-design.md)
 6. [Tasks technical design](./tasks/technical-design.md)
-7. [Prioritized backlog](./backlog.md)
+7. [Finance model design](./finance/model-design.md)
+8. [Finance functionality design](./finance/functionality-design.md)
+9. [Finance technical design](./finance/technical-design.md)
+10. [Finance implementation plan](./finance/implementation-plan.md)
+11. [Prioritized backlog](./backlog.md)
 
 ## Status Legend
 

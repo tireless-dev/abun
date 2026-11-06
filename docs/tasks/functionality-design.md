@@ -243,6 +243,8 @@ Quick list behavior:
 
 - opening a task row enters task detail
 - task detail opens as a bottom sheet routed through shared Compose Navigation, rather than through feature-local overlay state
+- task detail keeps the standard bottom-sheet top handle as a visible affordance while staying at about 80% of screen height
+- the web task list and task-detail surface mirror this interaction: rows stay compact and open the same read-only-first detail flow instead of exposing execution and deletion controls inline
 - list rows are not the place for completion
 - deliberate scheduling changes belong in task detail
 

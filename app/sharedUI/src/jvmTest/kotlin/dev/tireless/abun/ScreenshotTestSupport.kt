@@ -178,6 +178,7 @@ internal fun ScreenshotScreenFrame(
 internal fun AppTab.tabLabelForScreenshot(): String = when (this) {
     AppTab.TODAY -> "Dashboard"
     AppTab.TASKS -> "Tasks"
+    AppTab.FINANCE -> "Finance"
     AppTab.SETTINGS -> "Settings"
 }
 

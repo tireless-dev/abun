@@ -51,7 +51,7 @@ type AuthState = {
   userId: string;
 };
 
-type TaskWithStatus = TaskResponse & {
+export type TaskWithStatus = TaskResponse & {
   status: TaskStatus;
   alarm?: AlarmResponse;
   latestEvent?: TaskEventResponse;
@@ -223,6 +223,7 @@ export function App() {
   const [selectedDate, setSelectedDate] = useState(todayIsoDate());
   const [mainTab, setMainTab] = useState<MainTab>('TODAY');
   const [taskPanel, setTaskPanel] = useState<TaskPanel>('OPEN');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [taskStatuses, setTaskStatuses] = useState<Record<string, TaskStatus>>({});
@@ -234,7 +235,6 @@ export function App() {
   const [preferences, setPreferences] = useState<PreferencesState>(DEFAULT_PREFS);
 
   const [taskDraft, setTaskDraft] = useState('');
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [routineDraft, setRoutineDraft] = useState({ template_title: '', cron_schedule: '0 9 * * *', timezone: 'UTC' });
   const [alarmDraft, setAlarmDraft] = useState({ task_id: '', trigger_time: toDateTimeLocalValue(new Date(Date.now() + DEFAULT_PREFS.defaultAlarmLeadMinutes * 60_000)) });
   const [pomodoroDraft, setPomodoroDraft] = useState<{ taskId: string; phase: PomodoroPhase; note: string; taskUpdate: PomodoroTaskUpdate }>({
@@ -434,7 +434,6 @@ export function App() {
 
   async function appendEvent(taskId: string, type: TaskEventType, content?: string) {
     await client.createTaskEvent(taskId, { journal_date: selectedDate, event_type: type, event_time: nowIso(), content: content?.trim() || null });
-    setNoteDrafts((prev) => ({ ...prev, [taskId]: '' }));
     await loadAll();
   }
 
@@ -444,6 +443,11 @@ export function App() {
     const title = `${preferences.titlePrefix} ${rawTitle}`.trim();
     await client.createTask({ title, journal_date: selectedDate, event_time: nowIso() });
     setTaskDraft('');
+    await loadAll();
+  }
+
+  async function updateTask(taskId: string, patch: Parameters<typeof client.updateTask>[1]) {
+    await client.updateTask(taskId, patch);
     await loadAll();
   }
 
@@ -541,6 +545,7 @@ export function App() {
     .filter((alarm) => alarm.is_active)
     .sort((a, b) => new Date(a.trigger_time).getTime() - new Date(b.trigger_time).getTime());
   const dueNow = upcomingAlarms.filter((alarm) => new Date(alarm.trigger_time).getTime() <= nowMs);
+  const selectedTask = tasksWithStatus.find((task) => task.id === selectedTaskId) ?? null;
 
   if (auth.mode !== 'AUTH') {
     return (
@@ -623,7 +628,7 @@ export function App() {
                 <Metric label="In focus" value={inProgress.length} />
                 <Metric label="Due" value={dueNow.length} />
               </div>
-              <TaskStack tasks={openTasks.slice(0, 6)} empty="No open tasks." onEvent={appendEvent} onDelete={scheduleDelete} onFocus={(taskId) => startTimer(taskId)} noteDrafts={noteDrafts} setNoteDrafts={setNoteDrafts} working={working} compact />
+              <TaskStack tasks={openTasks.slice(0, 6)} empty="No open tasks." onOpen={setSelectedTaskId} compact />
             </section>
 
             <section className="panel focus-strip">
@@ -678,7 +683,7 @@ export function App() {
                     <h2>Open tasks</h2>
                   </div>
                 </div>
-                <TaskStack tasks={openTasks} empty="No open tasks." onEvent={appendEvent} onDelete={scheduleDelete} onFocus={(taskId) => startTimer(taskId)} noteDrafts={noteDrafts} setNoteDrafts={setNoteDrafts} working={working} />
+                <TaskStack tasks={openTasks} empty="No open tasks." onOpen={setSelectedTaskId} />
               </section>
             )}
 
@@ -690,7 +695,7 @@ export function App() {
                     <h2>Closed tasks</h2>
                   </div>
                 </div>
-                <TaskStack tasks={closedTasks} empty="No closed tasks." onEvent={appendEvent} onDelete={scheduleDelete} onFocus={(taskId) => startTimer(taskId)} noteDrafts={noteDrafts} setNoteDrafts={setNoteDrafts} working={working} />
+                <TaskStack tasks={closedTasks} empty="No closed tasks." onOpen={setSelectedTaskId} />
               </section>
             )}
 
@@ -848,6 +853,23 @@ export function App() {
         )}
       </section>
 
+      {selectedTask && (
+        <TaskDetailSheet
+          task={selectedTask}
+          tasks={tasks}
+          events={taskEvents[selectedTask.id] ?? []}
+          working={working}
+          onDismiss={() => setSelectedTaskId(null)}
+          onSave={(patch) => runAction(() => updateTask(selectedTask.id, patch), 'Task updated')}
+          onEvent={(type, note) => runAction(() => appendEvent(selectedTask.id, type, note), 'Task updated')}
+          onFocus={() => runAction(() => startTimer(selectedTask.id), 'Timer started')}
+          onDelete={() => {
+            scheduleDelete('task', selectedTask.id, `Task "${selectedTask.title}"`);
+            setSelectedTaskId(null);
+          }}
+        />
+      )}
+
       <section className="toast-stack" aria-live="polite" aria-atomic="true">
         {toasts.map((toast) => <p key={toast.id} className={`toast ${toast.type}`}>{toast.message}</p>)}
       </section>
@@ -864,58 +886,109 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function TaskStack({
+export function TaskStack({
   tasks,
   empty,
-  onEvent,
-  onDelete,
-  onFocus,
-  noteDrafts,
-  setNoteDrafts,
-  working,
+  onOpen,
   compact = false,
 }: {
   tasks: TaskWithStatus[];
   empty: string;
-  onEvent: (taskId: string, type: TaskEventType, content?: string) => Promise<void>;
-  onDelete: (kind: 'task', id: string, label: string) => void;
-  onFocus: (taskId: string) => Promise<void>;
-  noteDrafts: Record<string, string>;
-  setNoteDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  working: boolean;
+  onOpen: (taskId: string) => void;
   compact?: boolean;
 }) {
   if (tasks.length === 0) return <p className="empty">{empty}</p>;
   return (
     <div className="task-stack">
       {tasks.map((task) => (
-        <article key={task.id} className={`task-row ${compact ? 'compact' : ''}`}>
+        <article key={task.id} className={`task-row task-row-clickable ${compact ? 'compact' : ''}`} tabIndex={0} role="button" onClick={() => onOpen(task.id)} onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') onOpen(task.id);
+        }}>
           <div className="task-title-line">
-            <div>
+            <span className={`status-dot ${task.status.toLowerCase().replace('_', '-')}`} aria-label={statusLabel(task.status)} />
+            <div className="row-main">
               <strong>{task.title}</strong>
               <div className="task-meta">
-                <span className={`status-pill ${task.status.toLowerCase().replace('_', '-')}`}>{statusLabel(task.status)}</span>
                 {task.alarm && <span>{formatDateTime(task.alarm.trigger_time)}</span>}
                 {task.latestEvent && <span>{eventLabel(task.latestEvent.event_type)}</span>}
               </div>
             </div>
-            <div className="row-actions">
-              {isOpenStatus(task.status) && <button disabled={working} onClick={() => void onFocus(task.id)}>Focus</button>}
-              <button disabled={working} onClick={() => onDelete('task', task.id, `Task "${task.title}"`)}>Delete</button>
-            </div>
           </div>
-          {!compact && (
-            <>
-              <input value={noteDrafts[task.id] ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [task.id]: e.target.value }))} placeholder="Journal note" />
-              <div className="button-row">
-                <button disabled={working} onClick={() => void onEvent(task.id, 'PROGRESSED', noteDrafts[task.id])}>Progress</button>
-                <button disabled={working} onClick={() => void onEvent(task.id, 'COMPLETED', noteDrafts[task.id])}>Complete</button>
-                <button disabled={working} onClick={() => void onEvent(task.id, 'CANCELLED', noteDrafts[task.id])}>Cancel</button>
-              </div>
-            </>
-          )}
         </article>
       ))}
+    </div>
+  );
+}
+
+export function TaskDetailSheet({ task, tasks, events, working, onDismiss, onSave, onEvent, onFocus, onDelete }: {
+  task: TaskWithStatus;
+  tasks: TaskResponse[];
+  events: TaskEventResponse[];
+  working: boolean;
+  onDismiss: () => void;
+  onSave: (patch: Parameters<ReturnType<typeof createAbunApiClient>['updateTask']>[1]) => Promise<void>;
+  onEvent: (type: TaskEventType, note?: string) => Promise<void>;
+  onFocus: () => Promise<void>;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [note, setNote] = useState('');
+  const [draft, setDraft] = useState({
+    title: task.title,
+    detail: task.detail ?? '',
+    parent_id: task.parent_id ?? '',
+    start_not_before: task.start_not_before ? toDateTimeLocalValue(new Date(task.start_not_before)) : '',
+    end_not_after: task.end_not_after ? toDateTimeLocalValue(new Date(task.end_not_after)) : '',
+    estimated_duration: task.estimated_duration ?? '',
+  });
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onDismiss(); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onDismiss]);
+
+  const history = events.slice().sort((a, b) => (a.event_time < b.event_time ? 1 : -1));
+  return (
+    <div className="sheet-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onDismiss(); }}>
+      <section className="task-detail-sheet" role="dialog" aria-modal="true" aria-label={`Task detail: ${task.title}`}>
+        <div className="sheet-handle" aria-hidden="true" />
+        <header className="task-detail-header">
+          <span className={`status-pill ${task.status.toLowerCase().replace('_', '-')}`}>{statusLabel(task.status)}</span>
+          {!editing && <button aria-label="Edit task" onClick={() => setEditing(true)}>Edit</button>}
+        </header>
+
+        {editing ? (
+          <div className="task-detail-fields">
+            <label>Title<input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} /></label>
+            <label>Detail<input value={draft.detail} onChange={(e) => setDraft((p) => ({ ...p, detail: e.target.value }))} /></label>
+            <label>Parent task<select value={draft.parent_id} onChange={(e) => setDraft((p) => ({ ...p, parent_id: e.target.value }))}><option value="">No parent</option>{tasks.filter((candidate) => candidate.id !== task.id).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}</select></label>
+            <label>Start not before<input type="datetime-local" value={draft.start_not_before} onChange={(e) => setDraft((p) => ({ ...p, start_not_before: e.target.value }))} /></label>
+            <label>End not after<input type="datetime-local" value={draft.end_not_after} onChange={(e) => setDraft((p) => ({ ...p, end_not_after: e.target.value }))} /></label>
+            <label>Estimated duration<input placeholder="PT25M" value={draft.estimated_duration} onChange={(e) => setDraft((p) => ({ ...p, estimated_duration: e.target.value }))} /></label>
+            <div className="button-row task-detail-actions">
+              <button onClick={() => setEditing(false)}>Cancel</button>
+              <button className="primary-action" disabled={working || !draft.title.trim()} onClick={() => void onSave({ title: draft.title.trim(), detail: draft.detail.trim() || null, parent_id: draft.parent_id || null, start_not_before: draft.start_not_before ? toIsoFromDateTimeLocal(draft.start_not_before) : null, end_not_after: draft.end_not_after ? toIsoFromDateTimeLocal(draft.end_not_after) : null, estimated_duration: draft.estimated_duration.trim() || null }).then(() => setEditing(false))}>Save</button>
+              <button className="danger-action" disabled={working} onClick={() => setConfirmingDelete(true)}>Delete</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="task-detail-copy"><h2>{task.title}</h2>{task.detail && <p>{task.detail}</p>}<p className="muted">Parent: {tasks.find((candidate) => candidate.id === task.parent_id)?.title ?? 'None'}</p><p className="muted">Start: {task.start_not_before ? formatDateTime(task.start_not_before) : 'Not set'}</p><p className="muted">End: {task.end_not_after ? formatDateTime(task.end_not_after) : 'Not set'}</p><p className="muted">Estimate: {task.estimated_duration ?? 'Not set'}</p></div>
+            <input aria-label="Journal note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Journal note" />
+            <div className="button-row task-detail-actions">
+              {isOpenStatus(task.status) && <button disabled={working} onClick={() => void onFocus()}>Focus</button>}
+              {isOpenStatus(task.status) && <button disabled={working} onClick={() => void onEvent('PROGRESSED', note).then(() => setNote(''))}>Progress</button>}
+              {isOpenStatus(task.status) && <button className="primary-action" disabled={working} onClick={() => void onEvent('COMPLETED', note).then(() => setNote(''))}>Complete</button>}
+              {isOpenStatus(task.status) && <button disabled={working} onClick={() => void onEvent('CANCELLED', note).then(() => setNote(''))}>Cancel</button>}
+            </div>
+            <section><h2>History</h2><div className="timeline-list">{history.length === 0 ? <p className="empty">No history.</p> : history.map((event) => <div className="timeline-item" key={event.id}><time>{formatDateTime(event.event_time)}</time><span><strong>{eventLabel(event.event_type)}</strong>{event.content && <> — {event.content}</>}</span></div>)}</div></section>
+          </>
+        )}
+
+        {confirmingDelete && <div className="delete-confirm" role="alertdialog" aria-label="Delete task confirmation"><p>Delete “{task.title}”?</p><div className="button-row"><button onClick={() => setConfirmingDelete(false)}>Cancel</button><button className="danger-action" onClick={onDelete}>Delete</button></div></div>}
+      </section>
     </div>
   );
 }
