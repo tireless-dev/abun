@@ -22,6 +22,8 @@
     }
   ],
   "vars": {
-    "ABUN_REQUIRE_AUTH": "true"
+    "ABUN_REQUIRE_AUTH": "true",
+    "SUPABASE_URL": "https://slhqajiltwxbhxlscazz.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_WEcFwA8LWRJEaQL2C_Bq4g_9gA4yXS5"
   }
 }

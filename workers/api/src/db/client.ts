@@ -18,5 +18,10 @@ export async function createDbClient(
     ssl: shouldRelaxTls ? { rejectUnauthorized: false } : undefined,
   });
   await client.connect();
+  try {
+    await client.query("set search_path to abun, public");
+  } catch {
+    // Search path setting may not be supported by mock/in-memory drivers
+  }
   return client;
 }

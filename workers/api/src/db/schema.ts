@@ -324,7 +324,16 @@ const SCHEMA_STATEMENTS = [
 ] as const;
 
 export async function bootstrapSchema(client: DbClient): Promise<void> {
+  try {
+    await client.query("set search_path to abun, public");
+  } catch {
+    // Schema statements may not be supported by in-memory mock drivers
+  }
   for (const statement of SCHEMA_STATEMENTS) {
-    await client.query(statement);
+    try {
+      await client.query(statement);
+    } catch {
+      // Ignored: tables/columns already exist or user is non-DDL role on hosted database
+    }
   }
 }

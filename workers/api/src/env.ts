@@ -13,6 +13,8 @@ export interface WorkerEnv {
   AUTH_JWT_SECRET?: string;
   AUTH_ACCESS_TOKEN_TTL_SECONDS?: string;
   AUTH_REFRESH_TOKEN_TTL_SECONDS?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
   ASSETS?: AssetsBinding;
 }
 

@@ -11,7 +11,8 @@ This document defines the shared technical shape used by all modules.
 - shared logic and shared Compose UI
 - shared Compose UI uses Material 3 primitives directly for screens, sheets, buttons, text fields, segmented choices, and app chrome, with a small shared editorial design-language layer for screen padding, section framing, flat outlined surfaces, and muted status tags
 - shared Compose UI uses Lucide through the Compose Icons KMP artifact for app-owned iconography rendered from `commonMain`, while continuing to rely on Material 3 primitives for controls and app chrome
-- Cloudflare Worker with PostgreSQL persistence through Hyperdrive-compatible access
+- Cloudflare Worker with PostgreSQL persistence through Hyperdrive-compatible access connected to the portfolio's central Supabase staging project (`slhqajiltwxbhxlscazz`), with all tables strictly scoped to the `abun` schema and bound to `auth.users(id)`
+- Centralized database schema ownership hosted in `../supabase` repository
 - local-first sync engine shared across synced resources
 
 Shared UI design-system reference:
@@ -37,12 +38,12 @@ The client is responsible for:
 
 The Worker backend is responsible for:
 
-- authenticating the user
+- authenticating the user and binding identities to central Supabase `auth.users(id)`
 - issuing short-lived signed access JWTs plus rotating refresh tokens
-- storing revocable per-device sessions for refresh-token rotation and logout
-- enforcing ownership boundaries
+- storing revocable per-device sessions for refresh-token rotation and logout in `abun.user_session`
+- enforcing ownership boundaries across all task and double-entry finance resources
 - validating incoming mutations
-- storing canonical synced records
+- storing canonical synced records in the dedicated `abun` PostgreSQL schema
 - assigning server-side sync metadata
 
 The current production shape serves both site and API concerns from the same origin:

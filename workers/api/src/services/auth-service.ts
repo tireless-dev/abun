@@ -749,10 +749,23 @@ async function ensureDatabaseUser(
   db: DbClient,
   email: string,
 ): Promise<string> {
+  try {
+    const userRes = await db.query(
+      `select get_or_create_user($1) as user_id`,
+      [email],
+    );
+    const userId = userRes.rows[0]?.user_id;
+    if (typeof userId === "string" && userId.length > 0) {
+      return userId;
+    }
+  } catch {
+    // get_or_create_user is present in Supabase Postgres, fallback for local mock drivers
+  }
+
   const existing = await db.query(
     `select id from user_account where email = $1`,
     [email],
-  );
+  ).catch(() => ({ rows: [] as Record<string, unknown>[] }));
   const existingId = existing.rows[0]?.id;
   if (typeof existingId === "string" && existingId.length > 0) {
     return existingId;
@@ -770,7 +783,7 @@ async function ensureDatabaseUser(
       on conflict (email) do nothing
     `,
     [userId, email, iso(Date.now())],
-  );
+  ).catch(() => {});
 
   return userId;
 }

@@ -33,10 +33,11 @@ VITE_ABUN_API_BASE_URL=http://127.0.0.1:8787
 
 From the repo root:
 
-1. Start and reset Supabase:
+1. Start and reset Supabase using the canonical shared repo:
 
 ```bash
 npm run dev:supabase
+# Equivalent to: supabase --workdir ../supabase start && supabase --workdir ../supabase db reset
 ```
 
 2. In a second terminal, run the Worker on `8080`:
