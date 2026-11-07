@@ -2,6 +2,8 @@ package dev.tireless.abun.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -37,6 +39,9 @@ internal fun TaskListScreen(
 ) {
     val filteredTasks = filterTasksForSurface(state.taskView.tasks, state.selectedTaskFilter)
     Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
     ) {
         Row(

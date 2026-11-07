@@ -1,6 +1,10 @@
 package dev.tireless.abun.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -81,8 +85,11 @@ internal fun SettingsScreenContent(
     var selectedThemePreference by remember(state.preferences) { mutableStateOf(state.preferences.themePreference) }
     var rolloverTime by remember(state.preferences) { mutableStateOf(state.preferences.rolloverTime) }
 
-    androidx.compose.foundation.layout.Column(
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.lgDp),
     ) {
         Panel(testTag = "settings-panel-cloud") {
             SectionHeader("Cloud", "Sync status")

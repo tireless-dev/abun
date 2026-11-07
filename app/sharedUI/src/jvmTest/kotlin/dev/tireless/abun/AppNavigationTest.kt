@@ -14,6 +14,8 @@ import androidx.navigation.compose.rememberNavController
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.TaskSubTab
 import dev.tireless.abun.ui.navigation.AppNavHost
+import dev.tireless.abun.ui.navigation.AppRoute
+import dev.tireless.abun.ui.navigation.appTabForRoute
 import dev.tireless.abun.ui.theme.AppTheme
 import kotlin.test.Test
 
@@ -153,6 +155,152 @@ class AppNavigationTest {
         }
 
         onNodeWithTag("task-detail-sheet").fetchSemanticsNode()
+    }
+
+    @Test
+    fun `app content seamlessly navigates through all bottom tabs and subtabs without layout constraint exceptions`() = runDesktopComposeUiTest {
+        var state by mutableStateOf(
+            screenshotState(selectedTab = AppTab.TODAY)
+        )
+        setContent {
+            AppTheme {
+                AppContent(
+                    state = state,
+                    liveNow = ScreenshotNow,
+                    selectedTaskHistory = emptyList(),
+                    onSelectTab = { state = state.copy(selectedTab = it) },
+                    onSelectTaskSubTab = { state = state.copy(selectedTaskSubTab = it, selectedTab = AppTab.TASKS) },
+                    onSelectTaskFilter = {},
+                    onOpenTask = {},
+                    onOpenStartPomodoro = {},
+                    onCreateRoutine = {},
+                    onOpenRoutine = {},
+                    onRunRoutine = {},
+                    onUpdateThemePreference = {},
+                    onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                    onReopenLogin = {},
+                    onLogout = {},
+                    onRequestEmailOtp = {},
+                    onVerifyEmailOtp = {},
+                    onSkipLogin = {},
+                    onUpdateLoginEmail = {},
+                    taskHistoryFor = { emptyList() },
+                    onCreateTask = { _, _, _, _, _, _ -> },
+                    onCreateRoutineConfirm = { _, _, _, _, _ -> },
+                    onSaveTask = { _, _, _, _, _, _, _ -> },
+                    onProgressTask = { _, _ -> },
+                    onCompleteTask = { _, _ -> },
+                    onSkipTask = { _, _ -> },
+                    onPostponeTask = { _, _, _, _, _ -> },
+                    onDeleteTask = {},
+                    onSaveRoutine = { _, _, _, _, _, _ -> },
+                    onToggleRoutine = {},
+                    onDeleteRoutine = {},
+                    onStartPomodoro = { _, _ -> },
+                    onCompletePomodoro = { _, _ -> },
+                    onStopPomodoro = {},
+                )
+            }
+        }
+
+        // Initially on Day / Dashboard tab
+        onNodeWithTag("day-panel-summary").assertIsDisplayed()
+
+        // 1. Navigate to Tasks tab
+        onNodeWithText("Tasks").performClick()
+        waitForIdle()
+        onNodeWithText("All active").assertIsDisplayed()
+
+        // Switch Task subtabs
+        state = state.copy(selectedTaskSubTab = TaskSubTab.ROUTINES)
+        waitForIdle()
+        onNodeWithText("Routine support").assertExists()
+
+        state = state.copy(selectedTaskSubTab = TaskSubTab.POMODORO)
+        waitForIdle()
+        onNodeWithText("Timer").assertExists()
+
+        // 2. Navigate to Finance tab (renders FinanceCockpitScreen with verticalScroll)
+        onNodeWithText("Finance").performClick()
+        waitForIdle()
+        onNodeWithTag("finance-cockpit-screen").assertIsDisplayed()
+
+        // Navigate within Finance to Clearing Hub (also has verticalScroll)
+        onNodeWithTag("nav-clearing-hub-btn").performClick()
+        waitForIdle()
+        onNodeWithTag("clearing-hub-screen").assertIsDisplayed()
+
+        // Navigate within Finance to Ledger
+        onNodeWithTag("nav-finance-ledger-btn").performClick()
+        waitForIdle()
+        onNodeWithTag("finance-ledger-screen").assertIsDisplayed()
+
+        // 3. Navigate to Settings tab (renders SettingsScreen with verticalScroll)
+        onNodeWithText("Settings").performClick()
+        waitForIdle()
+        onNodeWithTag("settings-panel-cloud").assertIsDisplayed()
+
+        // 4. Navigate back to Dashboard tab
+        onNodeWithText("Dashboard").performClick()
+        waitForIdle()
+        onNodeWithTag("day-panel-summary").assertIsDisplayed()
+    }
+
+    @Test
+    fun `all scrollable finance subroutes and sheets in AppNavHost measure and render without infinite height constraint crash`() = runDesktopComposeUiTest {
+        val routesToTest = listOf(
+            AppRoute.FinanceCockpit.route to "finance-cockpit-screen",
+            AppRoute.DebtClearingHub.route to "clearing-hub-screen",
+            AppRoute.Finance.route to "finance-ledger-screen",
+            AppRoute.CreateBudgetRule.route to "budget-rule-sheet",
+            AppRoute.CombinedRepayment.route to "combined-repayment-sheet",
+            AppRoute.AmortizationWizard.route to "amortization-wizard-sheet",
+            AppRoute.FinanceAccounts.route to "finance-accounts-sheet-content",
+        )
+
+        routesToTest.forEach { (route, testTag) ->
+            setContent {
+                AppTheme {
+                    val navController = rememberNavController()
+                    LaunchedEffect(route) { navController.navigate(route) }
+                    AppNavHost(
+                        navController = navController,
+                        state = screenshotState(selectedTab = appTabForRoute(route)),
+                        liveNow = ScreenshotNow,
+                        isPomodoroActive = false,
+                        taskHistoryFor = { emptyList() },
+                        onSelectTaskFilter = {},
+                        onOpenTask = {},
+                        onOpenStartPomodoro = {},
+                        onCreateTask = {},
+                        onCreateRoutine = {},
+                        onOpenRoutine = {},
+                        onRunRoutine = {},
+                        onUpdateThemePreference = {},
+                        onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                        onReopenLogin = {},
+                        onLogout = {},
+                        onCreateTaskConfirm = { _, _, _, _, _, _ -> },
+                        onCreateRoutineConfirm = { _, _, _, _, _ -> },
+                        onSaveTask = { _, _, _, _, _, _, _ -> },
+                        onProgressTask = { _, _ -> },
+                        onCompleteTask = { _, _ -> },
+                        onSkipTask = { _, _ -> },
+                        onPostponeTask = { _, _, _, _, _ -> },
+                        onDeleteTask = {},
+                        onSaveRoutine = { _, _, _, _, _, _ -> },
+                        onToggleRoutine = {},
+                        onDeleteRoutine = {},
+                        onStartPomodoro = { _, _ -> },
+                        onCompletePomodoro = { _, _ -> },
+                        onStopPomodoro = {},
+                    )
+                }
+            }
+
+            waitForIdle()
+            onNodeWithTag(testTag).assertExists()
+        }
     }
 
     @Test

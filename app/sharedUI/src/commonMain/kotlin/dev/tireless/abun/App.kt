@@ -263,9 +263,7 @@ fun App() {
             },
         ) { padding: PaddingValues ->
             EditorialScreen(
-                modifier = Modifier
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(padding),
                 contentPadding = PaddingValues(
                     start = ThemeTokens.spacing.mdDp,
                     top = ThemeTokens.spacing.mdDp,
@@ -517,9 +515,7 @@ internal fun AppContent(
         },
     ) { padding: PaddingValues ->
         EditorialScreen(
-            modifier = Modifier
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.padding(padding),
         ) {
             AppNavHost(
                 navController = navController,

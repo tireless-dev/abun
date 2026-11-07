@@ -1,6 +1,8 @@
 package dev.tireless.abun.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +33,9 @@ internal fun HomeScreen(
     val active = state.activePomodoroSession
 
     Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.mdDp),
     ) {
         Panel(testTag = "day-panel-summary", compact = true) {

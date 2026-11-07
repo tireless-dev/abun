@@ -1,8 +1,12 @@
 package dev.tireless.abun
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,6 +46,26 @@ class EditorialPrimitivesTest {
         }
 
         onNodeWithTag("editorial-card").assertExists()
+    }
+
+    @Test
+    fun `editorial screen does not impose infinite height constraint on scrollable child`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
+                EditorialScreen {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .testTag("scrollable-child"),
+                    ) {
+                        Text("Scrollable Content")
+                    }
+                }
+            }
+        }
+
+        onNodeWithTag("scrollable-child").assertExists()
     }
 
     @Test

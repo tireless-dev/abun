@@ -15,7 +15,14 @@ import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskPostponedPayload
 import dev.tireless.abun.sync.TaskStatus
 import dev.tireless.abun.sync.PreferenceValueType
-import kotlinx.datetime.*
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 internal data class MutableSyncRow<T>(
     val entity: T,
@@ -1251,7 +1258,8 @@ class LocalStore(
         val rolloverParts = prefs.rolloverTime.split(":")
         val hour = rolloverParts.getOrNull(0)?.toIntOrNull() ?: 0
         val minute = rolloverParts.getOrNull(1)?.toIntOrNull() ?: 0
-        val rolloverDateTime = LocalDateTime(rolloverDate.year, rolloverDate.month, rolloverDate.day, hour, minute)
+        val rolloverDateTime =
+          LocalDateTime(rolloverDate.year, rolloverDate.month, rolloverDate.day, hour, minute)
         return rolloverDateTime.toInstant(TimeZone.currentSystemDefault())
     }
 

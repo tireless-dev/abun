@@ -1,6 +1,9 @@
 package dev.tireless.abun.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
@@ -23,22 +26,28 @@ internal fun RoutineListScreen(
     onOpenRoutine: (RoutineListItemView) -> Unit,
     onRunRoutine: (RoutineListItemView) -> Unit,
 ) {
-    Panel {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SectionHeader("Routine support", "Routines")
-            Button(onClick = onCreateRoutine) {
-                Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Panel {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionHeader("Routine support", "Routines")
+                Button(onClick = onCreateRoutine) {
+                    Text("Create", style = ThemeTokens.type.body.withMaterialContentColor())
+                }
             }
-        }
-        if (state.taskView.routines.isEmpty()) {
-            Text("No routines.", style = ThemeTokens.type.body)
-        } else {
-            state.taskView.routines.forEach { routine ->
-                RoutineRow(routine, onOpenRoutine, onRunRoutine)
+            if (state.taskView.routines.isEmpty()) {
+                Text("No routines.", style = ThemeTokens.type.body)
+            } else {
+                state.taskView.routines.forEach { routine ->
+                    RoutineRow(routine, onOpenRoutine, onRunRoutine)
+                }
             }
         }
     }
