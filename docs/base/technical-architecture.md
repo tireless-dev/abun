@@ -62,7 +62,9 @@ Current auth/session endpoints:
 - `POST /auth/refresh`
 - `POST /auth/logout`
 
-OTP email is the only supported auth method today, but it is carried behind the generic auth contract with `method = "otp_email"`.
+OTP email is the primary auth method, unified with Supabase Auth (`/auth/v1/otp`, `/auth/v1/verify`, `/auth/v1/token?grant_type=refresh_token`, `/auth/v1/user`). The Worker delegates OTP email delivery and session issuance directly to the central Supabase Auth service (shared across the portfolio), while exposing an offline deterministic mock fallback (`abun@tireless.dev` / `424242`) for automated test suites.
+
+All persistent product tables reside in the dedicated `abun` PostgreSQL schema and reference the centralized `auth.users(id)` directly. Hyperdrive connection pooling accelerates transactional queries from Cloudflare Workers to the hosted database.
 
 Debug login presets may prefill the shared test-account email and OTP in development builds, but they must still exchange a real server session before sync begins rather than persisting placeholder refresh tokens. Desktop local development should enable the same shared debug-auth preset path as Android and iOS debug builds so the login guide starts from the same OTP-requested state during routine validation. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and then enters the normal shared sync path.
 

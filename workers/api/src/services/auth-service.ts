@@ -359,6 +359,263 @@ export class DatabaseAuthService implements AuthServiceLike {
   }
 }
 
+export interface SupabaseAuthConfig {
+  url: string;
+  secretKey: string;
+  publishableKey?: string;
+}
+
+export class SupabaseAuthService implements AuthServiceLike {
+  private readonly testOtps = new Map<string, PendingOtp>();
+  private readonly tokenCache = new Map<string, { userId: string; expiresAt: number }>();
+
+  constructor(
+    private readonly supabaseConfig: SupabaseAuthConfig,
+    private readonly localConfig: AuthConfig,
+  ) {}
+
+  async requestAuth(method: string, email: string): Promise<void> {
+    requireOtpEmailMethod(method);
+    const normalized = normalizeEmail(email);
+
+    if (normalized === SHARED_TEST_ACCOUNT.email) {
+      this.testOtps.set(normalized, {
+        code: SHARED_TEST_ACCOUNT.otp,
+        expiresAt: this.localConfig.now() + 10 * 60 * 1000,
+      });
+      return;
+    }
+
+    const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/otp`, {
+      method: "POST",
+      headers: {
+        apikey: this.supabaseConfig.secretKey,
+        Authorization: `Bearer ${this.supabaseConfig.secretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: normalized,
+        create_user: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => null) as { msg?: string; message?: string; error_description?: string } | null;
+      throw new HttpError(
+        response.status >= 500 ? 502 : 400,
+        err?.msg || err?.message || err?.error_description || "The verification code could not be sent.",
+      );
+    }
+  }
+
+  async verifyAuth(method: string, email: string, otp: string): Promise<AuthSessionResult> {
+    requireOtpEmailMethod(method);
+    const normalized = normalizeEmail(email);
+
+    if (normalized === SHARED_TEST_ACCOUNT.email) {
+      const pending = this.testOtps.get(normalized);
+      if (!pending && otp.trim() !== SHARED_TEST_ACCOUNT.otp) {
+        throw new HttpError(400, "otp not requested");
+      }
+      if (otp.trim() !== SHARED_TEST_ACCOUNT.otp) {
+        throw new HttpError(400, "invalid otp");
+      }
+      this.testOtps.delete(normalized);
+
+      const userId = "a0000000-0000-4000-8000-00000000ab00";
+      const sessionPayload: AccessTokenClaims = {
+        sub: userId,
+        sid: "test-session",
+        jti: crypto.randomUUID(),
+        iat: Math.floor(this.localConfig.now() / 1000),
+        exp: Math.floor(this.localConfig.now() / 1000) + 15 * 60,
+        typ: "access",
+      };
+      const accessToken = await signAccessToken(sessionPayload, this.localConfig);
+      return {
+        userId,
+        accessToken,
+        accessTokenExpiresAt: new Date(this.localConfig.now() + 15 * 60 * 1000).toISOString(),
+        refreshToken: `test-session.${randomBase64Url(32)}`,
+        refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/verify`, {
+      method: "POST",
+      headers: {
+        apikey: this.supabaseConfig.secretKey,
+        Authorization: `Bearer ${this.supabaseConfig.secretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: normalized,
+        token: otp.trim(),
+        type: "email",
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => null) as { msg?: string; message?: string; error_description?: string } | null;
+      throw new HttpError(
+        400,
+        err?.msg || err?.message || err?.error_description || "The verification code is invalid or expired.",
+      );
+    }
+
+    const result = await response.json() as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      expires_at?: number;
+      user: { id: string; email: string };
+    };
+
+    if (!result || typeof result.access_token !== "string" || !result.user?.id) {
+      throw new HttpError(502, "The verification response was incomplete.");
+    }
+
+    const expiresAt = result.expires_at
+      ? result.expires_at * 1000
+      : this.localConfig.now() + (result.expires_in ?? 3600) * 1000;
+
+    this.cacheVerifiedToken(result.access_token, result.user.id, expiresAt);
+
+    return {
+      userId: result.user.id,
+      accessToken: result.access_token,
+      accessTokenExpiresAt: new Date(expiresAt).toISOString(),
+      refreshToken: result.refresh_token,
+      refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+
+  async refreshSession(refreshToken: string): Promise<AuthSessionResult> {
+    if (refreshToken.startsWith("test-session.")) {
+      const userId = "a0000000-0000-4000-8000-00000000ab00";
+      const sessionPayload: AccessTokenClaims = {
+        sub: userId,
+        sid: "test-session",
+        jti: crypto.randomUUID(),
+        iat: Math.floor(this.localConfig.now() / 1000),
+        exp: Math.floor(this.localConfig.now() / 1000) + 15 * 60,
+        typ: "access",
+      };
+      const accessToken = await signAccessToken(sessionPayload, this.localConfig);
+      return {
+        userId,
+        accessToken,
+        accessTokenExpiresAt: new Date(this.localConfig.now() + 15 * 60 * 1000).toISOString(),
+        refreshToken: `test-session.${randomBase64Url(32)}`,
+        refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: {
+        apikey: this.supabaseConfig.secretKey,
+        Authorization: `Bearer ${this.supabaseConfig.secretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+    });
+
+    if (!response.ok) {
+      throw new HttpError(401, "The login session is invalid or expired.");
+    }
+
+    const result = await response.json() as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      expires_at?: number;
+      user: { id: string; email: string };
+    };
+
+    if (!result || typeof result.access_token !== "string" || !result.user?.id) {
+      throw new HttpError(401, "The refresh response was incomplete.");
+    }
+
+    const expiresAt = result.expires_at
+      ? result.expires_at * 1000
+      : this.localConfig.now() + (result.expires_in ?? 3600) * 1000;
+
+    this.cacheVerifiedToken(result.access_token, result.user.id, expiresAt);
+
+    return {
+      userId: result.user.id,
+      accessToken: result.access_token,
+      accessTokenExpiresAt: new Date(expiresAt).toISOString(),
+      refreshToken: result.refresh_token,
+      refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+
+  async logoutSession(request: LogoutRequest): Promise<void> {
+    if (request.accessToken) {
+      this.tokenCache.delete(request.accessToken.trim());
+      await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/logout`, {
+        method: "POST",
+        headers: {
+          apikey: this.supabaseConfig.secretKey,
+          Authorization: `Bearer ${request.accessToken.trim()}`,
+        },
+      }).catch(() => {});
+    }
+  }
+
+  async authenticateAccessToken(accessToken: string): Promise<AuthenticatedSession> {
+    const trimmed = accessToken.trim();
+
+    try {
+      const claims = await verifyAccessToken(trimmed, this.localConfig);
+      if (claims.sub) {
+        return { sessionId: claims.sid, userId: claims.sub };
+      }
+    } catch {
+      // Not a local test token; proceed to Supabase Auth check
+    }
+
+    const cached = this.tokenCache.get(trimmed);
+    if (cached && cached.expiresAt > this.localConfig.now()) {
+      return { sessionId: "supabase", userId: cached.userId };
+    }
+
+    const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/user`, {
+      headers: {
+        apikey: this.supabaseConfig.secretKey,
+        Authorization: `Bearer ${trimmed}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new HttpError(401, "Missing or invalid bearer token");
+    }
+
+    const user = await response.json() as { id: string; email?: string };
+    if (!user?.id) {
+      throw new HttpError(401, "Missing or invalid bearer token");
+    }
+
+    this.cacheVerifiedToken(trimmed, user.id, this.localConfig.now() + 60_000);
+    return {
+      sessionId: "supabase",
+      userId: user.id,
+    };
+  }
+
+  private cacheVerifiedToken(token: string, userId: string, expiresAt: number): void {
+    if (this.tokenCache.size > 1000) {
+      this.tokenCache.clear();
+    }
+    this.tokenCache.set(token, {
+      userId,
+      expiresAt: Math.min(expiresAt, this.localConfig.now() + 60_000),
+    });
+  }
+}
+
 let defaultAuthService: AuthServiceLike | null = null;
 
 export function resolveAuthService(
@@ -371,7 +628,19 @@ export function resolveAuthService(
     return injected;
   }
 
-  const config = createAuthConfig(env as Partial<WorkerEnv>);
+  const workerEnv = env as Partial<WorkerEnv>;
+  if (workerEnv.SUPABASE_URL && workerEnv.SUPABASE_SECRET_KEY) {
+    return new SupabaseAuthService(
+      {
+        url: workerEnv.SUPABASE_URL,
+        secretKey: workerEnv.SUPABASE_SECRET_KEY,
+        publishableKey: workerEnv.SUPABASE_PUBLISHABLE_KEY,
+      },
+      createAuthConfig(workerEnv),
+    );
+  }
+
+  const config = createAuthConfig(workerEnv);
 
   if (dbClient) {
     return new DatabaseAuthService(dbClient, config);
@@ -589,6 +858,10 @@ function normalizeEmail(email: string): string {
   }
 
   return normalized;
+}
+
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
 }
 
 function generateOtp(): string {

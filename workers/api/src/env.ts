@@ -15,6 +15,7 @@ export interface WorkerEnv {
   AUTH_REFRESH_TOKEN_TTL_SECONDS?: string;
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_SECRET_KEY?: string;
   ASSETS?: AssetsBinding;
 }
 
