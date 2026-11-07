@@ -1,6 +1,5 @@
 package dev.tireless.abun.app
 
-import dev.tireless.abun.TestSharedAccount
 import dev.tireless.abun.finance.AccountCategory
 import dev.tireless.abun.finance.AmortizationMethod
 import dev.tireless.abun.finance.BudgetScopeType
@@ -97,6 +96,15 @@ class AbunAppController(
 
     fun updateLoginEmail(email: String) {
         _state.value = _state.value.copy(auth = _state.value.auth.copy(email = email, errorMessage = null))
+    }
+
+    fun resetLoginOtp() {
+        _state.value = _state.value.copy(
+            auth = _state.value.auth.copy(
+                otpRequested = false,
+                errorMessage = null,
+            ),
+        )
     }
 
     fun requestEmailOtp() {
@@ -866,7 +874,7 @@ class AbunAppController(
             return AuthViewState(
                 showGuide = false,
                 mode = AuthMode.AUTHENTICATED,
-                email = debugAuthPreset?.email ?: TestSharedAccount.EMAIL,
+                email = debugAuthPreset?.email.orEmpty(),
                 otpRequested = false,
                 prefilledOtp = debugAuthPreset?.otp.orEmpty(),
                 debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },

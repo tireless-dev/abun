@@ -12,17 +12,15 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class GuideScreenDebugAuthTest {
     @Test
-    fun `guide screen shows prefilled debug credentials`() = runDesktopComposeUiTest {
+    fun `guide screen shows sign in flow and otp verification steps`() = runDesktopComposeUiTest {
         setContent {
             GuideScreenContent(
                 state = screenshotState(
                     auth = AuthViewState(
                         showGuide = true,
                         mode = AuthMode.GUEST,
-                        email = "abun@tireless.dev",
+                        email = "user@example.com",
                         otpRequested = true,
-                        prefilledOtp = "424242",
-                        debugOtpHint = "Debug OTP: 424242",
                     ),
                 ),
                 onUpdateLoginEmail = {},
@@ -32,9 +30,11 @@ class GuideScreenDebugAuthTest {
             )
         }
 
-        onNodeWithText("Sign in").fetchSemanticsNode()
+        onNodeWithText("Check your inbox").fetchSemanticsNode()
+        onNodeWithText("user@example.com").fetchSemanticsNode()
         onNodeWithText("OTP code").fetchSemanticsNode()
-        onNodeWithText("Debug OTP: 424242").fetchSemanticsNode()
+        onNodeWithText("Verify and login").fetchSemanticsNode()
+        onNodeWithText("Resend OTP").fetchSemanticsNode()
     }
 
     @Test

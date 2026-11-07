@@ -43,19 +43,7 @@ actual fun rememberAbunAppController(): AbunAppController {
     }
 }
 
-private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = if (enabled) {
-    DebugAuthPreset(
-        email = "abun@tireless.dev",
-        otp = "424242",
-        accessToken = "debug-access-token",
-        userId = "debug-user",
-        accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-        refreshToken = "debug-refresh-token",
-        refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-    )
-} else {
-    null
-}
+private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = null
 
 private class AndroidLoginPreferenceStore(context: android.content.Context) : LoginPreferenceStore {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCE_FILE, android.content.Context.MODE_PRIVATE)

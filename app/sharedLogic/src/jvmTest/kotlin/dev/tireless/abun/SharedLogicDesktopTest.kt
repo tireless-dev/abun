@@ -193,8 +193,8 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `auth defaults prefill shared test account email`() {
-        assertEquals(TestSharedAccount.EMAIL, dev.tireless.abun.app.AuthViewState().email)
+    fun `auth defaults start with empty email`() {
+        assertEquals("", dev.tireless.abun.app.AuthViewState().email)
     }
 
     @Test
@@ -1087,6 +1087,7 @@ class SharedLogicDesktopTest {
             ),
         )
 
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
         controller.verifyEmailOtp(TestSharedAccount.OTP)
         var synced = false
         repeat(200) {
@@ -1178,6 +1179,7 @@ class SharedLogicDesktopTest {
             ),
         )
 
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
         controller.verifyEmailOtp(TestSharedAccount.OTP)
         waitFor { loginPreferenceStore.authSession()?.accessToken == "access-1" }
 
@@ -1224,6 +1226,7 @@ class SharedLogicDesktopTest {
 
         assertFalse(controller.state.value.syncState.syncReady)
 
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
         controller.verifyEmailOtp(TestSharedAccount.OTP)
 
         waitFor { controller.state.value.syncState.lastSyncedAt != null }

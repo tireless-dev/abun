@@ -164,6 +164,7 @@ fun App() {
                 onUpdateLoginEmail = controller::updateLoginEmail,
                 onRequestEmailOtp = controller::requestEmailOtp,
                 onVerifyEmailOtp = controller::verifyEmailOtp,
+                onResetLoginOtp = controller::resetLoginOtp,
                 onSkipLogin = controller::skipLogin,
             )
             return@AppTheme
@@ -403,6 +404,7 @@ internal fun AppContent(
     onLogout: () -> Unit,
     onRequestEmailOtp: () -> Unit,
     onVerifyEmailOtp: (String) -> Unit,
+    onResetLoginOtp: () -> Unit = {},
     onSkipLogin: () -> Unit,
     onUpdateLoginEmail: (String) -> Unit,
     taskHistoryFor: (String) -> List<JournalEntryView>,
@@ -445,6 +447,7 @@ internal fun AppContent(
             onUpdateLoginEmail = onUpdateLoginEmail,
             onRequestEmailOtp = onRequestEmailOtp,
             onVerifyEmailOtp = onVerifyEmailOtp,
+            onResetLoginOtp = onResetLoginOtp,
             onSkipLogin = onSkipLogin,
         )
         return
