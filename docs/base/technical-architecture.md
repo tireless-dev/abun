@@ -62,7 +62,7 @@ Current auth/session endpoints:
 - `POST /auth/refresh`
 - `POST /auth/logout`
 
-OTP email is the primary auth method, unified with Supabase Auth (`/auth/v1/otp`, `/auth/v1/verify`, `/auth/v1/token?grant_type=refresh_token`, `/auth/v1/user`). The Worker delegates OTP email delivery and session issuance directly to the central Supabase Auth service (shared across the portfolio), while exposing an offline deterministic mock fallback (`abun@tireless.dev` / `424242`) for automated test suites.
+OTP email is the primary auth method, unified with Supabase Auth (`/auth/v1/otp`, `/auth/v1/verify`, `/auth/v1/token?grant_type=refresh_token`, `/auth/v1/user`). The Worker delegates OTP email delivery and session issuance directly to the central Supabase Auth service without local mock OTP backdoors or test email exemptions. Client and worker unit tests mock the Supabase Auth HTTP contract directly.
 
 All persistent product tables reside in the dedicated `abun` PostgreSQL schema and reference the centralized `auth.users(id)` directly. Hyperdrive connection pooling accelerates transactional queries from Cloudflare Workers to the hosted database.
 

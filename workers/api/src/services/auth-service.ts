@@ -1,5 +1,4 @@
 import type { DbClient } from "../db/transaction";
-import { withTransaction } from "../db/transaction";
 import { HttpError } from "../http/errors";
 import type { WorkerEnv } from "../env";
 
@@ -188,177 +187,6 @@ export class AuthService implements AuthServiceLike {
   }
 }
 
-export class DatabaseAuthService implements AuthServiceLike {
-  constructor(
-    private readonly db: DbClient,
-    private readonly config: AuthConfig,
-  ) {}
-
-  async requestAuth(method: string, email: string): Promise<void> {
-    requireOtpEmailMethod(method);
-    const normalized = normalizeEmail(email);
-    const code =
-      normalized === SHARED_TEST_ACCOUNT.email
-        ? SHARED_TEST_ACCOUNT.otp
-        : generateOtp();
-    const now = new Date(this.config.now());
-
-    await withTransaction(this.db, async (tx) => {
-      await tx.query(
-        `
-          insert into otp_code(email, code, expires_at, created_at)
-          values ($1, $2, $3, $4)
-          on conflict (email)
-          do update set code = excluded.code, expires_at = excluded.expires_at, created_at = excluded.created_at
-        `,
-        [
-          normalized,
-          code,
-          new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
-          now.toISOString(),
-        ],
-      );
-    });
-  }
-
-  async verifyAuth(method: string, email: string, otp: string): Promise<AuthSessionResult> {
-    requireOtpEmailMethod(method);
-    const normalized = normalizeEmail(email);
-
-    return withTransaction(this.db, async (tx) => {
-      const pendingResult = await tx.query(
-        `select code, expires_at from otp_code where email = $1`,
-        [normalized],
-      );
-      const pending = pendingResult.rows[0];
-
-      if (!pending) {
-        throw new HttpError(400, "otp not requested");
-      }
-
-      if (String(pending.code) !== otp.trim()) {
-        throw new HttpError(400, "invalid otp");
-      }
-
-      if (Date.parse(String(pending.expires_at)) <= this.config.now()) {
-        throw new HttpError(400, "otp expired");
-      }
-
-      const userId = await ensureDatabaseUser(tx, normalized);
-      await tx.query(`delete from otp_code where email = $1`, [normalized]);
-
-      return issueSession({
-        config: this.config,
-        userId,
-        persistSession: async (session) => {
-          await tx.query(
-            `
-              insert into user_session(
-                id,
-                user_id,
-                refresh_token_hash,
-                refresh_expires_at,
-                revoked_at,
-                rotated_at,
-                created_at,
-                updated_at
-              )
-              values ($1, $2, $3, $4, $5, $6, $7, $8)
-            `,
-            [
-              session.id,
-              session.userId,
-              session.refreshTokenHash,
-              iso(session.refreshExpiresAt),
-              null,
-              null,
-              iso(session.createdAt),
-              iso(session.updatedAt),
-            ],
-          );
-        },
-      });
-    });
-  }
-
-  async refreshSession(refreshToken: string): Promise<AuthSessionResult> {
-    const sessionId = readRefreshTokenSessionId(refreshToken);
-
-    return withTransaction(this.db, async (tx) => {
-      const session = await selectDatabaseSession(tx, sessionId);
-      if (!session) {
-        throw new HttpError(401, "Invalid refresh token");
-      }
-
-      return rotateSession({
-        config: this.config,
-        refreshToken,
-        session,
-        persistSession: async (nextSession) => {
-          await tx.query(
-            `
-              update user_session
-              set refresh_token_hash = $2,
-                  refresh_expires_at = $3,
-                  rotated_at = $4,
-                  updated_at = $5
-              where id = $1
-            `,
-            [
-              nextSession.id,
-              nextSession.refreshTokenHash,
-              iso(nextSession.refreshExpiresAt),
-              iso(nextSession.rotatedAt),
-              iso(nextSession.updatedAt),
-            ],
-          );
-        },
-      });
-    });
-  }
-
-  async logoutSession(request: LogoutRequest): Promise<void> {
-    const sessionId = await resolveSessionIdForLogout(request, this.config);
-    if (!sessionId) {
-      return;
-    }
-
-    await withTransaction(this.db, async (tx) => {
-      await tx.query(
-        `
-          update user_session
-          set revoked_at = $2,
-              updated_at = $2
-          where id = $1 and revoked_at is null
-        `,
-        [sessionId, iso(this.config.now())],
-      );
-    });
-  }
-
-  async authenticateAccessToken(accessToken: string): Promise<AuthenticatedSession> {
-    const claims = await verifyAccessToken(accessToken, this.config);
-    const session = await selectDatabaseSession(this.db, claims.sid);
-
-    if (!session) {
-      throw new HttpError(401, "Missing or invalid bearer token");
-    }
-
-    if (session.revokedAt !== null) {
-      throw new HttpError(401, "Session revoked");
-    }
-
-    if (session.userId !== claims.sub) {
-      throw new HttpError(401, "Missing or invalid bearer token");
-    }
-
-    return {
-      sessionId: session.id,
-      userId: session.userId,
-    };
-  }
-}
-
 export interface SupabaseAuthConfig {
   url: string;
   secretKey: string;
@@ -366,7 +194,6 @@ export interface SupabaseAuthConfig {
 }
 
 export class SupabaseAuthService implements AuthServiceLike {
-  private readonly testOtps = new Map<string, PendingOtp>();
   private readonly tokenCache = new Map<string, { userId: string; expiresAt: number }>();
 
   constructor(
@@ -377,14 +204,6 @@ export class SupabaseAuthService implements AuthServiceLike {
   async requestAuth(method: string, email: string): Promise<void> {
     requireOtpEmailMethod(method);
     const normalized = normalizeEmail(email);
-
-    if (normalized === SHARED_TEST_ACCOUNT.email) {
-      this.testOtps.set(normalized, {
-        code: SHARED_TEST_ACCOUNT.otp,
-        expiresAt: this.localConfig.now() + 10 * 60 * 1000,
-      });
-      return;
-    }
 
     const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/otp`, {
       method: "POST",
@@ -411,35 +230,6 @@ export class SupabaseAuthService implements AuthServiceLike {
   async verifyAuth(method: string, email: string, otp: string): Promise<AuthSessionResult> {
     requireOtpEmailMethod(method);
     const normalized = normalizeEmail(email);
-
-    if (normalized === SHARED_TEST_ACCOUNT.email) {
-      const pending = this.testOtps.get(normalized);
-      if (!pending && otp.trim() !== SHARED_TEST_ACCOUNT.otp) {
-        throw new HttpError(400, "otp not requested");
-      }
-      if (otp.trim() !== SHARED_TEST_ACCOUNT.otp) {
-        throw new HttpError(400, "invalid otp");
-      }
-      this.testOtps.delete(normalized);
-
-      const userId = "a0000000-0000-4000-8000-00000000ab00";
-      const sessionPayload: AccessTokenClaims = {
-        sub: userId,
-        sid: "test-session",
-        jti: crypto.randomUUID(),
-        iat: Math.floor(this.localConfig.now() / 1000),
-        exp: Math.floor(this.localConfig.now() / 1000) + 15 * 60,
-        typ: "access",
-      };
-      const accessToken = await signAccessToken(sessionPayload, this.localConfig);
-      return {
-        userId,
-        accessToken,
-        accessTokenExpiresAt: new Date(this.localConfig.now() + 15 * 60 * 1000).toISOString(),
-        refreshToken: `test-session.${randomBase64Url(32)}`,
-        refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-    }
 
     const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/verify`, {
       method: "POST",
@@ -491,26 +281,6 @@ export class SupabaseAuthService implements AuthServiceLike {
   }
 
   async refreshSession(refreshToken: string): Promise<AuthSessionResult> {
-    if (refreshToken.startsWith("test-session.")) {
-      const userId = "a0000000-0000-4000-8000-00000000ab00";
-      const sessionPayload: AccessTokenClaims = {
-        sub: userId,
-        sid: "test-session",
-        jti: crypto.randomUUID(),
-        iat: Math.floor(this.localConfig.now() / 1000),
-        exp: Math.floor(this.localConfig.now() / 1000) + 15 * 60,
-        typ: "access",
-      };
-      const accessToken = await signAccessToken(sessionPayload, this.localConfig);
-      return {
-        userId,
-        accessToken,
-        accessTokenExpiresAt: new Date(this.localConfig.now() + 15 * 60 * 1000).toISOString(),
-        refreshToken: `test-session.${randomBase64Url(32)}`,
-        refreshTokenExpiresAt: new Date(this.localConfig.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-    }
-
     const response = await fetch(`${normalizeUrl(this.supabaseConfig.url)}/auth/v1/token?grant_type=refresh_token`, {
       method: "POST",
       headers: {
@@ -567,15 +337,6 @@ export class SupabaseAuthService implements AuthServiceLike {
 
   async authenticateAccessToken(accessToken: string): Promise<AuthenticatedSession> {
     const trimmed = accessToken.trim();
-
-    try {
-      const claims = await verifyAccessToken(trimmed, this.localConfig);
-      if (claims.sub) {
-        return { sessionId: claims.sid, userId: claims.sub };
-      }
-    } catch {
-      // Not a local test token; proceed to Supabase Auth check
-    }
 
     const cached = this.tokenCache.get(trimmed);
     if (cached && cached.expiresAt > this.localConfig.now()) {
@@ -641,11 +402,6 @@ export function resolveAuthService(
   }
 
   const config = createAuthConfig(workerEnv);
-
-  if (dbClient) {
-    return new DatabaseAuthService(dbClient, config);
-  }
-
   defaultAuthService ??= new AuthService(config);
   return defaultAuthService;
 }
@@ -804,44 +560,6 @@ async function resolveSessionIdForLogout(
   }
 
   return null;
-}
-
-async function selectDatabaseSession(
-  db: DbClient,
-  sessionId: string,
-): Promise<SessionRecord | null> {
-  const result = await db.query(
-    `
-      select
-        id,
-        user_id,
-        refresh_token_hash,
-        refresh_expires_at,
-        revoked_at,
-        rotated_at,
-        created_at,
-        updated_at
-      from user_session
-      where id = $1
-    `,
-    [sessionId],
-  );
-  const row = result.rows[0];
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    id: String(row.id),
-    userId: String(row.user_id),
-    refreshTokenHash: String(row.refresh_token_hash),
-    refreshExpiresAt: Date.parse(String(row.refresh_expires_at)),
-    revokedAt: row.revoked_at ? Date.parse(String(row.revoked_at)) : null,
-    rotatedAt: row.rotated_at ? Date.parse(String(row.rotated_at)) : null,
-    createdAt: Date.parse(String(row.created_at)),
-    updatedAt: Date.parse(String(row.updated_at)),
-  };
 }
 
 function requireOtpEmailMethod(method: string): void {
@@ -1016,51 +734,4 @@ function randomBase64Url(bytes: number): string {
   const value = new Uint8Array(bytes);
   crypto.getRandomValues(value);
   return base64UrlEncode(value);
-}
-
-async function ensureDatabaseUser(
-  db: DbClient,
-  email: string,
-): Promise<string> {
-  try {
-    const userRes = await db.query(
-      `select get_or_create_user($1) as user_id`,
-      [email],
-    );
-    const userId = userRes.rows[0]?.user_id;
-    if (typeof userId === "string" && userId.length > 0) {
-      return userId;
-    }
-  } catch {
-    // get_or_create_user is present in Supabase Postgres, fallback for local mock drivers
-  }
-
-  const existing = await db.query(
-    `select id from user_account where email = $1`,
-    [email],
-  ).catch(() => ({ rows: [] as Record<string, unknown>[] }));
-  const existingId = existing.rows[0]?.id;
-  if (typeof existingId === "string" && existingId.length > 0) {
-    return existingId;
-  }
-
-  const userId =
-    email === SHARED_TEST_ACCOUNT.email
-      ? SHARED_TEST_ACCOUNT.userId
-      : crypto.randomUUID();
-
-  await db.query(
-    `
-      insert into user_account(id, email, created_at)
-      values ($1, $2, $3)
-      on conflict (email) do nothing
-    `,
-    [userId, email, iso(Date.now())],
-  ).catch(() => {});
-
-  return userId;
-}
-
-function iso(epochMillis: number | null): string | null {
-  return epochMillis === null ? null : new Date(epochMillis).toISOString();
 }

@@ -15,18 +15,40 @@ describe("SupabaseAuthService", () => {
     now: () => 1700000000000,
   };
 
-  it("handles test account without external network calls", async () => {
-    const service = new SupabaseAuthService(supabaseConfig, localConfig);
+  it("throws 400 when Supabase rejects verification with invalid code", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ msg: "Token has expired or is invalid" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    await service.requestAuth("otp_email", "abun@tireless.dev");
-    const session = await service.verifyAuth("otp_email", "abun@tireless.dev", "424242");
+    try {
+      const service = new SupabaseAuthService(supabaseConfig, localConfig);
+      await expect(
+        service.verifyAuth("otp_email", "person@example.com", "999999"),
+      ).rejects.toThrow("Token has expired or is invalid");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 
-    expect(session.userId).toBe("a0000000-0000-4000-8000-00000000ab00");
-    expect(session.accessToken).toBeDefined();
-    expect(session.refreshToken).toContain("test-session.");
+  it("throws 401 when Supabase rejects refresh token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error_description: "Invalid Refresh Token" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    const authenticated = await service.authenticateAccessToken(session.accessToken);
-    expect(authenticated.userId).toBe("a0000000-0000-4000-8000-00000000ab00");
+    try {
+      const service = new SupabaseAuthService(supabaseConfig, localConfig);
+      await expect(
+        service.refreshSession("invalid-refresh-token"),
+      ).rejects.toThrow("The login session is invalid or expired.");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("requests OTP via Supabase Auth API for real emails", async () => {
