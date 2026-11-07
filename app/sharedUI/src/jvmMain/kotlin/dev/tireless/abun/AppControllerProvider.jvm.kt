@@ -6,7 +6,6 @@ import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DefaultTimeProvider
-import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.JvmNodeIdProvider
@@ -34,7 +33,6 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = JvmNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            debugAuthPreset = debugAuthPreset(enabled = isDesktopDebugRuntime()),
             serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
@@ -62,8 +60,6 @@ internal fun findRepoRoot(workingDirectory: String): Path? {
 
 private fun hasDesktopBuildScript(repoRoot: Path): Boolean =
     File(repoRoot.toFile(), "app/desktopApp/build.gradle.kts").exists()
-
-private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = null
 
 private class JvmLoginPreferenceStore : LoginPreferenceStore {
     private val preferences = Preferences.userRoot().node("dev/tireless/abun")

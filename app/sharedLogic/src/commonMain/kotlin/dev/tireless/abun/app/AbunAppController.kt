@@ -19,7 +19,6 @@ class AbunAppController(
     dependencies: AppDependencies,
 ) {
     private val timeProvider = dependencies.timeProvider
-    private val debugAuthPreset = dependencies.debugAuthPreset
     private val loginPreferenceStore = dependencies.loginPreferenceStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authRemoteApi = AuthRemoteApi(
@@ -85,8 +84,6 @@ class AbunAppController(
                 showGuide = true,
                 mode = AuthMode.GUEST,
                 otpRequested = false,
-                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
-                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
                 isSubmitting = false,
                 errorMessage = null,
             ),
@@ -113,19 +110,6 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email is required"))
             return
         }
-        debugAuthPreset
-            ?.takeIf { email == it.email.trim() }
-            ?.let {
-                _state.value = _state.value.copy(
-                    auth = _state.value.auth.copy(
-                        otpRequested = true,
-                        prefilledOtp = it.otp,
-                        debugOtpHint = "Debug OTP: ${it.otp}",
-                        errorMessage = null,
-                    ),
-                )
-                return
-            }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
             runCatching { authRemoteApi.requestOtp(email) }
@@ -144,27 +128,6 @@ class AbunAppController(
             _state.value = _state.value.copy(auth = _state.value.auth.copy(errorMessage = "Email and OTP are required"))
             return
         }
-        debugAuthPreset
-            ?.takeIf { email == it.email.trim() && code.trim() == it.otp.trim() }
-            ?.let {
-                scope.launch {
-                    _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
-                    runCatching {
-                        authRemoteApi.requestOtp(email)
-                        authRemoteApi.verifyOtp(email, code)
-                    }.onSuccess { response ->
-                        completeLogin(response.toAuthSession())
-                    }.onFailure { error ->
-                        _state.value = _state.value.copy(
-                            auth = _state.value.auth.copy(
-                                isSubmitting = false,
-                                errorMessage = error.message ?: "OTP verification failed",
-                            ),
-                        )
-                    }
-                }
-                return
-            }
         scope.launch {
             _state.value = _state.value.copy(auth = _state.value.auth.copy(isSubmitting = true, errorMessage = null))
             runCatching { authRemoteApi.verifyOtp(email, code) }
@@ -858,8 +821,6 @@ class AbunAppController(
                 showGuide = showGuide,
                 mode = AuthMode.GUEST,
                 otpRequested = false,
-                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
-                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
                 isSubmitting = false,
                 errorMessage = authError,
             ),
@@ -874,22 +835,12 @@ class AbunAppController(
             return AuthViewState(
                 showGuide = false,
                 mode = AuthMode.AUTHENTICATED,
-                email = debugAuthPreset?.email.orEmpty(),
+                email = "",
                 otpRequested = false,
-                prefilledOtp = debugAuthPreset?.otp.orEmpty(),
-                debugOtpHint = debugAuthPreset?.let { "Debug OTP: ${it.otp}" },
             )
         }
 
-        return debugAuthPreset?.let {
-            AuthViewState(
-                showGuide = !loginPreferenceStore.isLoginOmitted(),
-                email = it.email,
-                otpRequested = true,
-                prefilledOtp = it.otp,
-                debugOtpHint = "Debug OTP: ${it.otp}",
-            )
-        } ?: AuthViewState(showGuide = !loginPreferenceStore.isLoginOmitted())
+        return AuthViewState(showGuide = !loginPreferenceStore.isLoginOmitted())
     }
 
     private fun initialSyncReady(): Boolean {

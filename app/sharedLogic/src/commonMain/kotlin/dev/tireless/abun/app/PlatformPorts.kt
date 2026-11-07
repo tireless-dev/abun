@@ -52,24 +52,5 @@ data class AppDependencies(
     val idGenerator: IdGenerator,
     val timeProvider: TimeProvider,
     val serverBaseUrl: String,
-    val debugAuthPreset: DebugAuthPreset? = null,
     val logger: AppLogger = DefaultAppLogger,
-)
-
-data class DebugAuthPreset(
-    val email: String,
-    val otp: String,
-    val accessToken: String,
-    val userId: String,
-    val accessTokenExpiresAtEpochMillis: Long,
-    val refreshToken: String,
-    val refreshTokenExpiresAtEpochMillis: Long,
-)
-
-fun DebugAuthPreset.toAuthSession(): AuthSession = AuthSession(
-    userId = userId,
-    accessToken = accessToken,
-    accessTokenExpiresAtEpochMillis = accessTokenExpiresAtEpochMillis,
-    refreshToken = refreshToken,
-    refreshTokenExpiresAtEpochMillis = refreshTokenExpiresAtEpochMillis,
 )

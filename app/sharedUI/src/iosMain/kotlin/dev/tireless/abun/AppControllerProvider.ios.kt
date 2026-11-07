@@ -7,7 +7,6 @@ import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
-import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.IosDatabaseDriverFactory
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.IosNodeIdProvider
@@ -17,11 +16,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import kotlin.experimental.ExperimentalNativeApi
-import kotlin.native.Platform
 import platform.Foundation.NSUserDefaults
 
-@OptIn(ExperimentalNativeApi::class)
 @Composable
 actual fun rememberAbunAppController(): AbunAppController = remember {
     AbunAppController.create(
@@ -34,13 +30,10 @@ actual fun rememberAbunAppController(): AbunAppController = remember {
             nodeIdProvider = IosNodeIdProvider(),
             idGenerator = StableStringIdGenerator(),
             timeProvider = DefaultTimeProvider(),
-            debugAuthPreset = debugAuthPreset(enabled = Platform.isDebugBinary),
             serverBaseUrl = DEFAULT_SERVER_BASE_URL,
         ),
     )
 }
-
-private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = null
 
 private class IosLoginPreferenceStore : LoginPreferenceStore {
     private val defaults = NSUserDefaults.standardUserDefaults

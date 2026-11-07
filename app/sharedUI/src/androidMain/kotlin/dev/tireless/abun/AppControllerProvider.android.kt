@@ -2,7 +2,6 @@ package dev.tireless.abun
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import android.content.pm.ApplicationInfo
 import androidx.compose.ui.platform.LocalContext
 import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AndroidDatabaseDriverFactory
@@ -11,7 +10,6 @@ import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
-import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.StableStringIdGenerator
 import dev.tireless.abun.app.ThemePreference
@@ -34,16 +32,11 @@ actual fun rememberAbunAppController(): AbunAppController {
                 nodeIdProvider = AndroidNodeIdProvider(),
                 idGenerator = StableStringIdGenerator(),
                 timeProvider = DefaultTimeProvider(),
-                debugAuthPreset = debugAuthPreset(
-                    enabled = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
-                ),
                 serverBaseUrl = DEFAULT_SERVER_BASE_URL,
             ),
         )
     }
 }
-
-private fun debugAuthPreset(enabled: Boolean): DebugAuthPreset? = null
 
 private class AndroidLoginPreferenceStore(context: android.content.Context) : LoginPreferenceStore {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCE_FILE, android.content.Context.MODE_PRIVATE)

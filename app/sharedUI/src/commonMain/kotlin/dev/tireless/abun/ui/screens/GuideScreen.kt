@@ -68,7 +68,7 @@ internal fun GuideScreenContent(
     onResetLoginOtp: () -> Unit = {},
     onSkipLogin: () -> Unit,
 ) {
-    var otpCode by remember(state.auth.prefilledOtp) { mutableStateOf(state.auth.prefilledOtp) }
+    var otpCode by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier

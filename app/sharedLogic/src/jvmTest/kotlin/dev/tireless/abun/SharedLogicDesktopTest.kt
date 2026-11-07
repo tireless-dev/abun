@@ -8,7 +8,6 @@ import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.AppJson
 import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AuthMode
-import dev.tireless.abun.app.DebugAuthPreset
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.DatabaseDriverFactory
 import dev.tireless.abun.app.DeviceNodeIdProvider
@@ -63,24 +62,14 @@ import kotlin.time.Duration.Companion.minutes
 
 class SharedLogicDesktopTest {
     @Test
-    fun `debug preset prefills login and enables sync after fixed otp verification`() = runTest {
-        val controller = testController(
-            debugAuthPreset = DebugAuthPreset(
-                email = "abun@tireless.dev",
-                otp = "424242",
-                accessToken = "debug-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
-        )
+    fun `login flow authenticates and enables sync after otp verification`() = runTest {
+        val controller = testController()
 
-        assertEquals("abun@tireless.dev", controller.state.value.auth.email)
-        assertEquals("424242", controller.state.value.auth.prefilledOtp)
+        assertEquals("", controller.state.value.auth.email)
         assertFalse(controller.state.value.syncState.syncReady)
 
-        controller.verifyEmailOtp("424242")
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
         waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
 
         assertFalse(controller.state.value.auth.showGuide)
@@ -120,46 +109,13 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `reopen login from settings preserves shared debug convenience but stays guest`() = runTest {
-        val controller = testController(
-            debugAuthPreset = DebugAuthPreset(
-                email = TestSharedAccount.EMAIL,
-                otp = TestSharedAccount.OTP,
-                accessToken = "debug-access-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
-        )
-
-        controller.skipLogin()
-        controller.reopenLogin()
-
-        assertTrue(controller.state.value.auth.showGuide)
-        assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
-        assertEquals(TestSharedAccount.EMAIL, controller.state.value.auth.email)
-        assertEquals(TestSharedAccount.OTP, controller.state.value.auth.prefilledOtp)
-    }
-
-    @Test
     fun `successful login clears stored omission`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore()
-        val controller = testController(
-            loginPreferenceStore = loginPreferenceStore,
-            debugAuthPreset = DebugAuthPreset(
-                email = "abun@tireless.dev",
-                otp = "424242",
-                accessToken = "debug-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
-        )
+        val controller = testController(loginPreferenceStore = loginPreferenceStore)
 
         controller.skipLogin()
-        controller.verifyEmailOtp("424242")
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
         waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED }
 
         val second = testController(loginPreferenceStore = loginPreferenceStore)
@@ -168,28 +124,16 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `stored login omission still hides guide when debug auth preset is enabled`() = runTest {
+    fun `stored login omission hides guide on startup`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore().apply {
             setLoginOmitted(true)
         }
 
-        val controller = testController(
-            loginPreferenceStore = loginPreferenceStore,
-            debugAuthPreset = DebugAuthPreset(
-                email = "abun@tireless.dev",
-                otp = "424242",
-                accessToken = "debug-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
-        )
+        val controller = testController(loginPreferenceStore = loginPreferenceStore)
 
         assertFalse(controller.state.value.auth.showGuide)
         assertEquals(AuthMode.GUEST, controller.state.value.auth.mode)
-        assertEquals("abun@tireless.dev", controller.state.value.auth.email)
-        assertEquals("424242", controller.state.value.auth.prefilledOtp)
+        assertEquals("", controller.state.value.auth.email)
     }
 
     @Test
@@ -1119,7 +1063,7 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `debug preset otp verification exchanges real server session instead of persisting debug tokens`() = runTest {
+    fun `otp verification exchanges real server session and stores auth session`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore()
         val requests = mutableListOf<String>()
         val controller = AbunAppController.create(
@@ -1167,19 +1111,11 @@ class SharedLogicDesktopTest {
                 idGenerator = testIdGenerator(),
                 timeProvider = testTimeProvider(),
                 serverBaseUrl = "http://localhost:8080",
-                debugAuthPreset = DebugAuthPreset(
-                    email = TestSharedAccount.EMAIL,
-                    otp = TestSharedAccount.OTP,
-                    accessToken = "debug-access-token",
-                    userId = "debug-user",
-                    accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                    refreshToken = "debug-refresh-token",
-                    refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                ),
             ),
         )
 
         controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.requestEmailOtp()
         controller.verifyEmailOtp(TestSharedAccount.OTP)
         waitFor { loginPreferenceStore.authSession()?.accessToken == "access-1" }
 
@@ -1198,7 +1134,7 @@ class SharedLogicDesktopTest {
     }
 
     @Test
-    fun `debug preset login exchanges a real session before sync is enabled`() = runTest {
+    fun `login exchanges a real session before sync is enabled`() = runTest {
         val loginPreferenceStore = TestLoginPreferenceStore().apply {
             setLoginOmitted(true)
         }
@@ -1206,15 +1142,6 @@ class SharedLogicDesktopTest {
         val controller = testController(
             loginPreferenceStore = loginPreferenceStore,
             requestLog = requests,
-            debugAuthPreset = DebugAuthPreset(
-                email = TestSharedAccount.EMAIL,
-                otp = TestSharedAccount.OTP,
-                accessToken = "debug-access-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
             authVerifyResponse = dev.tireless.abun.app.AuthSessionResponse(
                 accessToken = "verified-access",
                 accessTokenExpiresAt = "2030-01-01T00:15:00Z",
@@ -1227,6 +1154,7 @@ class SharedLogicDesktopTest {
         assertFalse(controller.state.value.syncState.syncReady)
 
         controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.requestEmailOtp()
         controller.verifyEmailOtp(TestSharedAccount.OTP)
 
         waitFor { controller.state.value.syncState.lastSyncedAt != null }
@@ -1264,15 +1192,6 @@ class SharedLogicDesktopTest {
         val controller = testController(
             loginPreferenceStore = loginPreferenceStore,
             requestLog = requests,
-            debugAuthPreset = DebugAuthPreset(
-                email = TestSharedAccount.EMAIL,
-                otp = TestSharedAccount.OTP,
-                accessToken = "debug-access-token",
-                userId = "debug-user",
-                accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-                refreshToken = "debug-refresh-token",
-                refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
-            ),
             authRefreshResponse = dev.tireless.abun.app.AuthSessionResponse(
                 accessToken = "unused",
                 accessTokenExpiresAt = "2030-01-01T00:20:00Z",
@@ -1490,7 +1409,6 @@ class SharedLogicDesktopTest {
     private fun testController(
         timeProvider: TimeProvider = testTimeProvider(),
         idGenerator: IdGenerator = testIdGenerator(),
-        debugAuthPreset: DebugAuthPreset? = null,
         databaseDriverFactory: DatabaseDriverFactory = testDatabaseDriverFactory(),
         loginPreferenceStore: LoginPreferenceStore = TestLoginPreferenceStore(),
         requestLog: MutableList<String>? = null,
@@ -1556,7 +1474,6 @@ class SharedLogicDesktopTest {
             idGenerator = idGenerator,
             timeProvider = timeProvider,
             serverBaseUrl = "http://localhost:8080",
-            debugAuthPreset = debugAuthPreset,
         ),
     )
 

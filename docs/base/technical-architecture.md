@@ -66,7 +66,7 @@ OTP email is the primary auth method, unified with Supabase Auth (`/auth/v1/otp`
 
 All persistent product tables reside in the dedicated `abun` PostgreSQL schema and reference the centralized `auth.users(id)` directly. Hyperdrive connection pooling accelerates transactional queries from Cloudflare Workers to the hosted database.
 
-Debug login presets are disabled across all platforms by default; all clients (desktop, Android, iOS) present a clean sign-in screen starting with empty email and OTP inputs. The sign-in flow uses a two-step editorial experience: step 1 accepts an email to request a one-time passcode from Supabase Auth; step 2 verifies the OTP with options to change the email or resend the code. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and enters the normal shared sync path. Alternatively, users may skip the sign-in screen to continue in local-only guest mode.
+Debug login presets are completely removed from all platforms; all clients (desktop, Android, iOS) present a clean sign-in screen starting with empty email and OTP inputs. The sign-in flow uses a two-step editorial experience: step 1 accepts an email to request a one-time passcode from Supabase Auth; step 2 verifies the OTP with options to change the email or resend the code. A successful shared login clears any stored login omission, hides the guide, resets auth errors, marks sync ready, and enters the normal shared sync path. Alternatively, users may skip the sign-in screen to continue in local-only guest mode.
 
 ## Resource Categories
 
