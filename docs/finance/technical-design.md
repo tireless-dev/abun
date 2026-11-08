@@ -342,5 +342,9 @@ To respect foreign-key dependencies during pull-then-push sync, extend [`SyncEng
   - Clean initialization: eliminated automatic seeding of sample sub-accounts and default budget rules, keeping initial ledger pristine.
   - Hardened Default 5 mandatory root accounts (`Assets`, `Liabilities`, `Income`, `Expenses`, `Equity`) with deletion protection.
   - Implemented `canLoadPredefinedFinanceAccounts()`, `loadPredefinedFinanceAccounts()`, and `resetFinanceToDefaultAccounts()` with soft-delete tombstones for synced records and instant reset for local data.
+
+- **Phase 6 Complete (Beancount Migration Pipeline & High-Precision Currency Scaling)**:
+  - High-precision crypto currency scaling (`ETH` with $10^8$, `USDT` with $10^6$) and deterministic integer parsing (`toMinorUnitsFromDecimalString`) preventing floating-point drift.
+  - Full-fidelity Beancount migration CLI tool (`scripts/migrate_beancount_to_abun.py`) supporting AST resolution, materialization of 64 implicit `Pad` directives into explicit double-entry adjustments, conversion of 146 `^links` into first-class `ClearingGroup`s, and verification of 311 historical `Balance` assertions.
   - Added Settings UI panel (`settings-panel-finance-presets`) with status indicators and action buttons for one-click preset loading and complete reset to Default 5.
   - 100% test passing across `:core:jvmTest`, `:app:sharedLogic:jvmTest`, `:app:sharedUI:jvmTest`, `:app:desktopApp:test`, `npm run api:test`, `npm run api:typecheck`, and `npm run test:web`.
