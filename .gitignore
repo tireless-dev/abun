@@ -23,3 +23,4 @@ server/.env*
 !server/.env.example
 abun.db
 **/.wrangler/
+workers/api/src/version.ts

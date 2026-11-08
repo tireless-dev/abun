@@ -22,11 +22,17 @@ let buildTimestamp = "";
 
 try {
   const status = execSync("git status --porcelain", { cwd: rootDir, encoding: "utf8" }).trim();
-  const isDirty = status.length > 0;
+  const dirtyLines = status
+    ? status.split("\n").filter((line) => {
+        const file = line.slice(3).trim();
+        return file && !file.endsWith("src/version.ts");
+      })
+    : [];
+  const isDirty = dirtyLines.length > 0;
 
   if (isDirty) {
     let maxMtime = 0;
-    for (const line of status.split("\n")) {
+    for (const line of dirtyLines) {
       const file = line.slice(3).trim();
       const fullPath = join(rootDir, file);
       if (existsSync(fullPath)) {
@@ -60,5 +66,7 @@ export const API_BUILD_TIME = ${JSON.stringify(buildTimestamp)};
 `;
 
 const targetFile = join(apiDir, "src", "version.ts");
-writeFileSync(targetFile, fileContent, "utf8");
+if (!existsSync(targetFile) || readFileSync(targetFile, "utf8") !== fileContent) {
+  writeFileSync(targetFile, fileContent, "utf8");
+}
 console.log(`[generate-version] Generated version: ${baseVersion}, commit: ${commitHash}, buildTime: ${buildTimestamp} -> src/version.ts`);
