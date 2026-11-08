@@ -49,6 +49,24 @@ Core fields:
 
 Special account semantics:
 
+- **Default 5 Mandatory Root Accounts (`DEFAULT_FIVE_FINANCE_ACCOUNTS`)**:
+  - The module requires 5 foundational root accounts:
+    1. `acc-root-assets`: `Assets` (`资产`, `category = Asset`, `include_in_net_worth = true`, `liquid_tier = Liquid`)
+    2. `acc-root-liabilities`: `Liabilities` (`负债`, `category = Liability`, `include_in_net_worth = true`, `liquid_tier = None`)
+    3. `acc-root-income`: `Income` (`收入`, `category = Income`, `include_in_net_worth = false`, `liquid_tier = None`)
+    4. `acc-root-expenses`: `Expenses` (`支出`, `category = Expense`, `include_in_net_worth = false`, `liquid_tier = None`)
+    5. `acc-root-equity`: `Equity` (`权益`, `category = Equity`, `include_in_net_worth = false`, `liquid_tier = None`)
+  - **Undeletable Invariant**: These 5 root accounts are protected and cannot be deleted via UI or `deleteFinanceAccount`.
+- **Predefined Starter Sub-Accounts (`PREDEFINED_FINANCE_SUB_ACCOUNTS`)**:
+  - An optional preset of 8 standard sub-accounts that can be loaded on-demand via Settings when the ledger contains only the clean Default 5 roots:
+    1. `acc-assets-bank-default`: `Assets:Bank:Default` (`默认银行账户`, `Liquid`)
+    2. `acc-liabilities-cc-default`: `Liabilities:CreditCard:Default` (`默认信用卡`, `statement_day = 15, due_day = 5`)
+    3. `acc-liabilities-loan-default`: `Liabilities:Loan:Default` (`默认分期/贷款`)
+    4. `acc-expenses-food`: `Expenses:Food` (`餐饮日常`)
+    5. `acc-expenses-housing`: `Expenses:Housing` (`居住房租`)
+    6. `acc-expenses-interest`: `Expenses:Finance:Interest` (`利息与手续费`)
+    7. `acc-expenses-adjustment`: `Expenses:Adjustment:Unallocated` (`平账调整差额`)
+    8. `acc-income-salary`: `Income:Salary` (`工资薪水`)
 - **Excluded from net worth (`include_in_net_worth = false`)**: Balances in this account are omitted from personal net worth and wealth reports.
 - **Pass-through / direct-consumption (`is_pass_through = true`)**: Used for petty-cash containers such as meal cards, transit cards, or pocket money pools. Transfers into a pass-through account are immediately recognized as consumption against budgets and cashflow without requiring the user to log every micro-purchase inside the card.
 
@@ -195,6 +213,9 @@ Core fields:
 - `currency`: ISO 4217 currency of the budget (defaults to user's `base_currency`, e.g., `CNY`)
 - `include_in_runway`: boolean (whether remaining unspent budget for future days is subtracted as expected daily living burn in Cashflow Runway)
 - `is_deleted`: boolean
+
+Lifecycle note:
+- Budget rules are strictly user-configured and are not seeded by default on initialization or reset, ensuring a pristine ledger until intentionally created.
 
 ---
 

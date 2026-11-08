@@ -45,6 +45,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Scale
 import com.composables.icons.lucide.Trash2
 import dev.tireless.abun.app.AppUiState
+import dev.tireless.abun.app.DEFAULT_FIVE_FINANCE_ACCOUNT_IDS
 import dev.tireless.abun.app.FinanceAccountViewItem
 import dev.tireless.abun.finance.AccountCategory
 import dev.tireless.abun.finance.FinanceCurrencies
@@ -222,8 +223,10 @@ private fun AccountCardItem(
                         Text("Auto-Pad", style = ThemeTokens.type.label)
                     }
 
-                    IconButton(onClick = onDelete) {
-                        Icon(imageVector = Lucide.Trash2, contentDescription = "Delete account", tint = ThemeTokens.colors.textTertiary)
+                    if (acc.id !in DEFAULT_FIVE_FINANCE_ACCOUNT_IDS) {
+                        IconButton(onClick = onDelete) {
+                            Icon(imageVector = Lucide.Trash2, contentDescription = "Delete account", tint = ThemeTokens.colors.textTertiary)
+                        }
                     }
                 }
             }

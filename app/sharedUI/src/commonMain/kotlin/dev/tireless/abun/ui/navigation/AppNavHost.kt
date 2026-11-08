@@ -33,6 +33,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.savedstate.read
+import dev.tireless.abun.app.AppModule
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
 import dev.tireless.abun.app.FinanceLedgerFilter
@@ -148,6 +149,9 @@ fun AppNavHost(
     onManualCheckUpdate: () -> Unit = {},
     onTriggerOtaUpdate: () -> Unit = {},
     onUpdateAutoUpdateEnabled: (Boolean) -> Unit = {},
+    onToggleModule: (AppModule, Boolean) -> Unit = { _, _ -> },
+    onLoadPredefinedFinanceAccounts: () -> Unit = {},
+    onResetFinanceToDefaultAccounts: () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -186,6 +190,9 @@ fun AppNavHost(
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,
+                onToggleModule = onToggleModule,
+                onLoadPredefinedFinanceAccounts = onLoadPredefinedFinanceAccounts,
+                onResetFinanceToDefaultAccounts = onResetFinanceToDefaultAccounts,
             )
         }
         composable(AppRoute.Notes.route) {

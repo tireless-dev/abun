@@ -5,15 +5,7 @@ import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.LocalStore
 import dev.tireless.abun.app.TimeProvider
-import dev.tireless.abun.app.createFinanceAccount
 import dev.tireless.abun.app.createHybridClock
-import dev.tireless.abun.app.dirtyFinanceAccounts
-import dev.tireless.abun.app.financeAccount
-import dev.tireless.abun.app.financeClearingGroup
-import dev.tireless.abun.app.financeTransaction
-import dev.tireless.abun.app.mergeRemoteFinanceAccounts
-import dev.tireless.abun.app.mergeRemoteFinanceClearingGroups
-import dev.tireless.abun.app.mergeRemoteFinanceTransactions
 import dev.tireless.abun.db.AbunDatabase
 import dev.tireless.abun.finance.AccountCategory
 import dev.tireless.abun.finance.ClearingGroupStatus
@@ -62,7 +54,7 @@ class FinanceSyncTest {
     fun `created account is dirty and clearAccepted cleans dirty status`() {
         val store = newTestStore()
 
-        val accId = store.createFinanceAccount(
+        val accId = store.financeAccountStore.createFinanceAccount(
             path = "Liabilities:CreditCard:CMB",
             name = "招商银行信用卡",
             category = AccountCategory.LIABILITY,
@@ -71,7 +63,7 @@ class FinanceSyncTest {
             dueDay = 25,
         )
 
-        val dirty = store.dirtyFinanceAccounts()
+        val dirty = store.financeSyncStore.dirtyFinanceAccounts()
         assertTrue(dirty.any { it.id == accId })
         val dirtyAcc = dirty.first { it.id == accId }
         assertEquals("Liabilities:CreditCard:CMB", dirtyAcc.path)
@@ -85,10 +77,10 @@ class FinanceSyncTest {
                 serverVersion = 42L,
             ),
         )
-        store.mergeRemoteFinanceAccounts(acceptedResponse, clearAccepted = true)
+        store.financeSyncStore.mergeRemoteFinanceAccounts(acceptedResponse, clearAccepted = true)
 
         // Dirty list should no longer contain this account
-        assertFalse(store.dirtyFinanceAccounts().any { it.id == accId })
+        assertFalse(store.financeSyncStore.dirtyFinanceAccounts().any { it.id == accId })
         val dbRow = store.queries.selectFinanceAccountById(accId).executeAsOneOrNull()
         assertNotNull(dbRow)
         assertEquals(42L, dbRow.server_version)
@@ -110,9 +102,9 @@ class FinanceSyncTest {
             createdAt = "2026-05-20T00:00:00Z",
         )
 
-        store.mergeRemoteFinanceAccounts(listOf(remoteAccount))
+        store.financeSyncStore.mergeRemoteFinanceAccounts(listOf(remoteAccount))
 
-        val local = store.financeAccount("acc-remote-boc")
+        val local = store.financeAccountStore.financeAccount("acc-remote-boc")
         assertNotNull(local)
         assertEquals("Assets:Checking:BOC", local.path)
         assertEquals("中国银行活期", local.name)
@@ -122,7 +114,7 @@ class FinanceSyncTest {
         assertEquals(10L, dbRow.server_version)
 
         // Pulled item must not be dirty
-        assertFalse(store.dirtyFinanceAccounts().any { it.id == "acc-remote-boc" })
+        assertFalse(store.financeSyncStore.dirtyFinanceAccounts().any { it.id == "acc-remote-boc" })
     }
 
     @Test
@@ -139,8 +131,8 @@ class FinanceSyncTest {
             serverVersion = 1L,
             hlcMap = mapOf("core" to "1748120001500-0001-nodeA"),
         )
-        store.mergeRemoteFinanceAccounts(listOf(v1))
-        assertEquals("晚餐消费 (版本1)", store.financeAccount("acc-conflict-test")?.name)
+        store.financeSyncStore.mergeRemoteFinanceAccounts(listOf(v1))
+        assertEquals("晚餐消费 (版本1)", store.financeAccountStore.financeAccount("acc-conflict-test")?.name)
 
         // 2. Incoming with older HLC = 1200 should be ignored
         val vOlder = SyncFinanceAccount(
@@ -152,9 +144,9 @@ class FinanceSyncTest {
             serverVersion = 2L,
             hlcMap = mapOf("core" to "1748120001200-0001-nodeB"),
         )
-        store.mergeRemoteFinanceAccounts(listOf(vOlder))
+        store.financeSyncStore.mergeRemoteFinanceAccounts(listOf(vOlder))
         // Name should stay as version 1!
-        assertEquals("晚餐消费 (版本1)", store.financeAccount("acc-conflict-test")?.name)
+        assertEquals("晚餐消费 (版本1)", store.financeAccountStore.financeAccount("acc-conflict-test")?.name)
 
         // 3. Incoming with newer HLC = 2000 should overwrite
         val vNewer = SyncFinanceAccount(
@@ -166,21 +158,21 @@ class FinanceSyncTest {
             serverVersion = 3L,
             hlcMap = mapOf("core" to "1748120002000-0001-nodeC"),
         )
-        store.mergeRemoteFinanceAccounts(listOf(vNewer))
-        assertEquals("最新名字 (版本2)", store.financeAccount("acc-conflict-test")?.name)
+        store.financeSyncStore.mergeRemoteFinanceAccounts(listOf(vNewer))
+        assertEquals("最新名字 (版本2)", store.financeAccountStore.financeAccount("acc-conflict-test")?.name)
     }
 
     @Test
     fun `remote soft delete marks local account as deleted`() {
         val store = newTestStore()
 
-        val accId = store.createFinanceAccount(
+        val accId = store.financeAccountStore.createFinanceAccount(
             path = "Assets:Cash:Wallet",
             name = "随身钱包",
             category = AccountCategory.ASSET,
             currency = "CNY",
         )
-        assertNotNull(store.financeAccount(accId))
+        assertNotNull(store.financeAccountStore.financeAccount(accId))
 
         // Remote deletion arrives with newer HLC
         val deleteEvent = SyncFinanceAccount(
@@ -192,10 +184,10 @@ class FinanceSyncTest {
             serverVersion = 5L,
             hlcMap = mapOf("deleted" to "1748120009999-0001-remoteDevice"),
         )
-        store.mergeRemoteFinanceAccounts(listOf(deleteEvent))
+        store.financeSyncStore.mergeRemoteFinanceAccounts(listOf(deleteEvent))
 
         // Account should now be soft deleted (financeAccount returns null for active accounts)
-        assertNull(store.financeAccount(accId))
+        assertNull(store.financeAccountStore.financeAccount(accId))
     }
 
     @Test
@@ -213,9 +205,9 @@ class FinanceSyncTest {
             serverVersion = 1L,
             hlcMap = mapOf("core" to "1748120001000-0001-nodeA"),
         )
-        store.mergeRemoteFinanceClearingGroups(listOf(group))
+        store.financeSyncStore.mergeRemoteFinanceClearingGroups(listOf(group))
 
-        val localGroup = store.financeClearingGroup("cg-cycle-1")
+        val localGroup = store.financeLedgerStore.financeClearingGroup("cg-cycle-1")
         assertNotNull(localGroup)
         assertEquals("2026-05 信用卡清算", localGroup.name)
         assertEquals("2026-05", localGroup.statementCycle)
@@ -228,9 +220,9 @@ class FinanceSyncTest {
             serverVersion = 2L,
             hlcMap = mapOf("header" to "1748120001000-0001-nodeA"),
         )
-        store.mergeRemoteFinanceTransactions(listOf(tx))
+        store.financeSyncStore.mergeRemoteFinanceTransactions(listOf(tx))
 
-        val localTx = store.financeTransaction("tx-lunch-1")
+        val localTx = store.financeLedgerStore.financeTransaction("tx-lunch-1")
         assertNotNull(localTx)
         assertEquals("工作餐", localTx.summary)
         assertEquals("2026-05-24", localTx.txDate)

@@ -27,10 +27,22 @@ The client is responsible for:
 
 - rendering UI from local state
 - validating and applying local writes
-- persisting module data in SQLite
+- persisting module data in SQLite via a modular store architecture:
+  - `LocalStore` coordinates the database connection, time/ID generators, HLC clock, sync cursors, and account-switch lifecycle resets.
+  - Domain sub-stores provide cohesive, focused access to business data and queries:
+    - `PreferenceStore` (`store.preferenceStore`): preference mutations, enabled modules, migration, sync dirty/merge
+    - `TaskStore` (`store.taskStore`): tasks CRUD, backlog, day queries, journal, task history, auto-marking missed occurrences
+    - `RoutineAlarmStore` (`store.routineAlarmStore`): routines and alarms CRUD, recurrence execution, alarm triggers
+    - `PomodoroStore` (`store.pomodoroStore`): pomodoro timer sessions and task progress links
+    - `TaskSyncStore` (`store.taskSyncStore`): dirty entity collection and remote merge for core productivity resources
+    - `FinanceAccountStore` (`store.financeAccountStore`): Default 5 roots, sub-accounts, predefined account loading, auto-pad balance reconciliation, budget rules
+    - `FinanceLedgerStore` (`store.financeLedgerStore`): double-entry transactions, splits, clearing groups, amortization plans
+    - `FinanceViewDeriver` (`store.financeViewDeriver`): consolidated financial snapshot and cockpit view state derivation
+    - `FinanceSyncStore` (`store.financeSyncStore`): dirty entity collection and remote merge across all 8 finance tables
+  - `AbunAppController` and `SyncEngine` interact directly with these sub-stores.
 - managing modular workspace configuration (`app.enabled_modules` preference supporting TASKS, FINANCE, NOTES, THINGS) allowing dynamic activation of domain modules and automatic navigation fallback when a workspace is disabled
-- persisting local-only runtime preferences such as login-guide omission, device theme preference, and the current per-device auth session in platform preference storage when the state must survive app restarts without syncing to the server
-- tracking dirty state for synced resources
+- persisting local-only runtime preferences such as login-guide omission, device theme preference, the current per-device auth session, and `lastSyncedUserId` in platform preference storage when the state must survive app restarts without syncing to the server
+- tracking dirty state for synced resources and reconciling local SQLite ownership on login or session restore (preserving unsynced Guest data on first login and existing data when re-authenticating as the same user, while clearing local SQLite tables and resetting sync cursors when switching to a different `userId` or encountering legacy unattributed synced rows)
 - treating the shared auth/session controller and session manager as the source of truth for login, startup restore, refresh, logout, and guest fallback behavior across Android, iOS, and Desktop
 - restoring a persisted auth session on startup, silently refreshing it when only the access token is stale, falling back to guest mode when the refresh session is no longer usable, clearing legacy debug-placeholder sessions instead of treating them as real sync credentials, and surfacing a readable re-login message in shared app state when a revoked or invalid refresh token forces sign-out
 - running pull-then-push sync cycles

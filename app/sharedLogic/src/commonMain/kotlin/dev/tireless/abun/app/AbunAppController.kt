@@ -232,7 +232,7 @@ class AbunAppController(
     ) {
         val preparedTitle = applyTaskDefaults(title)
         if (preparedTitle == null) return
-        store.createTask(
+        store.taskStore.createTask(
             title = preparedTitle,
             journalDate = state.value.selectedDate,
             parentId = parentId,
@@ -246,13 +246,13 @@ class AbunAppController(
     }
 
     fun progressTask(taskId: String, note: String? = null) {
-        store.progressTask(taskId, state.value.selectedDate, note)
+        store.taskStore.progressTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
 
     fun completeTask(taskId: String, note: String? = null) {
-        store.completeTask(taskId, state.value.selectedDate, note)
+        store.taskStore.completeTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
@@ -264,7 +264,7 @@ class AbunAppController(
         estimatedDuration: String? = null,
         note: String? = null,
     ) {
-        store.postponeTask(taskId, state.value.selectedDate, startNotBefore, endNotAfter, estimatedDuration, note)
+        store.taskStore.postponeTask(taskId, state.value.selectedDate, startNotBefore, endNotAfter, estimatedDuration, note)
         refresh()
         requestSync()
     }
@@ -279,30 +279,30 @@ class AbunAppController(
         estimatedDuration: String? = null,
     ) {
         if (title.isBlank()) return
-        store.updateTask(taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
+        store.taskStore.updateTask(taskId, title, detail, parentId, startNotBefore, endNotAfter, estimatedDuration)
         refresh()
         requestSync()
     }
 
     fun cancelTask(taskId: String, note: String? = null) {
-        store.cancelTask(taskId, state.value.selectedDate, note)
+        store.taskStore.cancelTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
 
     fun skipTask(taskId: String, note: String? = null) {
-        store.skipTask(taskId, state.value.selectedDate, note)
+        store.taskStore.skipTask(taskId, state.value.selectedDate, note)
         refresh()
         requestSync()
     }
 
     fun deleteTask(taskId: String) {
-        store.deleteTask(taskId, state.value.selectedDate)
+        store.taskStore.deleteTask(taskId, state.value.selectedDate)
         refresh()
         requestSync()
     }
 
-    fun taskHistory(taskId: String): List<JournalEntryView> = store.taskHistory(taskId, state.value.preferences)
+    fun taskHistory(taskId: String): List<JournalEntryView> = store.taskStore.taskHistory(taskId, state.value.preferences)
 
     fun createRoutine(
         templateTitle: String,
@@ -312,7 +312,7 @@ class AbunAppController(
         defaultEstimatedDuration: String?,
     ) {
         if (templateTitle.isBlank() || recurrenceRule.isBlank()) return
-        store.createRoutine(
+        store.routineAlarmStore.createRoutine(
             templateTitle = templateTitle,
             templateDetail = templateDetail,
             recurrenceRule = recurrenceRule,
@@ -332,7 +332,7 @@ class AbunAppController(
         defaultEstimatedDuration: String?,
     ) {
         if (templateTitle.isBlank() || recurrenceRule.isBlank()) return
-        store.updateRoutine(
+        store.routineAlarmStore.updateRoutine(
             routineId = routineId,
             templateTitle = templateTitle,
             templateDetail = templateDetail,
@@ -345,27 +345,27 @@ class AbunAppController(
     }
 
     fun toggleRoutineActive(routineId: String) {
-        store.toggleRoutineActive(routineId)
+        store.routineAlarmStore.toggleRoutineActive(routineId)
         refresh()
         requestSync()
     }
 
     fun deleteRoutine(routineId: String) {
-        store.deleteRoutine(routineId)
+        store.routineAlarmStore.deleteRoutine(routineId)
         refresh()
         requestSync()
     }
 
     fun runRoutine(routineId: String) {
         val today = timeProvider.today().toString()
-        store.runRoutine(routineId, today)
+        store.routineAlarmStore.runRoutine(routineId, today)
         refresh()
         requestSync()
     }
 
     fun createAlarm(taskId: String, triggerTimeIso: String) {
         if (taskId.isBlank() || triggerTimeIso.isBlank()) return
-        runCatching { store.createAlarm(taskId, triggerTimeIso) }
+        runCatching { store.routineAlarmStore.createAlarm(taskId, triggerTimeIso) }
             .onSuccess {
                 refresh()
                 requestSync()
@@ -374,7 +374,7 @@ class AbunAppController(
 
     fun updateAlarm(alarmId: String, triggerTimeIso: String) {
         if (triggerTimeIso.isBlank()) return
-        runCatching { store.updateAlarm(alarmId, triggerTimeIso) }
+        runCatching { store.routineAlarmStore.updateAlarm(alarmId, triggerTimeIso) }
             .onSuccess {
                 refresh()
                 requestSync()
@@ -382,33 +382,33 @@ class AbunAppController(
     }
 
     fun toggleAlarmActive(alarmId: String) {
-        store.toggleAlarmActive(alarmId)
+        store.routineAlarmStore.toggleAlarmActive(alarmId)
         refresh()
         requestSync()
     }
 
     fun deleteAlarm(alarmId: String) {
-        store.deleteAlarm(alarmId)
+        store.routineAlarmStore.deleteAlarm(alarmId)
         refresh()
         requestSync()
     }
 
     fun startPomodoro(taskId: String? = null, phase: PomodoroPhase = PomodoroPhase.FOCUS) {
-        store.startPomodoroSession(taskId, phase, state.value.preferences) ?: return
+        store.pomodoroStore.startPomodoroSession(taskId, phase, state.value.preferences) ?: return
         _state.value = _state.value.copy(isPomodoroDialogOpen = true)
         refresh()
         requestSync()
     }
 
     fun completePomodoro(sessionId: String, note: String?, taskUpdate: PomodoroTaskUpdate) {
-        store.completePomodoroSession(sessionId, note, taskUpdate, state.value.selectedDate)
+        store.pomodoroStore.completePomodoroSession(sessionId, note, taskUpdate, state.value.selectedDate)
         _state.value = _state.value.copy(isPomodoroDialogOpen = false)
         refresh()
         requestSync()
     }
 
     fun cancelPomodoro(sessionId: String, note: String?) {
-        store.cancelPomodoroSession(sessionId, note)
+        store.pomodoroStore.cancelPomodoroSession(sessionId, note)
         _state.value = _state.value.copy(isPomodoroDialogOpen = false)
         refresh()
         requestSync()
@@ -451,7 +451,7 @@ class AbunAppController(
         rolloverTime: String,
         enabledModules: Set<AppModule>,
     ) {
-        store.updatePreferences(
+        store.preferenceStore.updatePreferences(
             titlePrefix = titlePrefix,
             defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
             focusMinutes = focusMinutes,
@@ -479,7 +479,7 @@ class AbunAppController(
         rolloverTime: String = _state.value.preferences.rolloverTime,
         enabledModules: Set<AppModule> = _state.value.preferences.enabledModules,
     ) {
-        store.updatePreferences(
+        store.preferenceStore.updatePreferences(
             titlePrefix = titlePrefix,
             defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
             focusMinutes = focusMinutes,
@@ -507,7 +507,10 @@ class AbunAppController(
             }
             currentModules - module
         }
-        store.updateEnabledModules(updatedSet)
+        store.preferenceStore.updateEnabledModules(updatedSet)
+        if (module == AppModule.FINANCE && enabled) {
+            store.financeAccountStore.ensureDefaultFinanceAccounts()
+        }
         val tabDisabled = when (module) {
             AppModule.TASKS -> _state.value.selectedTab == AppTab.TASKS
             AppModule.FINANCE -> _state.value.selectedTab == AppTab.FINANCE
@@ -593,29 +596,39 @@ class AbunAppController(
     }
 
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
-        store.autoMarkMissedTasks()
-        val preferences = store.preferences().copy(themePreference = loginPreferenceStore.themePreference())
-        val tasks = store.allTasks(_state.value.selectedDate)
-        val openTasks = store.openTasksForDate(_state.value.selectedDate)
-        val alarms = store.alarms(preferences)
+        store.taskStore.autoMarkMissedTasks()
+        val preferences = store.preferenceStore.preferences().copy(themePreference = loginPreferenceStore.themePreference())
+        val selectedTab = _state.value.selectedTab.takeIf { tab ->
+            when (tab) {
+                AppTab.TODAY, AppTab.SETTINGS -> true
+                AppTab.TASKS -> AppModule.TASKS in preferences.enabledModules
+                AppTab.FINANCE -> AppModule.FINANCE in preferences.enabledModules
+                AppTab.NOTES -> AppModule.NOTES in preferences.enabledModules
+                AppTab.THINGS -> AppModule.THINGS in preferences.enabledModules
+            }
+        } ?: AppTab.TODAY
+        val tasks = store.taskStore.allTasks(_state.value.selectedDate)
+        val openTasks = store.taskStore.openTasksForDate(_state.value.selectedDate)
+        val alarms = store.routineAlarmStore.alarms(preferences)
         _state.value = _state.value.copy(
+            selectedTab = selectedTab,
             today = deriveTodayViewState(
                 openTasks = openTasks,
-                journalEntries = store.journal(_state.value.selectedDate, preferences),
+                journalEntries = store.taskStore.journal(_state.value.selectedDate, preferences),
             ),
             taskView = TaskViewState(
                 tasks = tasks,
-                routines = store.routines(),
+                routines = store.routineAlarmStore.routines(),
                 alarms = alarms,
             ),
-            activePomodoroSession = store.activePomodoroSession(preferences, timeProvider.nowEpochMillis()),
-            recentPomodoroSessions = store.recentPomodoroSessions(preferences = preferences, nowEpochMillis = timeProvider.nowEpochMillis()),
-            pomodoroStartTasks = store.pomodoroStartableTasks().map {
+            activePomodoroSession = store.pomodoroStore.activePomodoroSession(preferences, timeProvider.nowEpochMillis()),
+            recentPomodoroSessions = store.pomodoroStore.recentPomodoroSessions(preferences = preferences, nowEpochMillis = timeProvider.nowEpochMillis()),
+            pomodoroStartTasks = store.pomodoroStore.pomodoroStartableTasks().map {
                 AgendaTaskItemView(taskId = it.id, title = it.title, status = it.status)
             },
             preferences = preferences,
             syncState = _state.value.syncState.copy(isSyncing = false, lastSyncedAt = lastSyncedAt),
-            financeView = store.deriveFinanceViewState(
+            financeView = store.financeViewDeriver.deriveFinanceViewState(
                 selectedFilter = _state.value.financeView.selectedFilter,
                 filterAccountId = _state.value.financeView.filterAccountId,
                 filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
@@ -631,7 +644,7 @@ class AbunAppController(
         clearingGroupId: String? = null,
     ) {
         _state.value = _state.value.copy(
-            financeView = store.deriveFinanceViewState(
+            financeView = store.financeViewDeriver.deriveFinanceViewState(
                 selectedFilter = filter,
                 filterAccountId = accountId,
                 filterClearingGroupId = clearingGroupId,
@@ -660,7 +673,7 @@ class AbunAppController(
         status: TransactionStatus = TransactionStatus.CLEARED,
         splits: List<FinanceSplitDraft>,
     ) {
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = txDate,
             summary = summary,
             payee = payee,
@@ -672,7 +685,7 @@ class AbunAppController(
     }
 
     fun deleteFinanceTransaction(id: String) {
-        store.deleteFinanceTransaction(id)
+        store.financeLedgerStore.deleteFinanceTransaction(id)
         refresh()
     }
 
@@ -688,7 +701,7 @@ class AbunAppController(
         statementDay: Int? = null,
         dueDay: Int? = null,
     ) {
-        store.createFinanceAccount(
+        store.financeAccountStore.createFinanceAccount(
             path = path,
             name = name,
             category = category,
@@ -704,8 +717,20 @@ class AbunAppController(
     }
 
     fun deleteFinanceAccount(id: String) {
-        store.deleteFinanceAccount(id)
+        store.financeAccountStore.deleteFinanceAccount(id)
         refresh()
+    }
+
+    fun loadPredefinedFinanceAccounts() {
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        refresh()
+        requestSync()
+    }
+
+    fun resetFinanceToDefaultAccounts() {
+        store.financeAccountStore.resetFinanceToDefaultAccounts()
+        refresh()
+        requestSync()
     }
 
     fun autoPadAccountBalance(
@@ -713,7 +738,7 @@ class AbunAppController(
         actualBalanceMinor: Long,
         adjustmentDate: String = _state.value.selectedDate,
     ) {
-        store.autoPadAccountBalance(
+        store.financeAccountStore.autoPadAccountBalance(
             accountId = accountId,
             actualBalanceMinor = actualBalanceMinor,
             adjustmentDate = adjustmentDate,
@@ -729,7 +754,7 @@ class AbunAppController(
         statementCycle: String? = null,
         dueDate: String? = null,
     ) {
-        store.createFinanceClearingGroup(
+        store.financeLedgerStore.createFinanceClearingGroup(
             name = name,
             groupType = groupType,
             anchorCurrency = anchorCurrency,
@@ -756,7 +781,7 @@ class AbunAppController(
         recordInitialDisbursement: Boolean = false,
         existingDisbursementSplitId: String? = null,
     ): String {
-        val planId = store.createFinanceAmortizationPlan(
+        val planId = store.financeLedgerStore.createFinanceAmortizationPlan(
             name = name,
             principalMinor = principalMinor,
             currency = currency,
@@ -777,7 +802,7 @@ class AbunAppController(
     }
 
     fun deleteFinanceAmortizationPlan(id: String) {
-        store.deleteFinanceAmortizationPlan(id)
+        store.financeLedgerStore.deleteFinanceAmortizationPlan(id)
         refresh()
     }
 
@@ -787,7 +812,7 @@ class AbunAppController(
         repaymentDate: String = _state.value.selectedDate,
         amountMinor: Long? = null,
     ) {
-        val cg = store.financeClearingGroup(clearingGroupId) ?: return
+        val cg = store.financeLedgerStore.financeClearingGroup(clearingGroupId) ?: return
         val targetAccId = cg.targetAccountId ?: return
         val viewState = _state.value.financeView
         val cgItem = viewState.clearingGroups.find { it.group.id == clearingGroupId }
@@ -795,7 +820,7 @@ class AbunAppController(
         val repayAmt = amountMinor ?: debtMinor
         if (repayAmt <= 0L) return
 
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = repaymentDate,
             summary = "${cg.name} 还款",
             status = TransactionStatus.CLEARED,
@@ -819,7 +844,7 @@ class AbunAppController(
     }
 
     fun executeLoanTrancheRepayment(transactionId: String) {
-        val tx = store.financeTransaction(transactionId) ?: return
+        val tx = store.financeLedgerStore.financeTransaction(transactionId) ?: return
         if (tx.status != TransactionStatus.SCHEDULED) return
         val now = timeProvider.nowEpochMillis()
         val hlc = store.clock.next()
@@ -842,22 +867,22 @@ class AbunAppController(
         )
         val sourcePlanId = tx.sourcePlanId
         if (sourcePlanId != null) {
-            val plan = store.financeAmortizationPlan(sourcePlanId)
+            val plan = store.financeLedgerStore.financeAmortizationPlan(sourcePlanId)
             if (plan != null) {
-                store.refreshClearingGroupStatus(plan.lifecycleClearingGroupId, now)
+                store.financeLedgerStore.refreshClearingGroupStatus(plan.lifecycleClearingGroupId, now)
             }
         }
         refresh()
     }
 
     fun reassignSplitClearingGroup(splitId: String, oldGroupId: String, newGroupId: String) {
-        store.reassignSplitClearingGroup(splitId, oldGroupId, newGroupId)
+        store.financeLedgerStore.reassignSplitClearingGroup(splitId, oldGroupId, newGroupId)
         refresh()
     }
 
     fun setFinanceRunwayHorizon(horizonDays: Int) {
         _state.value = _state.value.copy(
-            financeView = store.deriveFinanceViewState(
+            financeView = store.financeViewDeriver.deriveFinanceViewState(
                 selectedFilter = _state.value.financeView.selectedFilter,
                 filterAccountId = _state.value.financeView.filterAccountId,
                 filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
@@ -876,7 +901,7 @@ class AbunAppController(
         currency: String = "CNY",
         includeInRunway: Boolean = true,
     ) {
-        store.createBudgetRule(
+        store.financeAccountStore.createBudgetRule(
             name = name,
             scopeType = scopeType,
             accountPrefix = accountPrefix,
@@ -889,7 +914,7 @@ class AbunAppController(
     }
 
     fun deleteBudgetRule(id: String) {
-        store.deleteBudgetRule(id)
+        store.financeAccountStore.deleteBudgetRule(id)
         refresh()
     }
 
@@ -900,6 +925,7 @@ class AbunAppController(
     }
 
     private suspend fun completeLogin(session: AuthSession) {
+        reconcileLocalStoreForUser(session.userId)
         loginPreferenceStore.setLoginOmitted(false)
         authSessionManager.completeLogin(session)
         _state.value = _state.value.copy(
@@ -925,6 +951,7 @@ class AbunAppController(
                 throw error
             }
         if (restored != null) {
+            reconcileLocalStoreForUser(restored.userId)
             _state.value = _state.value.copy(
                 auth = _state.value.auth.copy(
                     showGuide = false,
@@ -942,6 +969,20 @@ class AbunAppController(
         }
 
         transitionToGuest(showGuide = true)
+    }
+
+    private fun reconcileLocalStoreForUser(userId: String) {
+        val previousUserId = loginPreferenceStore.lastSyncedUserId()
+        val shouldReset = when {
+            previousUserId != null && previousUserId != userId -> true
+            previousUserId == null && store.hasPreviouslySyncedData() -> true
+            else -> false
+        }
+        if (shouldReset) {
+            store.resetForAccountSwitch()
+            refresh(lastSyncedAt = null)
+        }
+        loginPreferenceStore.setLastSyncedUserId(userId)
     }
 
     private fun transitionToGuest(showGuide: Boolean, authError: String? = null) {

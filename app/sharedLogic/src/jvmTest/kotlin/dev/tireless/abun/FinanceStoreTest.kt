@@ -1,38 +1,14 @@
 package dev.tireless.abun
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import dev.tireless.abun.app.DEFAULT_FIVE_FINANCE_ACCOUNTS
+import dev.tireless.abun.app.DEFAULT_FIVE_FINANCE_ACCOUNT_IDS
 import dev.tireless.abun.app.DeviceNodeIdProvider
 import dev.tireless.abun.app.FinanceSplitDraft
 import dev.tireless.abun.app.IdGenerator
 import dev.tireless.abun.app.LocalStore
 import dev.tireless.abun.app.TimeProvider
-import dev.tireless.abun.app.autoPadAccountBalance
-import dev.tireless.abun.app.clearingGroupsForSplit
-import dev.tireless.abun.app.createBudgetRule
-import dev.tireless.abun.app.createFinanceAccount
-import dev.tireless.abun.app.createFinanceAmortizationPlan
-import dev.tireless.abun.app.createFinanceClearingGroup
-import dev.tireless.abun.app.createFinanceTransaction
 import dev.tireless.abun.app.createHybridClock
-import dev.tireless.abun.app.deleteBudgetRule
-import dev.tireless.abun.app.deleteFinanceAccount
-import dev.tireless.abun.app.deleteFinanceAmortizationPlan
-import dev.tireless.abun.app.deleteFinanceTransaction
-import dev.tireless.abun.app.deriveFinanceViewState
-import dev.tireless.abun.app.financeAccount
-import dev.tireless.abun.app.financeAccounts
-import dev.tireless.abun.app.financeAmortizationPlan
-import dev.tireless.abun.app.financeAmortizationPlans
-import dev.tireless.abun.app.financeBudgetRule
-import dev.tireless.abun.app.financeBudgetRules
-import dev.tireless.abun.app.financeClearingGroup
-import dev.tireless.abun.app.financeSplitsForAccount
-import dev.tireless.abun.app.financeSplitsForTransaction
-import dev.tireless.abun.app.financeTransaction
-import dev.tireless.abun.app.financeTransactions
-import dev.tireless.abun.app.reassignSplitClearingGroup
-import dev.tireless.abun.app.seedDefaultFinanceAccountsIfEmpty
-import dev.tireless.abun.app.updateFinanceAccount
 import dev.tireless.abun.db.AbunDatabase
 import dev.tireless.abun.finance.AccountCategory
 import dev.tireless.abun.finance.AmortizationMethod
@@ -44,6 +20,7 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -78,27 +55,90 @@ class FinanceStoreTest {
     }
 
     @Test
-    fun `default starter accounts are seeded on store initialization`() {
+    fun `default mandatory five accounts are seeded on store initialization without budget rules`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
 
-        assertTrue(accounts.isNotEmpty())
+        assertEquals(5, accounts.size)
         val paths = accounts.map { it.path }
-        assertTrue(paths.contains("Assets:Bank:Default"))
-        assertTrue(paths.contains("Liabilities:CreditCard:Default"))
-        assertTrue(paths.contains("Liabilities:Loan:Default"))
-        assertTrue(paths.contains("Expenses:Food"))
-        assertTrue(paths.contains("Expenses:Housing"))
-        assertTrue(paths.contains("Expenses:Finance:Interest"))
-        assertTrue(paths.contains("Expenses:Adjustment:Unallocated"))
-        assertTrue(paths.contains("Income:Salary"))
+        assertTrue(paths.contains("Assets"))
+        assertTrue(paths.contains("Liabilities"))
+        assertTrue(paths.contains("Income"))
+        assertTrue(paths.contains("Expenses"))
+        assertTrue(paths.contains("Equity"))
+
+        val rules = store.financeAccountStore.financeBudgetRules()
+        assertTrue(rules.isEmpty())
+        assertTrue(store.financeAccountStore.canLoadPredefinedFinanceAccounts())
+    }
+
+    @Test
+    fun `loadPredefinedFinanceAccounts is only allowed when only Default 5 exist`() {
+        val store = createTestStore()
+        assertTrue(store.financeAccountStore.canLoadPredefinedFinanceAccounts())
+
+        assertTrue(store.financeAccountStore.loadPredefinedFinanceAccounts())
+        val accounts = store.financeAccountStore.financeAccounts()
+        assertEquals(13, accounts.size) // 5 root + 8 sub-accounts
+        assertFalse(store.financeAccountStore.canLoadPredefinedFinanceAccounts())
+
+        // Calling again returns false because sub-accounts already exist
+        assertFalse(store.financeAccountStore.loadPredefinedFinanceAccounts())
+    }
+
+    @Test
+    fun `resetFinanceToDefaultAccounts erases sub-accounts and records back to Default 5`() {
+        val store = createTestStore()
+        assertTrue(store.financeAccountStore.loadPredefinedFinanceAccounts())
+        assertFalse(store.financeAccountStore.canLoadPredefinedFinanceAccounts())
+
+        store.financeLedgerStore.createFinanceTransaction(
+            txDate = "2026-05-25",
+            summary = "Test expense",
+            splits = listOf(
+                FinanceSplitDraft(accountId = "acc-expenses-food", amountMinor = 5000L),
+                FinanceSplitDraft(accountId = "acc-assets-bank-default", amountMinor = -5000L),
+            ),
+        )
+        store.financeAccountStore.createBudgetRule(
+            name = "Test rule",
+            scopeType = dev.tireless.abun.finance.BudgetScopeType.GLOBAL_DISCRETIONARY,
+            monthlyLimitMinor = 100000L,
+        )
+
+        assertEquals(13, store.financeAccountStore.financeAccounts().size)
+        assertEquals(1, store.financeLedgerStore.financeTransactions().size)
+        assertEquals(1, store.financeAccountStore.financeBudgetRules().size)
+
+        store.financeAccountStore.resetFinanceToDefaultAccounts()
+
+        val resetAccounts = store.financeAccountStore.financeAccounts()
+        assertEquals(5, resetAccounts.size)
+        assertEquals(DEFAULT_FIVE_FINANCE_ACCOUNT_IDS, resetAccounts.map { it.id }.toSet())
+        assertTrue(store.financeLedgerStore.financeTransactions().isEmpty())
+        assertTrue(store.financeAccountStore.financeBudgetRules().isEmpty())
+        assertTrue(store.financeAccountStore.canLoadPredefinedFinanceAccounts())
+
+        // Predefined sub-accounts can be loaded again
+        assertTrue(store.financeAccountStore.loadPredefinedFinanceAccounts())
+        assertEquals(13, store.financeAccountStore.financeAccounts().size)
+    }
+
+    @Test
+    fun `default mandatory five accounts cannot be deleted`() {
+        val store = createTestStore()
+        for (acc in DEFAULT_FIVE_FINANCE_ACCOUNTS) {
+            store.financeAccountStore.deleteFinanceAccount(acc.id)
+            assertNotNull(store.financeAccountStore.financeAccount(acc.id))
+        }
+        assertEquals(5, store.financeAccountStore.financeAccounts().size)
     }
 
     @Test
     fun `account lifecycle create update and delete`() {
         val store = createTestStore()
 
-        val accId = store.createFinanceAccount(
+        val accId = store.financeAccountStore.createFinanceAccount(
             path = "Assets:Crypto:ColdWallet",
             name = "冷钱包",
             category = AccountCategory.ASSET,
@@ -108,13 +148,13 @@ class FinanceStoreTest {
             liquidTier = LiquidTier.SEMI_LIQUID,
         )
 
-        val created = store.financeAccount(accId)
+        val created = store.financeAccountStore.financeAccount(accId)
         assertNotNull(created)
         assertEquals("冷钱包", created.name)
         assertEquals("USD", created.currency)
         assertEquals(LiquidTier.SEMI_LIQUID, created.liquidTier)
 
-        store.updateFinanceAccount(
+        store.financeAccountStore.updateFinanceAccount(
             id = accId,
             path = "Assets:Crypto:ColdWallet",
             name = "硬件冷钱包",
@@ -129,25 +169,26 @@ class FinanceStoreTest {
             isArchived = false,
         )
 
-        val updated = store.financeAccount(accId)
+        val updated = store.financeAccountStore.financeAccount(accId)
         assertNotNull(updated)
         assertEquals("硬件冷钱包", updated.name)
         assertEquals(LiquidTier.ILLIQUID, updated.liquidTier)
 
-        store.deleteFinanceAccount(accId)
-        assertNull(store.financeAccount(accId))
+        store.financeAccountStore.deleteFinanceAccount(accId)
+        assertNull(store.financeAccountStore.financeAccount(accId))
     }
 
     @Test
     fun `creating transaction validates zero sum balance and inserts splits atomically`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
         val food = accounts.first { it.path == "Expenses:Food" }
 
         // Unbalanced transaction should fail
         assertFailsWith<IllegalArgumentException> {
-            store.createFinanceTransaction(
+            store.financeLedgerStore.createFinanceTransaction(
                 txDate = "2026-11-05",
                 summary = "Unbalanced",
                 status = TransactionStatus.CLEARED,
@@ -159,7 +200,7 @@ class FinanceStoreTest {
         }
 
         // Balanced transaction succeeds
-        val txId = store.createFinanceTransaction(
+        val txId = store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-11-05",
             summary = "Dinner",
             payee = "Restaurant",
@@ -170,12 +211,12 @@ class FinanceStoreTest {
             ),
         )
 
-        val tx = store.financeTransaction(txId)
+        val tx = store.financeLedgerStore.financeTransaction(txId)
         assertNotNull(tx)
         assertEquals("Dinner", tx.summary)
         assertEquals("Restaurant", tx.payee)
 
-        val splits = store.financeSplitsForTransaction(txId)
+        val splits = store.financeLedgerStore.financeSplitsForTransaction(txId)
         assertEquals(2, splits.size)
         assertEquals(-5000L, splits[0].amountMinor)
         assertEquals(5000L, splits[1].amountMinor)
@@ -186,18 +227,19 @@ class FinanceStoreTest {
     @Test
     fun `clearing group auto updates status to settled upon full repayment`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
         val loan = accounts.first { it.path == "Liabilities:Loan:Default" }
 
-        val groupId = store.createFinanceClearingGroup(
+        val groupId = store.financeLedgerStore.createFinanceClearingGroup(
             name = "装修贷平账测试",
             groupType = ClearingGroupType.LOAN_LIFECYCLE,
             anchorCurrency = "CNY",
         )
 
         // 1. Initial borrowing: Bank +10,000, Loan -10,000
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-01-01",
             summary = "Borrow loan",
             splits = listOf(
@@ -206,12 +248,12 @@ class FinanceStoreTest {
             ),
         )
 
-        val groupAfterBorrow = store.financeClearingGroup(groupId)
+        val groupAfterBorrow = store.financeLedgerStore.financeClearingGroup(groupId)
         assertNotNull(groupAfterBorrow)
         assertEquals(ClearingGroupStatus.ACTIVE, groupAfterBorrow.status)
 
         // 2. Full repayment: Bank -10,000, Loan +10,000
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-02-01",
             summary = "Repay loan",
             splits = listOf(
@@ -220,7 +262,7 @@ class FinanceStoreTest {
             ),
         )
 
-        val groupAfterRepay = store.financeClearingGroup(groupId)
+        val groupAfterRepay = store.financeLedgerStore.financeClearingGroup(groupId)
         assertNotNull(groupAfterRepay)
         assertEquals(ClearingGroupStatus.SETTLED, groupAfterRepay.status)
         assertNotNull(groupAfterRepay.settledAt)
@@ -229,12 +271,13 @@ class FinanceStoreTest {
     @Test
     fun `autoPadAccountBalance creates adjustment transaction when drift exists`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
         val food = accounts.first { it.path == "Expenses:Food" }
 
         // Initial deposit and spending
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-11-01",
             summary = "Salary deposit",
             splits = listOf(
@@ -242,7 +285,7 @@ class FinanceStoreTest {
                 FinanceSplitDraft(accountId = accounts.first { it.path == "Income:Salary" }.id, amountMinor = -1000000L),
             ),
         )
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-11-02",
             summary = "Lunch",
             splits = listOf(
@@ -252,7 +295,7 @@ class FinanceStoreTest {
         )
 
         // If actual balance is 9,500 (300 missing/unrecorded)
-        val padTxId = store.autoPadAccountBalance(
+        val padTxId = store.financeAccountStore.autoPadAccountBalance(
             accountId = bank.id,
             actualBalanceMinor = 950000L,
             adjustmentDate = "2026-11-05",
@@ -260,12 +303,12 @@ class FinanceStoreTest {
         assertNotNull(padTxId)
 
         // Verify account balance now matches exactly 9,500
-        val splits = store.financeSplitsForAccount(bank.id)
+        val splits = store.financeLedgerStore.financeSplitsForAccount(bank.id)
         val newBalance = splits.sumOf { it.amountMinor }
         assertEquals(950000L, newBalance)
 
         // Re-running auto-pad when already balanced returns null
-        val noOpPad = store.autoPadAccountBalance(
+        val noOpPad = store.financeAccountStore.autoPadAccountBalance(
             accountId = bank.id,
             actualBalanceMinor = 950000L,
             adjustmentDate = "2026-11-05",
@@ -276,11 +319,12 @@ class FinanceStoreTest {
     @Test
     fun `deriveFinanceViewState and deleteFinanceTransaction lifecycle`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
         val food = accounts.first { it.path == "Expenses:Food" }
 
-        val txId = store.createFinanceTransaction(
+        val txId = store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-11-05",
             summary = "Lunch",
             payee = "Subway",
@@ -290,7 +334,7 @@ class FinanceStoreTest {
             ),
         )
 
-        val viewState = store.deriveFinanceViewState()
+        val viewState = store.financeViewDeriver.deriveFinanceViewState()
         assertEquals(1, viewState.transactions.size)
         val txView = viewState.transactions.first()
         assertEquals("Subway", txView.transaction.payee)
@@ -300,27 +344,28 @@ class FinanceStoreTest {
         assertTrue(txView.beancountText.contains("Expenses:Food"))
 
         // Delete transaction
-        store.deleteFinanceTransaction(txId)
-        assertNull(store.financeTransaction(txId))
+        store.financeLedgerStore.deleteFinanceTransaction(txId)
+        assertNull(store.financeLedgerStore.financeTransaction(txId))
 
-        val updatedViewState = store.deriveFinanceViewState()
+        val updatedViewState = store.financeViewDeriver.deriveFinanceViewState()
         assertEquals(0, updatedViewState.transactions.size)
     }
 
     @Test
     fun `credit card statement auto-binding refund reduction and repayment settling`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val card = accounts.first { it.path == "Liabilities:CreditCard:Default" }
         val food = accounts.first { it.path == "Expenses:Food" }
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
 
-        // Card has statementDay = 5, dueDay = 25
-        assertEquals(5, card.statementDay)
-        assertEquals(25, card.dueDay)
+        // Card has statementDay = 15, dueDay = 5
+        assertEquals(15, card.statementDay)
+        assertEquals(5, card.dueDay)
 
         // Purchase 1 on May 4: -50.00 CNY (5000 minor units) on card, +50.00 CNY on food
-        val tx1Id = store.createFinanceTransaction(
+        val tx1Id = store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-05-04",
             summary = "Dinner",
             status = TransactionStatus.CLEARED,
@@ -331,17 +376,17 @@ class FinanceStoreTest {
         )
 
         // Verify credit card split automatically bound to 2026-05 statement group
-        val tx1Splits = store.financeSplitsForTransaction(tx1Id)
+        val tx1Splits = store.financeLedgerStore.financeSplitsForTransaction(tx1Id)
         val cardSplit1 = tx1Splits.first { it.accountId == card.id }
-        val cgs1 = store.clearingGroupsForSplit(cardSplit1.id)
+        val cgs1 = store.financeLedgerStore.clearingGroupsForSplit(cardSplit1.id)
         assertEquals(1, cgs1.size)
         val stmtGroup = cgs1.first()
         assertEquals("cg-stmt:${card.id}:2026-05", stmtGroup.id)
         assertEquals("2026-05", stmtGroup.statementCycle)
-        assertEquals("2026-05-25", stmtGroup.dueDate)
+        assertEquals("2026-06-05", stmtGroup.dueDate)
 
         // Purchase 2 on May 4: -30.00 CNY on card
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-05-04",
             summary = "Groceries",
             status = TransactionStatus.CLEARED,
@@ -352,7 +397,7 @@ class FinanceStoreTest {
         )
 
         // Refund on May 5: +20.00 CNY refund on card (reducing debt to -60.00 CNY)
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-05-05",
             summary = "Grocery Refund",
             status = TransactionStatus.CLEARED,
@@ -363,13 +408,13 @@ class FinanceStoreTest {
         )
 
         // View state evaluates group balance to -60.00 CNY (-6000 minor)
-        val midViewState = store.deriveFinanceViewState()
+        val midViewState = store.financeViewDeriver.deriveFinanceViewState()
         val stmtViewItem = midViewState.clearingGroups.first { it.group.id == stmtGroup.id }
         assertEquals(-6000L, stmtViewItem.evaluation.realizedBalance)
         assertEquals(ClearingGroupStatus.ACTIVE, stmtViewItem.evaluation.derivedStatus)
 
         // Repay remaining 60.00 CNY from bank to card on May 20
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-05-20",
             summary = "Statement Repayment",
             status = TransactionStatus.CLEARED,
@@ -380,7 +425,7 @@ class FinanceStoreTest {
         )
 
         // Verify statement clearing group is now Settled with 0 balance!
-        val settledViewState = store.deriveFinanceViewState()
+        val settledViewState = store.financeViewDeriver.deriveFinanceViewState()
         val settledStmt = settledViewState.clearingGroups.first { it.group.id == stmtGroup.id }
         assertEquals(0L, settledStmt.evaluation.realizedBalance)
         assertEquals(ClearingGroupStatus.SETTLED, settledStmt.evaluation.derivedStatus)
@@ -389,12 +434,13 @@ class FinanceStoreTest {
     @Test
     fun `reassignSplitClearingGroup shifts split to next statement cycle`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val card = accounts.first { it.path == "Liabilities:CreditCard:Default" }
         val food = accounts.first { it.path == "Expenses:Food" }
 
         // Transaction on May 5 automatically bound to 2026-05 cycle
-        val txId = store.createFinanceTransaction(
+        val txId = store.financeLedgerStore.createFinanceTransaction(
             txDate = "2026-05-05",
             summary = "Late posted meal",
             status = TransactionStatus.CLEARED,
@@ -404,12 +450,12 @@ class FinanceStoreTest {
             ),
         )
 
-        val cardSplit = store.financeSplitsForTransaction(txId).first { it.accountId == card.id }
-        val oldGroup = store.clearingGroupsForSplit(cardSplit.id).first()
+        val cardSplit = store.financeLedgerStore.financeSplitsForTransaction(txId).first { it.accountId == card.id }
+        val oldGroup = store.financeLedgerStore.clearingGroupsForSplit(cardSplit.id).first()
         assertEquals("cg-stmt:${card.id}:2026-05", oldGroup.id)
 
         // Manually create / shift to June statement group
-        val juneGroupId = store.createFinanceClearingGroup(
+        val juneGroupId = store.financeLedgerStore.createFinanceClearingGroup(
             name = "${card.name} 2026-06 账单",
             groupType = ClearingGroupType.CREDIT_STATEMENT,
             anchorCurrency = "CNY",
@@ -418,19 +464,19 @@ class FinanceStoreTest {
             dueDate = "2026-06-25",
         )
 
-        store.reassignSplitClearingGroup(
+        store.financeLedgerStore.reassignSplitClearingGroup(
             splitId = cardSplit.id,
             oldGroupId = oldGroup.id,
             newGroupId = juneGroupId,
         )
 
         // Verify split is now bound to June statement group
-        val newCgs = store.clearingGroupsForSplit(cardSplit.id)
+        val newCgs = store.financeLedgerStore.clearingGroupsForSplit(cardSplit.id)
         assertEquals(1, newCgs.size)
         assertEquals(juneGroupId, newCgs.first().id)
 
         // Verify old group balance is now 0 and June group has -4000L
-        val viewState = store.deriveFinanceViewState()
+        val viewState = store.financeViewDeriver.deriveFinanceViewState()
         val oldGroupItem = viewState.clearingGroups.first { it.group.id == oldGroup.id }
         val juneGroupItem = viewState.clearingGroups.first { it.group.id == juneGroupId }
         assertEquals(0L, oldGroupItem.evaluation.realizedBalance)
@@ -440,11 +486,12 @@ class FinanceStoreTest {
     @Test
     fun `amortization plan generates schedule and balances to principal`() {
         val store = createTestStore()
-        val accounts = store.financeAccounts()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
         val bank = accounts.first { it.path == "Assets:Bank:Default" }
         val interest = accounts.first { it.path == "Expenses:Finance:Interest" }
 
-        val loanId = store.createFinanceAccount(
+        val loanId = store.financeAccountStore.createFinanceAccount(
             path = "Liabilities:Loan:Consumer",
             name = "个人信用贷",
             category = AccountCategory.LIABILITY,
@@ -452,7 +499,7 @@ class FinanceStoreTest {
         )
 
         // Create 12-month equal principal plan for 12,000 CNY (1,200,000 minor)
-        val planId = store.createFinanceAmortizationPlan(
+        val planId = store.financeLedgerStore.createFinanceAmortizationPlan(
             name = "装修消费贷",
             principalMinor = 1200000L,
             totalPeriods = 12,
@@ -466,18 +513,18 @@ class FinanceStoreTest {
             recordInitialDisbursement = true,
         )
 
-        val plan = store.financeAmortizationPlan(planId)
+        val plan = store.financeLedgerStore.financeAmortizationPlan(planId)
         assertNotNull(plan)
         assertEquals("装修消费贷", plan.name)
         assertEquals(12, plan.totalPeriods)
 
         // Verify initial disbursement transaction created
-        val txs = store.financeTransactions().filter { it.sourcePlanId == planId }
+        val txs = store.financeLedgerStore.financeTransactions().filter { it.sourcePlanId == planId }
         assertEquals(13, txs.size) // 1 disbursement + 12 scheduled
 
         val disbursementTx = txs.first { it.periodIndex == 0 }
         assertEquals(TransactionStatus.CLEARED, disbursementTx.status)
-        val disbSplits = store.financeSplitsForTransaction(disbursementTx.id)
+        val disbSplits = store.financeLedgerStore.financeSplitsForTransaction(disbursementTx.id)
         val bankDisb = disbSplits.first { it.accountId == bank.id }
         val loanDisb = disbSplits.first { it.accountId == loanId }
         assertEquals(1200000L, bankDisb.amountMinor)
@@ -489,7 +536,7 @@ class FinanceStoreTest {
         var totalPrincipal = 0L
         for (stx in scheduledTxs) {
             assertEquals(TransactionStatus.SCHEDULED, stx.status)
-            val splits = store.financeSplitsForTransaction(stx.id)
+            val splits = store.financeLedgerStore.financeSplitsForTransaction(stx.id)
             val pSplit = splits.first { it.accountId == loanId }
             totalPrincipal += pSplit.amountMinor
             // Verify each scheduled transaction balances to 0
@@ -499,20 +546,20 @@ class FinanceStoreTest {
         assertEquals(1200000L, totalPrincipal)
 
         // Verify clearing group tracking
-        val clearingGroup = store.financeClearingGroup(plan.lifecycleClearingGroupId)
+        val clearingGroup = store.financeLedgerStore.financeClearingGroup(plan.lifecycleClearingGroupId)
         assertNotNull(clearingGroup)
         assertEquals(ClearingGroupType.LOAN_LIFECYCLE, clearingGroup.groupType)
 
         // Initial realized balance should be -12,000.00
-        val viewStateInitial = store.deriveFinanceViewState()
+        val viewStateInitial = store.financeViewDeriver.deriveFinanceViewState()
         val cgItem = viewStateInitial.clearingGroups.first { it.group.id == clearingGroup.id }
         assertEquals(-1200000L, cgItem.evaluation.realizedBalance)
         assertEquals(0L, cgItem.evaluation.projectedBalance) // -12,000 + 12,000 scheduled = 0!
 
         // Delete plan cleans up scheduled tranches and marks plan deleted
-        store.deleteFinanceAmortizationPlan(planId)
-        assertNull(store.financeAmortizationPlan(planId))
-        val remainingTxs = store.financeTransactions().filter { it.sourcePlanId == planId }
+        store.financeLedgerStore.deleteFinanceAmortizationPlan(planId)
+        assertNull(store.financeLedgerStore.financeAmortizationPlan(planId))
+        val remainingTxs = store.financeLedgerStore.financeTransactions().filter { it.sourcePlanId == planId }
         // Disbursement tx is CLEARED so kept, SCHEDULED txs are deleted
         assertEquals(1, remainingTxs.size)
         assertEquals(0, remainingTxs.first().periodIndex)
@@ -521,14 +568,15 @@ class FinanceStoreTest {
     @Test
     fun `budget rule lifecycle and runway derivation in view state`() {
         val store = createTestStore()
-        store.seedDefaultFinanceAccountsIfEmpty()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        store.financeAccountStore.seedDefaultBudgetRuleIfEmpty()
 
-        val rules = store.financeBudgetRules()
+        val rules = store.financeAccountStore.financeBudgetRules()
         assertEquals(1, rules.size)
         assertEquals("日常支出护栏", rules.first().name)
         assertEquals(dev.tireless.abun.finance.BudgetScopeType.GLOBAL_DISCRETIONARY, rules.first().scopeType)
 
-        val foodRule = store.createBudgetRule(
+        val foodRule = store.financeAccountStore.createBudgetRule(
             name = "餐饮专项",
             scopeType = dev.tireless.abun.finance.BudgetScopeType.ACCOUNT_SUBTREE,
             accountPrefix = "Expenses:Food",
@@ -536,17 +584,17 @@ class FinanceStoreTest {
             currency = "CNY",
             includeInRunway = false,
         )
-        assertEquals(2, store.financeBudgetRules().size)
+        assertEquals(2, store.financeAccountStore.financeBudgetRules().size)
 
         // Initial view state
-        val initialView = store.deriveFinanceViewState()
+        val initialView = store.financeViewDeriver.deriveFinanceViewState()
         assertEquals(2, initialView.budgetEvaluations.size)
         assertNotNull(initialView.runwayProjection30)
         assertNotNull(initialView.runwayProjection90)
 
         // Record an expense of 200 CNY in Expenses:Food
         val today = "2026-05-25"
-        store.createFinanceTransaction(
+        store.financeLedgerStore.createFinanceTransaction(
             txDate = today,
             summary = "Lunch with team",
             splits = listOf(
@@ -555,7 +603,7 @@ class FinanceStoreTest {
             ),
         )
 
-        val updatedView = store.deriveFinanceViewState()
+        val updatedView = store.financeViewDeriver.deriveFinanceViewState()
         val globalEval = updatedView.budgetEvaluations.first { it.rule.scopeType == dev.tireless.abun.finance.BudgetScopeType.GLOBAL_DISCRETIONARY }
         val foodEval = updatedView.budgetEvaluations.first { it.rule.id == foodRule.id }
 
@@ -565,8 +613,8 @@ class FinanceStoreTest {
         assertEquals(130000L, foodEval.evaluation.remainingMinor)
 
         // Delete custom budget rule
-        store.deleteBudgetRule(foodRule.id)
-        assertNull(store.financeBudgetRule(foodRule.id))
-        assertEquals(1, store.financeBudgetRules().size)
+        store.financeAccountStore.deleteBudgetRule(foodRule.id)
+        assertNull(store.financeAccountStore.financeBudgetRule(foodRule.id))
+        assertEquals(1, store.financeAccountStore.financeBudgetRules().size)
     }
 }

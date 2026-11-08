@@ -43,6 +43,8 @@ interface LoginPreferenceStore {
     fun authSession(): AuthSession?
     fun setAuthSession(session: AuthSession)
     fun clearAuthSession()
+    fun lastSyncedUserId(): String? = null
+    fun setLastSyncedUserId(userId: String?) {}
     fun isAutoUpdateEnabled(): Boolean = true
     fun setAutoUpdateEnabled(enabled: Boolean) {}
 }

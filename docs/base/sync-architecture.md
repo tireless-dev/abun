@@ -90,6 +90,12 @@ Sync and direct business calls now have an auth precondition:
 
 This guest fallback is an auth-state transition only. It does not delete local task data or reset local SQLite state.
 
+When an authenticated session is established (via OTP verification or startup restore), the client reconciles local SQLite state against `lastSyncedUserId` persisted in platform preferences:
+
+- **First login from pure Guest mode** (`lastSyncedUserId == null` and no local rows have `server_version > 0`): local dirty rows are preserved and pushed into the newly authenticated account during the initial sync cycle.
+- **Re-login as the same user** (`lastSyncedUserId == session.userId`): existing synced and offline dirty rows are preserved and synced incrementally.
+- **Account switch or legacy unattributed synced rows** (`lastSyncedUserId != session.userId`, or `lastSyncedUserId == null` while local SQLite contains already-synced `server_version > 0` records): local SQLite tables are cleared, default starter accounts/rules are re-seeded, and all `sync_state` cursors reset to `0` before pulling the authenticated user's data.
+
 ### Business APIs
 
 Used by direct-access or non-local-first clients:

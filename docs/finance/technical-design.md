@@ -279,6 +279,18 @@ WHERE cg.id = :groupId;
 - For `CreditStatement`:
   - Transitions to `'Settled'` when `realized_balance == 0` AND (`today > statement_closing_date` OR an explicit repayment split `+amount` is present).
 
+### 4. Account Presets, Invariants & Reset to Default 5
+- **Default 5 Invariant**: The module enforces that the 5 foundational root accounts (`DEFAULT_FIVE_FINANCE_ACCOUNTS`: `Assets`, `Liabilities`, `Income`, `Expenses`, `Equity`) are automatically created via `ensureDefaultFinanceAccounts()` when the Finance module is enabled or during account switches. They are seeded with `is_dirty = 0L` to prevent unwanted sync pushes on fresh installs.
+- **Deletion Protection**: `deleteFinanceAccount(id)` strictly rejects deletion of any account whose ID is in `DEFAULT_FIVE_FINANCE_ACCOUNT_IDS`, preserving the root tree hierarchy.
+- **Predefined Sub-Accounts Loading**:
+  - `canLoadPredefinedFinanceAccounts()` queries SQLite to verify that active accounts consist strictly of the basic 5 root accounts and that no active records (`finance_transaction`, `finance_split`, `finance_clearing_group`, `finance_amortization_plan`, or `finance_budget_rule`) exist.
+  - `loadPredefinedFinanceAccounts()` guards on `canLoadPredefinedFinanceAccounts()`, ensures the Default 5 exist, and upserts the 8 standard starter sub-accounts (`PREDEFINED_FINANCE_SUB_ACCOUNTS`) with `is_dirty = 1L` and dirty fields tracking so they sync to the server when connected.
+- **Reset to Default 5**:
+  - `resetFinanceToDefaultAccounts()` safely resets the ledger to the baseline Default 5 roots:
+    - Synced entities (`server_version > 0`) across non-default accounts, splits, transactions, clearing groups, amortization plans, budget rules, and exchange rates are marked soft-deleted (`is_deleted = 1L`, `is_dirty = 1L`, `dirty_fields = ["deleted"]`, HLC updated) to propagate tombstones to the backend during next sync.
+    - Local-only entities (`server_version == 0`) are deleted directly from SQLite.
+    - Ensures Default 5 accounts are active (`is_deleted = 0L`), restoring `canLoadPredefinedFinanceAccounts() == true`.
+
 ---
 
 ## Sync Rules
@@ -301,11 +313,11 @@ To respect foreign-key dependencies during pull-then-push sync, extend [`SyncEng
 
 ---
 
-## Implementation Status (Reviewed 2026-11-06)
+## Implementation Status (Reviewed 2026-11-08)
 
 - **Phase 1 Complete (Double-Entry Core & Clearing Engine)**:
   - Pure arithmetic, ISO 4217 scales, cross-currency balancing weights (`weight_amount_minor`, `weight_currency`), validation logic (`FinanceValidators`), and clearing group evaluation (`ClearingGroupEvaluator`) implemented in `core`.
-  - Local SQLDelight tables (`finance_account`, `finance_exchange_rate`, `finance_transaction`, `finance_split`, `finance_clearing_group`, `finance_split_clearing_group`) and atomic transactions (`FinanceStore.kt`) implemented and tested on JVM SQLite.
+  - Local SQLDelight tables (`finance_account`, `finance_exchange_rate`, `finance_transaction`, `finance_split`, `finance_clearing_group`, `finance_split_clearing_group`) and atomic transactions partitioned into modular sub-stores (`FinanceAccountStore`, `FinanceLedgerStore`, `FinanceViewDeriver`, `FinanceSyncStore` on `LocalStore`) implemented and tested on JVM SQLite.
   - UI layer (`app/sharedUI`) complete with top-level `Finance` navigation destination, `FinanceLedgerScreen` (Standard view & Beancount plain-text ledger view), `CreateFinanceTransactionSheet` (fast 2-split and expandable multi-split with auto-balance calculation), and `FinanceAccountsSheet` (account grouping and Auto-Pad reconciliation).
 
 - **Phase 2 Complete (Credit Card Statements, Combined Repayments & Installment Generator)**:
@@ -323,4 +335,10 @@ To respect foreign-key dependencies during pull-then-push sync, extend [`SyncEng
   - Cloudflare Worker D1/in-memory sync services (`workers/api/src/services/finance-sync-services.ts`) and HTTP routes (`/api/sync/finance-*`).
   - Client-side `SyncEngine.kt`, `SyncRemoteApi.kt`, and `FinanceSyncStore.kt` orchestrating topological pull and push sync with field-level HLC conflict resolution.
   - Loan Prepayment Optimizer (`LoanPrepaymentOptimizer`) simulating early payoff impacts comparing Term Reduction vs. Installment Reduction strategies.
+
+- **Phase 5 Complete (Account Presets, Default 5 Invariant & Reset Lifecycle)**:
+  - Clean initialization: eliminated automatic seeding of sample sub-accounts and default budget rules, keeping initial ledger pristine.
+  - Hardened Default 5 mandatory root accounts (`Assets`, `Liabilities`, `Income`, `Expenses`, `Equity`) with deletion protection.
+  - Implemented `canLoadPredefinedFinanceAccounts()`, `loadPredefinedFinanceAccounts()`, and `resetFinanceToDefaultAccounts()` with soft-delete tombstones for synced records and instant reset for local data.
+  - Added Settings UI panel (`settings-panel-finance-presets`) with status indicators and action buttons for one-click preset loading and complete reset to Default 5.
   - 100% test passing across `:core:jvmTest`, `:app:sharedLogic:jvmTest`, `:app:sharedUI:jvmTest`, `:app:desktopApp:test`, `npm run api:test`, `npm run api:typecheck`, and `npm run test:web`.

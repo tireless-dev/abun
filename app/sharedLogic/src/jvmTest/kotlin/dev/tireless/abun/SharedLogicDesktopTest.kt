@@ -148,12 +148,12 @@ class SharedLogicDesktopTest {
         val store = testStore()
         val date = "2026-05-25"
 
-        val taskId = store.createTask("Plan sync client", date)
-        store.progressTask(taskId, date, "Started wiring persistence")
-        store.completeTask(taskId, date, "Finished first pass")
+        val taskId = store.taskStore.createTask("Plan sync client", date)
+        store.taskStore.progressTask(taskId, date, "Started wiring persistence")
+        store.taskStore.completeTask(taskId, date, "Finished first pass")
 
-        val tasks = store.allTasks()
-        val journal = store.journal(date)
+        val tasks = store.taskStore.allTasks()
+        val journal = store.taskStore.journal(date)
 
         assertEquals(1, tasks.size)
         assertEquals(TaskStatus.COMPLETED, tasks.single().status)
@@ -164,7 +164,7 @@ class SharedLogicDesktopTest {
     fun `create task persists planning window fields and detail in sync payload`() {
         val store = testStore()
 
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Plan sync client",
             journalDate = "2026-05-25",
             detail = "Break the migration into thin slices",
@@ -173,7 +173,7 @@ class SharedLogicDesktopTest {
             estimatedDuration = "PT2H",
         )
 
-        val dirtyTask = store.dirtyTasks().single { it.id == taskId }
+        val dirtyTask = store.taskSyncStore.dirtyTasks().single { it.id == taskId }
 
         assertEquals("Break the migration into thin slices", dirtyTask.detail)
         assertEquals("2026-05-26T09:00:00Z", dirtyTask.startNotBefore)
@@ -188,10 +188,10 @@ class SharedLogicDesktopTest {
     @Test
     fun `update task persists editable detail planning window and parent fields`() {
         val store = testStore()
-        val parentId = store.createTask(title = "Parent task", journalDate = "2026-05-24")
-        val taskId = store.createTask(title = "Draft task", journalDate = "2026-05-25")
+        val parentId = store.taskStore.createTask(title = "Parent task", journalDate = "2026-05-24")
+        val taskId = store.taskStore.createTask(title = "Draft task", journalDate = "2026-05-25")
 
-        store.updateTask(
+        store.taskStore.updateTask(
             taskId = taskId,
             title = "Refined task",
             detail = "Add implementation notes",
@@ -201,8 +201,8 @@ class SharedLogicDesktopTest {
             estimatedDuration = "PT45M",
         )
 
-        val task = store.allTasks().single { it.id == taskId }
-        val dirtyTask = store.dirtyTasks().single { it.id == taskId }
+        val task = store.taskStore.allTasks().single { it.id == taskId }
+        val dirtyTask = store.taskSyncStore.dirtyTasks().single { it.id == taskId }
 
         assertEquals("Refined task", task.title)
         assertEquals("Add implementation notes", task.detail)
@@ -220,11 +220,11 @@ class SharedLogicDesktopTest {
     fun `backlog tasks stay out of day open tasks until scheduled`() {
         val store = testStore()
 
-        val backlogId = store.createTask(
+        val backlogId = store.taskStore.createTask(
             title = "Unscheduled idea",
             journalDate = "2026-05-25",
         )
-        val scheduledId = store.createTask(
+        val scheduledId = store.taskStore.createTask(
             title = "Windowed work",
             journalDate = "2026-05-25",
             startNotBefore = "2026-05-26T09:00:00Z",
@@ -232,9 +232,9 @@ class SharedLogicDesktopTest {
             estimatedDuration = "PT4H",
         )
 
-        val backlog = store.backlogTasks()
-        val may25OpenTasks = store.openTasksForDate("2026-05-25")
-        val may26OpenTasks = store.openTasksForDate("2026-05-26")
+        val backlog = store.taskStore.backlogTasks()
+        val may25OpenTasks = store.taskStore.openTasksForDate("2026-05-25")
+        val may26OpenTasks = store.taskStore.openTasksForDate("2026-05-26")
 
         assertEquals(listOf(backlogId), backlog.map { it.id })
         assertTrue(may25OpenTasks.none { it.id == backlogId })
@@ -254,17 +254,17 @@ class SharedLogicDesktopTest {
             },
         )
 
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Soon deleted task",
             journalDate = "2026-05-24",
             startNotBefore = "2026-05-24T09:00:00Z",
         )
 
-        store.deleteTask(taskId, "2026-05-25")
+        store.taskStore.deleteTask(taskId, "2026-05-25")
 
-        val beforeDeletion = store.openTasksForDate("2026-05-24")
-        val onDeletionDate = store.openTasksForDate("2026-05-25")
-        val afterDeletion = store.openTasksForDate("2026-05-26")
+        val beforeDeletion = store.taskStore.openTasksForDate("2026-05-24")
+        val onDeletionDate = store.taskStore.openTasksForDate("2026-05-25")
+        val afterDeletion = store.taskStore.openTasksForDate("2026-05-26")
 
         assertEquals(listOf(taskId), beforeDeletion.map { it.id })
         assertTrue(onDeletionDate.none { it.id == taskId })
@@ -274,15 +274,15 @@ class SharedLogicDesktopTest {
     @Test
     fun `delete task appends deleted event for day timeline history`() {
         val store = testStore()
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Delete me later",
             journalDate = "2026-05-24",
             startNotBefore = "2026-05-24T09:00:00Z",
         )
 
-        store.deleteTask(taskId, "2026-05-25")
+        store.taskStore.deleteTask(taskId, "2026-05-25")
 
-        val journal = store.journal("2026-05-25")
+        val journal = store.taskStore.journal("2026-05-25")
 
         assertTrue(journal.any { it.taskId == taskId && it.eventType == TaskEventType.DELETED })
     }
@@ -290,12 +290,12 @@ class SharedLogicDesktopTest {
     @Test
     fun `task history returns visible business events across all days`() {
         val store = testStore()
-        val taskId = store.createTask(title = "History task", journalDate = "2026-05-24")
+        val taskId = store.taskStore.createTask(title = "History task", journalDate = "2026-05-24")
 
-        store.progressTask(taskId, "2026-05-25", "Started")
-        store.completeTask(taskId, "2026-05-26", "Finished")
+        store.taskStore.progressTask(taskId, "2026-05-25", "Started")
+        store.taskStore.completeTask(taskId, "2026-05-26", "Finished")
 
-        val history = store.taskHistory(taskId)
+        val history = store.taskStore.taskHistory(taskId)
 
         assertEquals(
             listOf(TaskEventType.COMPLETED, TaskEventType.PROGRESSED, TaskEventType.CREATED),
@@ -307,7 +307,7 @@ class SharedLogicDesktopTest {
     @Test
     fun `postpone task updates planning window and records postponed payload`() {
         val store = testStore()
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Postpone me",
             journalDate = "2026-05-24",
             startNotBefore = "2026-05-24T09:00:00Z",
@@ -315,7 +315,7 @@ class SharedLogicDesktopTest {
             estimatedDuration = "PT1H",
         )
 
-        store.postponeTask(
+        store.taskStore.postponeTask(
             taskId = taskId,
             journalDate = "2026-05-24",
             startNotBefore = "2026-05-25T10:00:00Z",
@@ -324,9 +324,9 @@ class SharedLogicDesktopTest {
             note = "Move to tomorrow",
         )
 
-        val task = store.allTasks().single { it.id == taskId }
-        val postponed = store.dirtyTaskEvents().single { it.eventType == TaskEventType.POSTPONED }
-        val history = store.taskHistory(taskId)
+        val task = store.taskStore.allTasks().single { it.id == taskId }
+        val postponed = store.taskSyncStore.dirtyTaskEvents().single { it.eventType == TaskEventType.POSTPONED }
+        val history = store.taskStore.taskHistory(taskId)
 
         assertEquals("2026-05-25T10:00:00Z", task.startNotBefore)
         assertEquals("2026-05-25T18:00:00Z", task.endNotAfter)
@@ -341,22 +341,22 @@ class SharedLogicDesktopTest {
             postponed.postponed,
         )
         assertTrue(history.first().content?.contains("2026-05-25T10:00:00Z") == true)
-        assertTrue(store.journal("2026-05-24").last().content?.contains("2026-05-25T18:00:00Z") == true)
+        assertTrue(store.taskStore.journal("2026-05-24").last().content?.contains("2026-05-25T18:00:00Z") == true)
     }
 
     @Test
     fun `journal only exposes business timeline events`() {
         val store = testStore()
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Legacy event task",
             journalDate = "2026-05-25",
         )
-        val alarmId = store.createAlarm(taskId, "2026-05-25T09:00:00Z")
+        val alarmId = store.routineAlarmStore.createAlarm(taskId, "2026-05-25T09:00:00Z")
 
-        store.fireAlarm(alarmId, "2026-05-25T09:00:00Z")
-        store.cancelTask(taskId, "2026-05-25", "No longer needed")
+        store.routineAlarmStore.fireAlarm(alarmId, "2026-05-25T09:00:00Z")
+        store.taskStore.cancelTask(taskId, "2026-05-25", "No longer needed")
 
-        val journal = store.journal("2026-05-25")
+        val journal = store.taskStore.journal("2026-05-25")
 
         assertEquals(listOf(TaskEventType.CREATED), journal.map { it.eventType })
     }
@@ -529,8 +529,8 @@ class SharedLogicDesktopTest {
             }, testTimeProvider()),
         )
 
-        val tasks = store.allTasks()
-        val history = store.taskHistory("task-1")
+        val tasks = store.taskStore.allTasks()
+        val history = store.taskStore.taskHistory("task-1")
 
         assertEquals(listOf("Legacy task"), tasks.map { it.title })
         assertEquals(listOf(TaskEventType.CREATED), history.map { it.eventType })
@@ -575,16 +575,16 @@ class SharedLogicDesktopTest {
     fun `routine and alarm CRUD persist and hide deleted rows`() {
         val store = testStore()
         val date = "2026-05-25"
-        val taskId = store.createTask("Prepare notes", date)
+        val taskId = store.taskStore.createTask("Prepare notes", date)
 
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Stretch",
             templateDetail = "Loosen up after standup",
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
             defaultStartNotBefore = "2026-05-25T09:00:00Z",
             defaultEstimatedDuration = "PT10M",
         )
-        store.updateRoutine(
+        store.routineAlarmStore.updateRoutine(
             routineId = routineId,
             templateTitle = "Stretch break",
             templateDetail = "Reset posture before coding",
@@ -592,14 +592,14 @@ class SharedLogicDesktopTest {
             defaultStartNotBefore = "2026-05-25T10:00:00Z",
             defaultEstimatedDuration = "PT15M",
         )
-        store.toggleRoutineActive(routineId)
+        store.routineAlarmStore.toggleRoutineActive(routineId)
 
-        val alarmId = store.createAlarm(taskId, "2026-05-25T10:00:00Z")
-        store.updateAlarm(alarmId, "2026-05-25T11:00:00Z")
-        store.toggleAlarmActive(alarmId)
+        val alarmId = store.routineAlarmStore.createAlarm(taskId, "2026-05-25T10:00:00Z")
+        store.routineAlarmStore.updateAlarm(alarmId, "2026-05-25T11:00:00Z")
+        store.routineAlarmStore.toggleAlarmActive(alarmId)
 
-        val routines = store.routines()
-        val alarms = store.alarms()
+        val routines = store.routineAlarmStore.routines()
+        val alarms = store.routineAlarmStore.alarms()
 
         assertEquals(1, routines.size)
         assertEquals("Stretch break", routines.single().templateTitle)
@@ -612,17 +612,17 @@ class SharedLogicDesktopTest {
         assertEquals("2026-05-25T11:00:00Z", alarms.single().triggerTimeIso)
         assertFalse(alarms.single().isActive)
 
-        store.deleteRoutine(routineId)
-        store.deleteAlarm(alarmId)
+        store.routineAlarmStore.deleteRoutine(routineId)
+        store.routineAlarmStore.deleteAlarm(alarmId)
 
-        assertTrue(store.routines().isEmpty())
-        assertTrue(store.alarms().isEmpty())
+        assertTrue(store.routineAlarmStore.routines().isEmpty())
+        assertTrue(store.routineAlarmStore.alarms().isEmpty())
     }
 
     @Test
     fun `running routine creates one deterministic occurrence with inherited defaults`() {
         val store = testStore()
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Morning plan",
             templateDetail = "Review the top priority before inbox",
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
@@ -630,13 +630,13 @@ class SharedLogicDesktopTest {
             defaultEstimatedDuration = "PT30M",
         )
 
-        store.runRoutine(routineId, "2026-05-25")
-        store.runRoutine(routineId, "2026-05-25")
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
 
         val taskId = "routine-task:$routineId:2026-05-25"
         val createdEventId = "routine-created-event:$routineId:2026-05-25"
-        val tasks = store.allTasks().filter { it.routineId == routineId }
-        val events = store.dirtyTaskEvents().filter { it.taskId == taskId }
+        val tasks = store.taskStore.allTasks().filter { it.routineId == routineId }
+        val events = store.taskSyncStore.dirtyTaskEvents().filter { it.taskId == taskId }
 
         assertEquals(1, tasks.size)
         assertEquals(taskId, tasks.single().id)
@@ -653,7 +653,7 @@ class SharedLogicDesktopTest {
     fun `routine occurrence context hides skip after rollover and exposes next boundary`() {
         val timeProvider = mutableTimeProvider("2026-05-26T03:00:00Z", "2026-05-26")
         val store = testStore(timeProvider = timeProvider)
-        store.updatePreferences(
+        store.preferenceStore.updatePreferences(
             titlePrefix = "",
             defaultAlarmLeadMinutes = 15,
             focusMinutes = 25,
@@ -664,7 +664,7 @@ class SharedLogicDesktopTest {
             themePreference = ThemePreference.SYSTEM,
             rolloverTime = "02:00",
         )
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Morning plan",
             templateDetail = null,
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
@@ -672,9 +672,9 @@ class SharedLogicDesktopTest {
             defaultEstimatedDuration = null,
         )
 
-        store.runRoutine(routineId, "2026-05-25")
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
 
-        val task = store.allTasks("2026-05-25").single { it.routineId == routineId }
+        val task = store.taskStore.allTasks("2026-05-25").single { it.routineId == routineId }
         val boundaryLocal = kotlinx.datetime.Instant.parse(checkNotNull(task.routineNextOccurrenceBoundary))
             .toLocalDateTime(TimeZone.currentSystemDefault())
 
@@ -689,7 +689,7 @@ class SharedLogicDesktopTest {
     @Test
     fun `routine occurrence context hides postpone at next occurrence boundary`() {
         val store = testStore()
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Morning plan",
             templateDetail = null,
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
@@ -697,13 +697,13 @@ class SharedLogicDesktopTest {
             defaultEstimatedDuration = null,
         )
 
-        store.runRoutine(routineId, "2026-05-25")
-        val initial = store.allTasks("2026-05-25").single { it.routineId == routineId }
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
+        val initial = store.taskStore.allTasks("2026-05-25").single { it.routineId == routineId }
         val boundaryMinusOne = kotlinx.datetime.Instant.parse(checkNotNull(initial.routineNextOccurrenceBoundary))
             .minus(1.minutes)
             .toString()
 
-        store.postponeTask(
+        store.taskStore.postponeTask(
             taskId = initial.id,
             journalDate = "2026-05-25",
             startNotBefore = boundaryMinusOne,
@@ -712,7 +712,7 @@ class SharedLogicDesktopTest {
             note = "Push to the edge",
         )
 
-        val postponed = store.allTasks("2026-05-25").single { it.id == initial.id }
+        val postponed = store.taskStore.allTasks("2026-05-25").single { it.id == initial.id }
 
         assertEquals(false, postponed.routineCanPostpone)
     }
@@ -723,7 +723,7 @@ class SharedLogicDesktopTest {
         val afterRollover = LocalDateTime(2026, 5, 26, 3, 0).toInstant(zone).toString()
         val timeProvider = mutableTimeProvider(afterRollover, "2026-05-26")
         val store = testStore(timeProvider = timeProvider)
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Evening reset",
             templateDetail = null,
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=21;BYMINUTE=0",
@@ -731,17 +731,17 @@ class SharedLogicDesktopTest {
             defaultEstimatedDuration = null,
         )
 
-        store.runRoutine(routineId, "2026-05-25")
-        val taskId = store.allTasks("2026-05-25").single { it.routineId == routineId }.id
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
+        val taskId = store.taskStore.allTasks("2026-05-25").single { it.routineId == routineId }.id
 
-        store.completeTask(taskId, "2026-05-26", "Too late")
-        store.skipTask(taskId, "2026-05-26", "Also too late")
-        store.autoMarkMissedTasks()
+        store.taskStore.completeTask(taskId, "2026-05-26", "Too late")
+        store.taskStore.skipTask(taskId, "2026-05-26", "Also too late")
+        store.taskStore.autoMarkMissedTasks()
 
-        assertEquals(listOf(taskId), store.openTasksForDate("2026-05-25").map { it.id })
-        assertTrue(store.openTasksForDate("2026-05-26").none { it.id == taskId })
-        assertEquals(listOf(TaskEventType.MISSED), store.journal("2026-05-26").map { it.eventType })
-        val historyEventTypes = store.taskHistory(taskId).map { it.eventType }
+        assertEquals(listOf(taskId), store.taskStore.openTasksForDate("2026-05-25").map { it.id })
+        assertTrue(store.taskStore.openTasksForDate("2026-05-26").none { it.id == taskId })
+        assertEquals(listOf(TaskEventType.MISSED), store.taskStore.journal("2026-05-26").map { it.eventType })
+        val historyEventTypes = store.taskStore.taskHistory(taskId).map { it.eventType }
         assertEquals(2, historyEventTypes.size)
         assertEquals(setOf(TaskEventType.CREATED, TaskEventType.MISSED), historyEventTypes.toSet())
     }
@@ -750,7 +750,7 @@ class SharedLogicDesktopTest {
     fun `preferences persist and pomodoro session uses updated defaults`() {
         val store = testStore()
 
-        store.updatePreferences(
+        store.preferenceStore.updatePreferences(
             titlePrefix = "[focus]",
             defaultAlarmLeadMinutes = 20,
             focusMinutes = 30,
@@ -762,15 +762,15 @@ class SharedLogicDesktopTest {
             rolloverTime = "04:00",
         )
 
-        val preferences = store.preferences()
-        val session = checkNotNull(store.startPomodoroSession(taskId = null, phase = PomodoroPhase.FOCUS, preferences = preferences))
+        val preferences = store.preferenceStore.preferences()
+        val session = checkNotNull(store.pomodoroStore.startPomodoroSession(taskId = null, phase = PomodoroPhase.FOCUS, preferences = preferences))
 
         assertEquals("[focus]", preferences.titlePrefix)
         assertEquals(20, preferences.defaultAlarmLeadMinutes)
         assertEquals(DateFormatPreference.MONTH_DAY, preferences.dateFormat)
         assertEquals(ThemePreference.SYSTEM, preferences.themePreference)
         assertEquals(30, session.durationMinutes)
-        assertTrue(store.activePomodoroSession(preferences) != null)
+        assertTrue(store.pomodoroStore.activePomodoroSession(preferences) != null)
         assertEquals(
             setOf(
                 "task.title_prefix",
@@ -784,7 +784,7 @@ class SharedLogicDesktopTest {
                 "task.blank_title_policy",
                 "app.enabled_modules",
             ),
-            store.dirtyPreferences().map { it.key }.toSet(),
+            store.preferenceStore.dirtyPreferences().map { it.key }.toSet(),
         )
     }
 
@@ -805,10 +805,10 @@ class SharedLogicDesktopTest {
     @Test
     fun `enabled modules defaults to all and can be updated`() {
         val store = testStore()
-        assertEquals(AppModule.entries.toSet(), store.preferences().enabledModules)
+        assertEquals(AppModule.entries.toSet(), store.preferenceStore.preferences().enabledModules)
 
-        store.updateEnabledModules(setOf(AppModule.TASKS, AppModule.FINANCE))
-        assertEquals(setOf(AppModule.TASKS, AppModule.FINANCE), store.preferences().enabledModules)
+        store.preferenceStore.updateEnabledModules(setOf(AppModule.TASKS, AppModule.FINANCE))
+        assertEquals(setOf(AppModule.TASKS, AppModule.FINANCE), store.preferenceStore.preferences().enabledModules)
     }
 
     @Test
@@ -829,20 +829,43 @@ class SharedLogicDesktopTest {
     }
 
     @Test
+    fun `controller loadPredefinedFinanceAccounts and resetFinanceToDefaultAccounts flow`() = runTest {
+        val controller = testController()
+        val financeViewInitial = controller.state.value.financeView
+        assertTrue(financeViewInitial.canLoadPredefinedAccounts)
+        assertFalse(financeViewInitial.hasSubAccountsOrRecords)
+        assertEquals(5, financeViewInitial.accounts.size)
+
+        // Load predefined sub-accounts
+        controller.loadPredefinedFinanceAccounts()
+        val financeViewLoaded = controller.state.value.financeView
+        assertFalse(financeViewLoaded.canLoadPredefinedAccounts)
+        assertTrue(financeViewLoaded.hasSubAccountsOrRecords)
+        assertEquals(13, financeViewLoaded.accounts.size)
+
+        // Reset to Default 5
+        controller.resetFinanceToDefaultAccounts()
+        val financeViewReset = controller.state.value.financeView
+        assertTrue(financeViewReset.canLoadPredefinedAccounts)
+        assertFalse(financeViewReset.hasSubAccountsOrRecords)
+        assertEquals(5, financeViewReset.accounts.size)
+    }
+
+    @Test
     fun `pomodoro completion stores note and task update`() {
         val store = testStore()
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Focus task",
             journalDate = "2026-05-25",
             startNotBefore = "2026-05-25T09:00:00Z",
         )
-        val session = checkNotNull(store.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferences()))
+        val session = checkNotNull(store.pomodoroStore.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferenceStore.preferences()))
 
-        store.completePomodoroSession(session.id, "Deep work finished", PomodoroTaskUpdate.PROGRESS, "2026-05-25")
+        store.pomodoroStore.completePomodoroSession(session.id, "Deep work finished", PomodoroTaskUpdate.PROGRESS, "2026-05-25")
 
-        val active = store.activePomodoroSession()
-        val recent = store.recentPomodoroSessions(limit = 1)
-        val journal = store.journal("2026-05-25")
+        val active = store.pomodoroStore.activePomodoroSession()
+        val recent = store.pomodoroStore.recentPomodoroSessions(limit = 1)
+        val journal = store.taskStore.journal("2026-05-25")
 
         assertEquals(null, active)
         assertEquals("Deep work finished", recent.single().note)
@@ -853,15 +876,15 @@ class SharedLogicDesktopTest {
     @Test
     fun `starting linked focus pomodoro records progress for a valid task`() {
         val store = testStore()
-        val taskId = store.createTask(
+        val taskId = store.taskStore.createTask(
             title = "Focus task",
             journalDate = "2026-05-25",
             startNotBefore = "2026-05-25T09:00:00Z",
         )
 
-        checkNotNull(store.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferences()))
+        checkNotNull(store.pomodoroStore.startPomodoroSession(taskId, PomodoroPhase.FOCUS, store.preferenceStore.preferences()))
 
-        val progressedEvents = store.taskHistory(taskId).map { it.eventType }
+        val progressedEvents = store.taskStore.taskHistory(taskId).map { it.eventType }
 
         assertTrue(progressedEvents.contains(TaskEventType.PROGRESSED))
     }
@@ -874,12 +897,12 @@ class SharedLogicDesktopTest {
             "2026-05-25",
         )
         val store = testStore(timeProvider = timeProvider)
-        val futureTaskId = store.createTask(
+        val futureTaskId = store.taskStore.createTask(
             title = "Future task",
             journalDate = "2026-05-25",
             startNotBefore = "2026-05-27T09:00:00Z",
         )
-        val routineId = store.createRoutine(
+        val routineId = store.routineAlarmStore.createRoutine(
             templateTitle = "Late routine",
             templateDetail = null,
             recurrenceRule = "RRULE:FREQ=DAILY;BYHOUR=21;BYMINUTE=0",
@@ -887,26 +910,26 @@ class SharedLogicDesktopTest {
             defaultEstimatedDuration = null,
         )
 
-        store.runRoutine(routineId, "2026-05-25")
-        val expiredTaskId = store.allTasks("2026-05-25").single { it.routineId == routineId }.id
-        val invalidStart = store.startPomodoroSession(futureTaskId, PomodoroPhase.FOCUS, store.preferences())
-        val validSession = checkNotNull(store.startPomodoroSession(expiredTaskId, PomodoroPhase.FOCUS, store.preferences()))
+        store.routineAlarmStore.runRoutine(routineId, "2026-05-25")
+        val expiredTaskId = store.taskStore.allTasks("2026-05-25").single { it.routineId == routineId }.id
+        val invalidStart = store.pomodoroStore.startPomodoroSession(futureTaskId, PomodoroPhase.FOCUS, store.preferenceStore.preferences())
+        val validSession = checkNotNull(store.pomodoroStore.startPomodoroSession(expiredTaskId, PomodoroPhase.FOCUS, store.preferenceStore.preferences()))
         timeProvider.set(LocalDateTime(2026, 5, 26, 3, 0).toInstant(zone).toString(), "2026-05-26")
 
-        store.completePomodoroSession(validSession.id, "Too late to count", PomodoroTaskUpdate.COMPLETE, "2026-05-26")
+        store.pomodoroStore.completePomodoroSession(validSession.id, "Too late to count", PomodoroTaskUpdate.COMPLETE, "2026-05-26")
 
         assertEquals(null, invalidStart)
-        assertEquals(emptyList(), store.pomodoroStartableTasks().map { it.id })
-        assertFalse(store.taskHistory(expiredTaskId).any { it.eventType == TaskEventType.COMPLETED })
+        assertEquals(emptyList(), store.pomodoroStore.pomodoroStartableTasks().map { it.id })
+        assertFalse(store.taskStore.taskHistory(expiredTaskId).any { it.eventType == TaskEventType.COMPLETED })
     }
 
     @Test
     fun `sync engine pulls before push and clears accepted dirty fields`() = runTest {
         val store = testStore()
         val date = "2026-05-25"
-        store.createTask("Offline task", date)
+        store.taskStore.createTask("Offline task", date)
 
-        val taskPushResponse = store.dirtyTasks().map {
+        val taskPushResponse = store.taskSyncStore.dirtyTasks().map {
             it.copy(
                 acceptedFields = it.dirtyFields,
                 rejectedFields = emptyList(),
@@ -915,7 +938,7 @@ class SharedLogicDesktopTest {
                 createdAt = "2026-05-25T09:00:00Z",
             )
         }
-        val taskEventPushResponse = store.dirtyTaskEvents().map {
+        val taskEventPushResponse = store.taskSyncStore.dirtyTaskEvents().map {
             it.copy(
                 accepted = true,
                 serverVersion = 2,
@@ -985,8 +1008,8 @@ class SharedLogicDesktopTest {
             }),
         ).syncNow()
 
-        assertTrue(store.dirtyTasks().isEmpty())
-        assertTrue(store.dirtyTaskEvents().isEmpty())
+        assertTrue(store.taskSyncStore.dirtyTasks().isEmpty())
+        assertTrue(store.taskSyncStore.dirtyTaskEvents().isEmpty())
         assertEquals(
             listOf(
                 "GET /api/sync/preferences",
@@ -1469,12 +1492,36 @@ class SharedLogicDesktopTest {
                         "/auth/refresh" -> AppJson.encodeToString(authRefreshResponse)
                         "/auth/logout" -> ""
                         "/api/version" -> """{"version":"0.0.0","name":"api","commit":"470a79a","buildTime":"202611081035"}"""
-                        "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
-                        "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
-                        "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
-                        "/api/sync/alarms" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
-                        "/api/sync/task-events" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
-                        "/api/sync/pomodoro-sessions" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                        "/api/sync/preferences" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<SyncPreference>()))
+                        }
+                        "/api/sync/routines" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<String>()))
+                        }
+                        "/api/sync/tasks" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncTask>()))
+                        }
+                        "/api/sync/alarms" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncAlarm>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncAlarm>()))
+                        }
+                        "/api/sync/task-events" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncTaskEvent>()))
+                        }
+                        "/api/sync/pomodoro-sessions" -> if (request.method.value == "GET") {
+                            AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>(), nextCursor = 0, hasMore = false))
+                        } else {
+                            AppJson.encodeToString(BatchRequest(items = emptyList<dev.tireless.abun.sync.SyncPomodoroSession>()))
+                        }
                         else -> if (request.url.encodedPath.startsWith("/api/sync/finance-")) {
                             if (request.method.value == "GET") {
                                 AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
@@ -1526,6 +1573,7 @@ class SharedLogicDesktopTest {
         private var omitted = false
         private var themePreference = ThemePreference.SYSTEM
         private var authSession: AuthSession? = null
+        private var lastSyncedUserId: String? = null
 
         override fun isLoginOmitted(): Boolean = omitted
 
@@ -1548,6 +1596,157 @@ class SharedLogicDesktopTest {
         override fun clearAuthSession() {
             authSession = null
         }
+
+        override fun lastSyncedUserId(): String? = lastSyncedUserId
+
+        override fun setLastSyncedUserId(userId: String?) {
+            lastSyncedUserId = userId
+        }
+    }
+
+    @Test
+    fun `switching to a different account clears previous account local tasks and resets sync cursors`() = runTest {
+        val driverFactory = testDatabaseDriverFactory()
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setLastSyncedUserId("user-a")
+        }
+        val seedStore = testStore(databaseDriverFactory = driverFactory)
+        seedStore.taskSyncStore.mergeRemoteTasks(
+            listOf(
+                dev.tireless.abun.sync.SyncTask(
+                    id = "task-user-a",
+                    title = "User A synced task",
+                    isDeleted = false,
+                    hlcMap = mapOf("title" to "1715959378000-0001-deviceA"),
+                    dirtyFields = emptyList(),
+                    serverVersion = 20,
+                    createdAt = "2026-05-25T09:00:00Z",
+                    serverUpdatedAt = "2026-05-25T10:00:00Z",
+                ),
+            ),
+        )
+        seedStore.taskStore.createTask("User A offline draft", "2026-05-25")
+        seedStore.updateSyncCursor(SyncScope.TASKS, 20)
+
+        val controller = testController(
+            databaseDriverFactory = driverFactory,
+            loginPreferenceStore = loginPreferenceStore,
+            authVerifyResponse = dev.tireless.abun.app.AuthSessionResponse(
+                accessToken = "user-b-access",
+                accessTokenExpiresAt = "2030-01-01T00:15:00Z",
+                refreshToken = "user-b-refresh",
+                refreshTokenExpiresAt = "2030-02-01T00:00:00Z",
+                userId = "user-b",
+            ),
+        )
+
+        assertEquals(2, controller.state.value.taskView.tasks.size)
+
+        controller.updateLoginEmail("userb@example.com")
+        controller.verifyEmailOtp("123456")
+        waitFor { controller.state.value.syncState.lastSyncedAt != null }
+
+        assertTrue(controller.state.value.taskView.tasks.isEmpty())
+        assertEquals(0L, seedStore.syncCursor(SyncScope.TASKS))
+        assertEquals("user-b", loginPreferenceStore.lastSyncedUserId())
+    }
+
+    @Test
+    fun `logging in with legacy unattributed synced rows clears stale local data`() = runTest {
+        val driverFactory = testDatabaseDriverFactory()
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val seedStore = testStore(databaseDriverFactory = driverFactory)
+        seedStore.taskSyncStore.mergeRemoteTasks(
+            listOf(
+                dev.tireless.abun.sync.SyncTask(
+                    id = "legacy-synced-task",
+                    title = "the very first task of a bun changed",
+                    isDeleted = false,
+                    hlcMap = mapOf("title" to "1781941256931-0000-desktop-device"),
+                    dirtyFields = emptyList(),
+                    serverVersion = 20,
+                    createdAt = "2026-06-19T12:35:03Z",
+                    serverUpdatedAt = "2026-06-20T07:41:19Z",
+                ),
+            ),
+        )
+
+        val controller = testController(
+            databaseDriverFactory = driverFactory,
+            loginPreferenceStore = loginPreferenceStore,
+        )
+
+        assertEquals(listOf("the very first task of a bun changed"), controller.state.value.taskView.tasks.map { it.title })
+
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+        waitFor { controller.state.value.syncState.lastSyncedAt != null }
+
+        assertTrue(controller.state.value.taskView.tasks.isEmpty())
+        assertEquals(TestSharedAccount.USER_ID, loginPreferenceStore.lastSyncedUserId())
+    }
+
+    @Test
+    fun `upgrading from guest mode preserves unsynced local tasks on first login`() = runTest {
+        val driverFactory = testDatabaseDriverFactory()
+        val loginPreferenceStore = TestLoginPreferenceStore()
+        val requests = mutableListOf<String>()
+        val controller = testController(
+            databaseDriverFactory = driverFactory,
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+        )
+
+        controller.skipLogin()
+        controller.createTask("Guest local task")
+        assertEquals(listOf("Guest local task"), controller.state.value.taskView.tasks.map { it.title })
+
+        controller.reopenLogin()
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+        waitFor { controller.state.value.syncState.lastSyncedAt != null }
+
+        assertEquals(listOf("Guest local task"), controller.state.value.taskView.tasks.map { it.title })
+        assertTrue(requests.contains("POST /api/sync/tasks"))
+        assertEquals(TestSharedAccount.USER_ID, loginPreferenceStore.lastSyncedUserId())
+    }
+
+    @Test
+    fun `re-logging into the same account preserves existing synced and offline tasks`() = runTest {
+        val driverFactory = testDatabaseDriverFactory()
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setLastSyncedUserId(TestSharedAccount.USER_ID)
+        }
+        val seedStore = testStore(databaseDriverFactory = driverFactory)
+        seedStore.taskSyncStore.mergeRemoteTasks(
+            listOf(
+                dev.tireless.abun.sync.SyncTask(
+                    id = "same-user-synced-task",
+                    title = "Existing synced task",
+                    isDeleted = false,
+                    hlcMap = mapOf("title" to "1715959378000-0001-deviceA"),
+                    dirtyFields = emptyList(),
+                    serverVersion = 5,
+                    createdAt = "2026-05-25T09:00:00Z",
+                    serverUpdatedAt = "2026-05-25T10:00:00Z",
+                ),
+            ),
+        )
+        seedStore.taskStore.createTask("Offline task while logged out", "2026-05-25")
+
+        val controller = testController(
+            databaseDriverFactory = driverFactory,
+            loginPreferenceStore = loginPreferenceStore,
+        )
+
+        controller.updateLoginEmail(TestSharedAccount.EMAIL)
+        controller.verifyEmailOtp(TestSharedAccount.OTP)
+        waitFor { controller.state.value.syncState.lastSyncedAt != null }
+
+        assertEquals(
+            setOf("Existing synced task", "Offline task while logged out"),
+            controller.state.value.taskView.tasks.map { it.title }.toSet(),
+        )
     }
 
     private suspend fun waitFor(

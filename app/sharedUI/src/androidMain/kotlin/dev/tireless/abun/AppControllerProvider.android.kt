@@ -97,6 +97,18 @@ private class AndroidLoginPreferenceStore(context: android.content.Context) : Lo
         }.apply()
     }
 
+    override fun lastSyncedUserId(): String? = preferences.getString(LAST_SYNCED_USER_ID_KEY, null)
+
+    override fun setLastSyncedUserId(userId: String?) {
+        preferences.edit().apply {
+            if (userId.isNullOrBlank()) {
+                remove(LAST_SYNCED_USER_ID_KEY)
+            } else {
+                putString(LAST_SYNCED_USER_ID_KEY, userId)
+            }
+        }.apply()
+    }
+
     override fun isAutoUpdateEnabled(): Boolean = preferences.getBoolean(AUTO_UPDATE_ENABLED_KEY, true)
 
     override fun setAutoUpdateEnabled(enabled: Boolean) {
@@ -113,3 +125,4 @@ private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"
 private const val AUTH_ACCESS_EXPIRES_AT_KEY = "app.auth.access_token_expires_at"
 private const val AUTH_REFRESH_TOKEN_KEY = "app.auth.refresh_token"
 private const val AUTH_REFRESH_EXPIRES_AT_KEY = "app.auth.refresh_token_expires_at"
+private const val LAST_SYNCED_USER_ID_KEY = "app.auth.last_synced_user_id"

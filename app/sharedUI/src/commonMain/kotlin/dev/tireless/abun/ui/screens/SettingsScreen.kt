@@ -44,7 +44,6 @@ import dev.tireless.abun.core.ota.BuildInfo
 import dev.tireless.abun.dateFormatFromLabel
 import dev.tireless.abun.label
 import dev.tireless.abun.ota.OtaStatus
-import dev.tireless.abun.rememberAbunAppController
 import dev.tireless.abun.themePreferenceFromLabel
 import dev.tireless.abun.ui.EditorialCard
 import dev.tireless.abun.ui.SwissBentoCard
@@ -76,13 +75,10 @@ internal fun SettingsScreen(
     ) -> Unit,
     onReopenLogin: () -> Unit,
     onLogout: () -> Unit,
-    onToggleModule: ((AppModule, Boolean) -> Unit)? = null,
+    onToggleModule: (AppModule, Boolean) -> Unit = { _, _ -> },
+    onLoadPredefinedFinanceAccounts: () -> Unit = {},
+    onResetFinanceToDefaultAccounts: () -> Unit = {},
 ) {
-    val controller = rememberAbunAppController()
-    val effectiveToggleModule: (AppModule, Boolean) -> Unit = onToggleModule ?: { module, enabled ->
-        controller.setModuleEnabled(module, enabled)
-    }
-
     SettingsScreenContent(
         state = state,
         otaStatus = otaStatus,
@@ -94,7 +90,9 @@ internal fun SettingsScreen(
         onUpdatePreferences = onUpdatePreferences,
         onReopenLogin = onReopenLogin,
         onLogout = onLogout,
-        onToggleModule = effectiveToggleModule,
+        onToggleModule = onToggleModule,
+        onLoadPredefinedFinanceAccounts = onLoadPredefinedFinanceAccounts,
+        onResetFinanceToDefaultAccounts = onResetFinanceToDefaultAccounts,
     )
 }
 
@@ -121,6 +119,8 @@ internal fun SettingsScreenContent(
     onReopenLogin: () -> Unit,
     onLogout: () -> Unit,
     onToggleModule: (AppModule, Boolean) -> Unit = { _, _ -> },
+    onLoadPredefinedFinanceAccounts: () -> Unit = {},
+    onResetFinanceToDefaultAccounts: () -> Unit = {},
 ) {
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
@@ -385,6 +385,57 @@ internal fun SettingsScreenContent(
                 },
             ) {
                 Text("Save settings", style = ThemeTokens.type.body.withMaterialContentColor())
+            }
+        }
+
+        // Section Finance Account Presets
+        if (AppModule.FINANCE in state.preferences.enabledModules) {
+            SwissBentoCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-panel-finance-presets"),
+                contentPadding = PaddingValues(16.dp),
+            ) {
+                SwissCardHeader(
+                    title = "FINANCE PRESETS · 财务账户预设",
+                    accentDotColor = ThemeTokens.colors.financeAccent,
+                    trailingText = if (state.financeView.canLoadPredefinedAccounts) "DEFAULT 5" else "CONFIGURED",
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                val statusText = if (state.financeView.canLoadPredefinedAccounts) {
+                    "当前仅有基础五类根账户，可加载预设子账户以快速上手记账。"
+                } else {
+                    "已配置子账户或已有记账记录。如需重置，可清除子账户与记录并恢复为基础五类根账户。"
+                }
+                Text(
+                    text = statusText,
+                    style = ThemeTokens.type.body,
+                    color = ThemeTokens.colors.textSecondary,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(
+                        onClick = onLoadPredefinedFinanceAccounts,
+                        enabled = state.financeView.canLoadPredefinedAccounts,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("finance-load-predefined-button"),
+                    ) {
+                        Text("加载预设子账户")
+                    }
+                    OutlinedButton(
+                        onClick = onResetFinanceToDefaultAccounts,
+                        enabled = !state.financeView.canLoadPredefinedAccounts,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("finance-reset-default-five-button"),
+                    ) {
+                        Text("重置为基础五类账户")
+                    }
+                }
             }
         }
 

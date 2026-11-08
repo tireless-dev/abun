@@ -91,6 +91,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.Timer
 import dev.tireless.abun.app.AbunAppController
+import dev.tireless.abun.app.AppModule
 import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.AuthMode
@@ -752,6 +753,9 @@ fun App() {
                         onManualCheckUpdate = { controller.checkForUpdates(isManual = true) },
                         onTriggerOtaUpdate = controller::triggerOtaDownload,
                         onUpdateAutoUpdateEnabled = controller::setAutoUpdateEnabled,
+                        onToggleModule = controller::setModuleEnabled,
+                        onLoadPredefinedFinanceAccounts = controller::loadPredefinedFinanceAccounts,
+                        onResetFinanceToDefaultAccounts = controller::resetFinanceToDefaultAccounts,
                     )
                 }
 
@@ -905,6 +909,7 @@ internal fun AppContent(
     onStartPomodoro: (String?, PomodoroPhase) -> Unit,
     onCompletePomodoro: (String, PomodoroTaskUpdate) -> Unit,
     onStopPomodoro: (String) -> Unit,
+    onToggleModule: (AppModule, Boolean) -> Unit = { _, _ -> },
 ) {
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -1031,6 +1036,7 @@ internal fun AppContent(
                         onStartPomodoro = onStartPomodoro,
                         onCompletePomodoro = onCompletePomodoro,
                         onStopPomodoro = onStopPomodoro,
+                        onToggleModule = onToggleModule,
                     )
                 }
             }

@@ -202,12 +202,156 @@ WHERE task_id = ?
 ORDER BY event_time DESC, created_at DESC
 LIMIT 1;
 
+initSyncState:
+INSERT OR IGNORE INTO sync_state(scope, last_server_version)
+VALUES (?, 0);
+
 upsertSyncState:
 INSERT OR REPLACE INTO sync_state(scope, last_server_version)
 VALUES (?, ?);
 
 selectSyncState:
 SELECT * FROM sync_state WHERE scope = ?;
+
+hasSyncedRecords:
+SELECT CASE WHEN
+    EXISTS (SELECT 1 FROM sync_state WHERE last_server_version > 0) OR
+    EXISTS (SELECT 1 FROM preference WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM routine WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM task WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM task_event WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM alarm WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM pomodoro_session WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_account WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_exchange_rate WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_clearing_group WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_transaction WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_split WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_split_clearing_group WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_amortization_plan WHERE server_version > 0) OR
+    EXISTS (SELECT 1 FROM finance_budget_rule WHERE server_version > 0)
+THEN 1 ELSE 0 END;
+
+hasActiveFinanceRecords:
+SELECT CASE WHEN
+    EXISTS (SELECT 1 FROM finance_transaction WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_split WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_clearing_group WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_split_clearing_group WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_amortization_plan WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_budget_rule WHERE is_deleted = 0) OR
+    EXISTS (SELECT 1 FROM finance_exchange_rate WHERE is_deleted = 0)
+THEN 1 ELSE 0 END;
+
+softDeleteSyncedFinanceSplitClearingGroups:
+UPDATE finance_split_clearing_group
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceSplitClearingGroups:
+DELETE FROM finance_split_clearing_group WHERE server_version = 0;
+
+softDeleteSyncedFinanceSplits:
+UPDATE finance_split
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceSplits:
+DELETE FROM finance_split WHERE server_version = 0;
+
+softDeleteSyncedFinanceTransactions:
+UPDATE finance_transaction
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceTransactions:
+DELETE FROM finance_transaction WHERE server_version = 0;
+
+softDeleteSyncedFinanceClearingGroups:
+UPDATE finance_clearing_group
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceClearingGroups:
+DELETE FROM finance_clearing_group WHERE server_version = 0;
+
+softDeleteSyncedFinanceAmortizationPlans:
+UPDATE finance_amortization_plan
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceAmortizationPlans:
+DELETE FROM finance_amortization_plan WHERE server_version = 0;
+
+softDeleteSyncedFinanceBudgetRules:
+UPDATE finance_budget_rule
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceBudgetRules:
+DELETE FROM finance_budget_rule WHERE server_version = 0;
+
+softDeleteSyncedFinanceExchangeRates:
+UPDATE finance_exchange_rate
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0;
+
+deleteLocalFinanceExchangeRates:
+DELETE FROM finance_exchange_rate WHERE server_version = 0;
+
+softDeleteSyncedNonDefaultFinanceAccounts:
+UPDATE finance_account
+SET is_deleted = 1, is_dirty = 1, dirty_fields = '["deleted"]', hlc_map = ?, updated_at = ?
+WHERE server_version > 0 AND is_deleted = 0 AND id NOT IN ('acc-root-assets', 'acc-root-liabilities', 'acc-root-income', 'acc-root-expenses', 'acc-root-equity');
+
+deleteLocalNonDefaultFinanceAccounts:
+DELETE FROM finance_account
+WHERE server_version = 0 AND id NOT IN ('acc-root-assets', 'acc-root-liabilities', 'acc-root-income', 'acc-root-expenses', 'acc-root-equity');
+
+deleteAllPreferences:
+DELETE FROM preference;
+
+deleteAllAppPreferences:
+DELETE FROM app_preferences;
+
+deleteAllRoutines:
+DELETE FROM routine;
+
+deleteAllTasks:
+DELETE FROM task;
+
+deleteAllTaskEvents:
+DELETE FROM task_event;
+
+deleteAllAlarms:
+DELETE FROM alarm;
+
+deleteAllPomodoroSessions:
+DELETE FROM pomodoro_session;
+
+deleteAllFinanceSplitClearingGroups:
+DELETE FROM finance_split_clearing_group;
+
+deleteAllFinanceSplits:
+DELETE FROM finance_split;
+
+deleteAllFinanceTransactions:
+DELETE FROM finance_transaction;
+
+deleteAllFinanceAmortizationPlans:
+DELETE FROM finance_amortization_plan;
+
+deleteAllFinanceClearingGroups:
+DELETE FROM finance_clearing_group;
+
+deleteAllFinanceExchangeRates:
+DELETE FROM finance_exchange_rate;
+
+deleteAllFinanceBudgetRules:
+DELETE FROM finance_budget_rule;
+
+deleteAllFinanceAccounts:
+DELETE FROM finance_account;
 
 selectPreferenceByKey:
 SELECT * FROM preference WHERE pref_key = ?;

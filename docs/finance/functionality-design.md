@@ -92,6 +92,11 @@ Subtabs:
 ### 4. Accounts & Reconciliation Surface
 
 - Tree view of `Assets`, `Liabilities`, `Income`, `Expenses`, and `Equity`.
+- **Default 5 Root Invariant**: The module strictly initializes with the 5 foundational root accounts (`Assets` 资产, `Liabilities` 负债, `Income` 收入, `Expenses` 支出, `Equity` 权益). These root accounts cannot be deleted.
+- **Clean Ledger by Default**: No sample sub-accounts or default budget rules are auto-seeded upon enabling the module or switching accounts, keeping the ledger minimal and uncluttered.
+- **Account Presets & Reset in Settings**:
+  - **Load Predefined Accounts (`加载预设子账户`)**: Available in Settings (`settings-panel-finance-presets`) only when the ledger has strictly the Default 5 root accounts and zero finance records. In one tap, users can load 8 standard starter sub-accounts (bank, credit card, loan, living expenses, salary).
+  - **Reset to Default 5 (`重置为基础五类账户`)**: Available whenever sub-accounts or transactions exist. In one tap, it safely clears all sub-accounts, transactions, clearing groups, amortization plans, and budget rules (propagating soft-deletions for synced cloud records), leaving only the clean Default 5 root accounts.
 - Quick badges indicating `Pass-through (转入即消费)` and `Excluded from Net Worth (不计入净资产)`.
 - **`[Reconcile / Auto-Pad]`** action on any asset or liability account.
 

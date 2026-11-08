@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -306,5 +307,145 @@ class AppNavigationTest {
     @Test
     fun `task detail route still belongs to tasks tab`() {
         kotlin.test.assertEquals(AppTab.TASKS, dev.tireless.abun.ui.navigation.appTabForRoute("task-detail/task-1"))
+    }
+
+    @Test
+    fun `settings module toggle dispatches through AppNavHost to update enabledModules`() = runDesktopComposeUiTest {
+        var state by mutableStateOf(
+            screenshotState(selectedTab = AppTab.SETTINGS).copy(
+                preferences = screenshotState().preferences.copy(
+                    enabledModules = setOf(dev.tireless.abun.app.AppModule.TASKS),
+                ),
+            ),
+        )
+
+        setContent {
+            AppTheme {
+                AppContent(
+                    state = state,
+                    liveNow = ScreenshotNow,
+                    selectedTaskHistory = emptyList(),
+                    onSelectTab = { state = state.copy(selectedTab = it) },
+                    onSelectTaskSubTab = { state = state.copy(selectedTaskSubTab = it) },
+                    onSelectTaskFilter = {},
+                    onOpenTask = {},
+                    onOpenStartPomodoro = {},
+                    onCreateRoutine = {},
+                    onOpenRoutine = {},
+                    onRunRoutine = {},
+                    onUpdateThemePreference = {},
+                    onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                    onReopenLogin = {},
+                    onLogout = {},
+                    onRequestEmailOtp = {},
+                    onVerifyEmailOtp = {},
+                    onSkipLogin = {},
+                    onUpdateLoginEmail = {},
+                    taskHistoryFor = { emptyList() },
+                    onCreateTask = { _, _, _, _, _, _ -> },
+                    onCreateRoutineConfirm = { _, _, _, _, _ -> },
+                    onSaveTask = { _, _, _, _, _, _, _ -> },
+                    onProgressTask = { _, _ -> },
+                    onCompleteTask = { _, _ -> },
+                    onSkipTask = { _, _ -> },
+                    onPostponeTask = { _, _, _, _, _ -> },
+                    onDeleteTask = {},
+                    onSaveRoutine = { _, _, _, _, _, _ -> },
+                    onToggleRoutine = {},
+                    onDeleteRoutine = {},
+                    onStartPomodoro = { _, _ -> },
+                    onCompletePomodoro = { _, _ -> },
+                    onStopPomodoro = {},
+                    onToggleModule = { module, enabled ->
+                        val updated = if (enabled) {
+                            state.preferences.enabledModules + module
+                        } else {
+                            state.preferences.enabledModules - module
+                        }
+                        state = state.copy(preferences = state.preferences.copy(enabledModules = updated))
+                    },
+                )
+            }
+        }
+
+        waitForIdle()
+        onNodeWithTag("module-toggle-finance").performClick()
+        waitForIdle()
+
+        kotlin.test.assertTrue(dev.tireless.abun.app.AppModule.FINANCE in state.preferences.enabledModules)
+    }
+
+    @Test
+    fun `settings screen renders finance presets card and triggers load and reset callbacks`() = runDesktopComposeUiTest {
+        var loadTriggered = false
+        var resetTriggered = false
+        var state by mutableStateOf(
+            screenshotState(selectedTab = AppTab.SETTINGS).copy(
+                preferences = screenshotState().preferences.copy(
+                    enabledModules = setOf(dev.tireless.abun.app.AppModule.TASKS, dev.tireless.abun.app.AppModule.FINANCE),
+                ),
+                financeView = screenshotState().financeView.copy(
+                    canLoadPredefinedAccounts = true,
+                ),
+            ),
+        )
+
+        setContent {
+            AppTheme {
+                AppNavHost(
+                    navController = rememberNavController(),
+                    state = state,
+                    liveNow = ScreenshotNow,
+                    isPomodoroActive = false,
+                    taskHistoryFor = { emptyList() },
+                    onSelectTaskFilter = {},
+                    onOpenTask = {},
+                    onOpenStartPomodoro = {},
+                    onCreateTask = {},
+                    onCreateRoutine = {},
+                    onOpenRoutine = {},
+                    onRunRoutine = {},
+                    onUpdateThemePreference = {},
+                    onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
+                    onReopenLogin = {},
+                    onLogout = {},
+                    onCreateTaskConfirm = { _, _, _, _, _, _ -> },
+                    onCreateRoutineConfirm = { _, _, _, _, _ -> },
+                    onSaveTask = { _, _, _, _, _, _, _ -> },
+                    onProgressTask = { _, _ -> },
+                    onCompleteTask = { _, _ -> },
+                    onSkipTask = { _, _ -> },
+                    onPostponeTask = { _, _, _, _, _ -> },
+                    onDeleteTask = {},
+                    onSaveRoutine = { _, _, _, _, _, _ -> },
+                    onToggleRoutine = {},
+                    onDeleteRoutine = {},
+                    onStartPomodoro = { _, _ -> },
+                    onCompletePomodoro = { _, _ -> },
+                    onStopPomodoro = {},
+                    onLoadPredefinedFinanceAccounts = { loadTriggered = true },
+                    onResetFinanceToDefaultAccounts = { resetTriggered = true },
+                )
+            }
+        }
+
+        waitForIdle()
+        onNodeWithTag("settings-panel-finance-presets").assertExists()
+        onNodeWithTag("finance-load-predefined-button").assertExists()
+        onNodeWithTag("finance-reset-default-five-button").assertExists()
+
+        onNodeWithTag("finance-load-predefined-button").performScrollTo().performClick()
+        waitForIdle()
+        kotlin.test.assertTrue(loadTriggered)
+
+        state = state.copy(
+            financeView = state.financeView.copy(
+                canLoadPredefinedAccounts = false,
+            ),
+        )
+        waitForIdle()
+        onNodeWithTag("finance-reset-default-five-button").performScrollTo().performClick()
+        waitForIdle()
+        kotlin.test.assertTrue(resetTriggered)
     }
 }

@@ -111,6 +111,16 @@ private class JvmLoginPreferenceStore : LoginPreferenceStore {
         preferences.remove(AUTH_REFRESH_TOKEN_KEY)
         preferences.remove(AUTH_REFRESH_EXPIRES_AT_KEY)
     }
+
+    override fun lastSyncedUserId(): String? = preferences.get(LAST_SYNCED_USER_ID_KEY, null)
+
+    override fun setLastSyncedUserId(userId: String?) {
+        if (userId.isNullOrBlank()) {
+            preferences.remove(LAST_SYNCED_USER_ID_KEY)
+        } else {
+            preferences.put(LAST_SYNCED_USER_ID_KEY, userId)
+        }
+    }
 }
 
 private const val LOGIN_OMITTED_KEY = "app.auth.login_omitted"
@@ -120,3 +130,4 @@ private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"
 private const val AUTH_ACCESS_EXPIRES_AT_KEY = "app.auth.access_token_expires_at"
 private const val AUTH_REFRESH_TOKEN_KEY = "app.auth.refresh_token"
 private const val AUTH_REFRESH_EXPIRES_AT_KEY = "app.auth.refresh_token_expires_at"
+private const val LAST_SYNCED_USER_ID_KEY = "app.auth.last_synced_user_id"

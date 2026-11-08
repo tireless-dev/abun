@@ -100,6 +100,8 @@ data class FinanceViewState(
     val filterAccountId: String? = null,
     val filterClearingGroupId: String? = null,
     val viewMode: FinanceLedgerViewMode = FinanceLedgerViewMode.STANDARD,
+    val canLoadPredefinedAccounts: Boolean = false,
+    val hasSubAccountsOrRecords: Boolean = false,
 ) {
     val currentRunwayProjection: CashflowRunwayProjection?
         get() = if (runwayHorizonDays == 30) runwayProjection30 else runwayProjection90
