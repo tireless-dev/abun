@@ -98,7 +98,15 @@ Subtabs:
 - **Account Presets & Reset in Settings**:
   - **Load Predefined Accounts (`加载预设子账户`)**: Available in Settings (`settings-panel-finance-presets`) only when the ledger has strictly the Default 5 root accounts and zero finance records. In one tap, users can load 8 standard starter sub-accounts (bank, credit card, loan, living expenses, salary).
   - **Reset to Default 5 (`重置为基础五类账户`)**: Available whenever sub-accounts or transactions exist. In one tap, it safely clears all sub-accounts, transactions, clearing groups, amortization plans, and budget rules (propagating soft-deletions for synced cloud records), leaving only the clean Default 5 root accounts.
-- Quick badges indicating `Pass-through (转入即消费)` and `Excluded from Net Worth (不计入净资产)`.
+- **Dedicated Finance Settings Screen (`FinanceSettingsScreen`)**:
+  - Accessible directly from the 4th tab of `FinanceTopBarSubnav` ("总览" | "明细" | "清算" | "设置").
+  - Displays the full 5-root hierarchy with parent-child indentation.
+  - Per-account configuration toggles:
+    - `⚡ 转出即消费 (Pass-Through)`: For pocket money, family allowance, and meal stipend accounts (e.g., 工商银行、网商亲情卡、邮储银行). Marking an asset account as pass-through automatically sets `liquid_tier = 'None'` and `include_in_net_worth = 0`. Transfers from liquid bank accounts (like CMB) into pass-through accounts are treated as immediate consumption outflow, with zero phantom inflow.
+    - `● 计入流动性 / ○ 排除流动性 (`liquidTier`)`: Allows excluding locked, non-liquid accounts (e.g. 公积金 `HPF`, 医保个人账户 `MIPA`, 云鞍应收款 `Wanon`) from runway and safe-to-spend calculations.
+    - `✓ 计入净资产 / ✕ 排除净资产 (`includeInNetWorth`)`: Allows excluding informal personal borrowings (e.g. 父母借款 `Parents`, 个人借款 `Personal`) and locked assets from net worth calculations so the dashboard reflects actionable commercial solvency.
+    - `已归档 / 正常 (`isArchived`)`: Allows hiding and soft-deactivating closed accounts (e.g. 已结清的京东金融 `JD`).
+  - Inline sub-account creation card and Auto-Pad reconciliation drawer.
 - **`[Reconcile / Auto-Pad]`** action on any asset or liability account.
 
 ---
