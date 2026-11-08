@@ -136,4 +136,60 @@ describe('CashflowRunway', () => {
     expect(projection.safeToSpendMinor).toBe(1000000);
     expect(projection.minimumTroughMinor).toBe(1000000);
   });
+
+  it('internal transfers between liquid accounts do not create phantom inflows or outflows', () => {
+    const initialCash = 1000000;
+    const liquidAccountIds = new Set(['acc-cmb', 'acc-icbc']);
+
+    const transferTx: FinanceTransaction = {
+      id: 'tx-transfer',
+      tx_date: '2026-12-01',
+      summary: 'Transfer',
+      status: 'Scheduled',
+      is_deleted: false,
+    };
+    const splits: FinanceSplit[] = [
+      {
+        id: 's-1',
+        transaction_id: 'tx-transfer',
+        account_id: 'acc-cmb',
+        amount_minor: -20000,
+        currency: 'CNY',
+        weight_amount_minor: -20000,
+        weight_currency: 'CNY',
+        narration: '',
+        sort_order: 0,
+        is_deleted: false,
+      },
+      {
+        id: 's-2',
+        transaction_id: 'tx-transfer',
+        account_id: 'acc-icbc',
+        amount_minor: 20000,
+        currency: 'CNY',
+        weight_amount_minor: 20000,
+        weight_currency: 'CNY',
+        narration: '',
+        sort_order: 1,
+        is_deleted: false,
+      },
+    ];
+
+    const projection = projectCashflowRunway(
+      '2026-11-30',
+      5,
+      initialCash,
+      [transferTx],
+      new Map([['tx-transfer', splits]]),
+      liquidAccountIds,
+      [],
+      new Map(),
+      0
+    );
+
+    const dec1Point = projection.dailyPoints.find((p) => p.date === '2026-12-01')!;
+    expect(dec1Point.scheduledInflowsMinor).toBe(0);
+    expect(dec1Point.scheduledOutflowsMinor).toBe(0);
+    expect(dec1Point.projectedLiquidCashMinor).toBe(initialCash);
+  });
 });

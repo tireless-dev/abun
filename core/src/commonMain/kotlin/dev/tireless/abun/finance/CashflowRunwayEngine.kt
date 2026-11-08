@@ -60,14 +60,14 @@ object CashflowRunwayEngine {
 
             for (tx in scheduledTxs) {
                 val splits = splitsByTx[tx.id].orEmpty()
-                for (split in splits) {
-                    if (split.accountId in liquidAccountIds) {
-                        if (split.amountMinor > 0L) {
-                            inflows += split.amountMinor
-                        } else if (split.amountMinor < 0L) {
-                            outflows += (-split.amountMinor)
-                        }
-                    }
+                val netLiquidChange = splits
+                    .filter { it.accountId in liquidAccountIds }
+                    .sumOf { it.amountMinor }
+
+                if (netLiquidChange > 0L) {
+                    inflows += netLiquidChange
+                } else if (netLiquidChange < 0L) {
+                    outflows += (-netLiquidChange)
                 }
             }
 

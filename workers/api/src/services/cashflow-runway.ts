@@ -93,14 +93,14 @@ export function projectCashflowRunway(
 
     for (const tx of scheduledTxs) {
       const splits = splitsByTx.get(tx.id) ?? [];
-      for (const split of splits) {
-        if (liquidAccountIds.has(split.account_id)) {
-          if (split.amount_minor > 0) {
-            inflows += split.amount_minor;
-          } else if (split.amount_minor < 0) {
-            outflows += -split.amount_minor;
-          }
-        }
+      const netLiquidChange = splits
+        .filter((s) => liquidAccountIds.has(s.account_id))
+        .reduce((sum, s) => sum + s.amount_minor, 0);
+
+      if (netLiquidChange > 0) {
+        inflows += netLiquidChange;
+      } else if (netLiquidChange < 0) {
+        outflows += -netLiquidChange;
       }
     }
 

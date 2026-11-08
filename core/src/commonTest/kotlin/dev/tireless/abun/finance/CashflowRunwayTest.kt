@@ -117,4 +117,38 @@ class CashflowRunwayTest {
         assertEquals(1000000L, projection.minimumTroughMinor)
         assertEquals(1000000L, projection.safeToSpendMinor)
     }
+
+    @Test
+    fun `internal transfers between liquid accounts do not create phantom inflows or outflows`() {
+        val initialCash = 1000000L
+        val liquidAccountIds = setOf("acc-cmb", "acc-icbc")
+
+        // Intra-wallet transfer: CMB -200, ICBC +200
+        val transferTx = FinanceTransaction(
+            id = "tx-transfer",
+            txDate = "2026-12-01",
+            status = TransactionStatus.SCHEDULED,
+        )
+        val splits = listOf(
+            FinanceSplit(id = "s-1", transactionId = "tx-transfer", accountId = "acc-cmb", amountMinor = -20000L),
+            FinanceSplit(id = "s-2", transactionId = "tx-transfer", accountId = "acc-icbc", amountMinor = 20000L),
+        )
+
+        val projection = CashflowRunwayEngine.projectRunway(
+            currentDate = "2026-11-30",
+            horizonDays = 5,
+            currentLiquidCashMinor = initialCash,
+            scheduledTransactions = listOf(transferTx),
+            splitsByTx = mapOf("tx-transfer" to splits),
+            liquidAccountIds = liquidAccountIds,
+            unsettledStatements = emptyList(),
+            statementBalancesByGroupId = emptyMap(),
+            dailyLivingBurnMinor = 0L,
+        )
+
+        val dec1Point = projection.dailyPoints.first { it.date == "2026-12-01" }
+        assertEquals(0L, dec1Point.scheduledInflowsMinor)
+        assertEquals(0L, dec1Point.scheduledOutflowsMinor)
+        assertEquals(initialCash, dec1Point.projectedLiquidCashMinor)
+    }
 }
