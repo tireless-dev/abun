@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.9",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "bun run generate-version && bun x wrangler dev",
     "deploy": "bun run generate-version && bun x wrangler deploy",
@@ -13,13 +13,13 @@
     "generate-version": "bun run ./scripts/generate-version.ts"
   },
   "dependencies": {
-    "pg": "^8.16.3"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20260607.1",
-    "@types/pg": "^8.15.6",
-    "typescript": "6.0.3",
-    "vitest": "4.1.8",
-    "wrangler": "4.98.0"
+    "@cloudflare/workers-types": "5.20261108.1",
+    "@types/pg": "^8.23.1",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "wrangler": "4.158.0"
   }
 }
