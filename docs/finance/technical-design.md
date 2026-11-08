@@ -10,9 +10,11 @@ This document defines the technical architecture, database schema, synchronizati
 
 To prevent floating-point rounding errors across Kotlin (JVM/Android/iOS/JS), SQLite, and TypeScript/PostgreSQL on Cloudflare Workers:
 
-- **Storage (`amount_minor`)**: All monetary amounts are stored as **64-bit signed integers in the currency's minor units (`BIGINT` / `INTEGER`)** according to ISO 4217 exponent rules:
-  - Standard 2-decimal currencies (`CNY`, `USD`, `EUR`, `HKD`, `GBP`): scaled by $10^2$ (`¥100.50` $\rightarrow$ `10050`).
-  - Zero-decimal currencies (`JPY`, `KRW`): scaled by $10^0$ (`¥1000 JPY` $\rightarrow$ `1000`).
+- **Storage (`amount_minor`)**: All monetary amounts are stored as **64-bit signed integers in the currency's minor units (`BIGINT` / `INTEGER`)** according to ISO 4217 exponent rules and crypto precision standards:
+  - Standard 2-decimal currencies (`CNY`, `USD`, `EUR`, `HKD`, `GBP`, `SGD`, `THB`): scaled by $10^2$ (`¥100.50` $\rightarrow$ `10050`).
+  - Zero-decimal currencies (`JPY`, `KRW`, `VND`): scaled by $10^0$ (`¥1000 JPY` $\rightarrow$ `1000`).
+  - 3-decimal currencies (`BHD`, `KWD`, `OMR`): scaled by $10^3$.
+  - High-precision crypto currencies: `USDT` scaled by $10^6$ (`1.009241 USDT` $\rightarrow$ `1009241`), `ETH` scaled by $10^8$ (`1.60999095 ETH` $\rightarrow$ `160999095`).
 - **Cross-Currency Balancing Weights (`weight_amount_minor`, `weight_currency`)**:
   - Every `finance_split` stores both its native account amount (`amount_minor`, `currency`) and its transaction-balancing weight (`weight_amount_minor`, `weight_currency`).
   - For single-currency splits, `weight_amount_minor = amount_minor` and `weight_currency = currency`.

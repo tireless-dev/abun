@@ -20,7 +20,9 @@ object FinanceCurrencies {
         return when (currency.uppercase()) {
             "JPY", "KRW", "VND", "CLP", "PYG" -> 0
             "BHD", "JOD", "KWD", "OMR", "TND" -> 3
-            else -> 2 // Default for CNY, USD, EUR, HKD, GBP, etc.
+            "USDT" -> 6
+            "ETH" -> 8
+            else -> 2 // Default for CNY, USD, EUR, HKD, GBP, SGD, THB, etc.
         }
     }
 
@@ -28,6 +30,22 @@ object FinanceCurrencies {
         val scale = minorUnitScale(currency)
         val factor = 10.0.pow(scale)
         return (majorAmount * factor).roundToLong()
+    }
+
+    fun toMinorUnitsFromDecimalString(amountStr: String, currency: String): Long {
+        val scale = minorUnitScale(currency)
+        val cleanStr = amountStr.replace(",", "").trim()
+        if (cleanStr.isEmpty()) return 0L
+        val isNegative = cleanStr.startsWith("-")
+        val unsignedStr = if (isNegative || cleanStr.startsWith("+")) cleanStr.substring(1) else cleanStr
+        val parts = unsignedStr.split(".")
+        val intPart = parts[0].ifEmpty { "0" }.toLong()
+        val fracRaw = if (parts.size > 1) parts[1] else ""
+        val fracPadded = fracRaw.take(scale).padEnd(scale, '0')
+        val fracPart = if (scale > 0 && fracPadded.isNotEmpty()) fracPadded.toLong() else 0L
+        val factor = 10.0.pow(scale).roundToLong()
+        val total = intPart * factor + fracPart
+        return if (isNegative) -total else total
     }
 
     fun toMajorUnits(minorUnits: Long, currency: String): Double {

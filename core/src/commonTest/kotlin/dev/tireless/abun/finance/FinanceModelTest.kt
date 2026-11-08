@@ -8,6 +8,23 @@ import kotlin.test.assertTrue
 class FinanceModelTest {
 
     @Test
+    fun `currency scale and minor unit conversions handle crypto and fiat correctly`() {
+        assertEquals(2, FinanceCurrencies.minorUnitScale("CNY"))
+        assertEquals(2, FinanceCurrencies.minorUnitScale("USD"))
+        assertEquals(0, FinanceCurrencies.minorUnitScale("JPY"))
+        assertEquals(3, FinanceCurrencies.minorUnitScale("KWD"))
+        assertEquals(6, FinanceCurrencies.minorUnitScale("USDT"))
+        assertEquals(8, FinanceCurrencies.minorUnitScale("ETH"))
+
+        // Decimal string conversion tests
+        assertEquals(10050L, FinanceCurrencies.toMinorUnitsFromDecimalString("100.50", "CNY"))
+        assertEquals(-337885L, FinanceCurrencies.toMinorUnitsFromDecimalString("-3,378.85", "CNY"))
+        assertEquals(612530L, FinanceCurrencies.toMinorUnitsFromDecimalString("0.61253", "USDT"))
+        assertEquals(160999095L, FinanceCurrencies.toMinorUnitsFromDecimalString("1.60999095", "ETH"))
+        assertEquals(-495100L, FinanceCurrencies.toMinorUnitsFromDecimalString("-0.004951", "ETH"))
+    }
+
+    @Test
     fun `valid 2-split single currency transaction passes validation`() {
         val tx = FinanceTransaction(
             id = "tx-1",
