@@ -446,88 +446,184 @@ private fun AccountHierarchyItemRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 1. Pass-Through Toggle (Assets only - 转出即消费)
+                // 1. Asset Account Role Segment: [🟢 流动主力] [🟡 沉淀资产] [⚡ 转出即消费]
                 if (acc.category == AccountCategory.ASSET) {
+                    val isOperating = !acc.isPassThrough && acc.liquidTier == LiquidTier.LIQUID
+                    val isSediment = !acc.isPassThrough && acc.liquidTier != LiquidTier.LIQUID
                     val isPass = acc.isPassThrough
-                    val pillBg = if (isPass) Color(0xFFFFF3E0) else ThemeTokens.colors.surfaceMuted
-                    val textCol = if (isPass) Color(0xFFE65100) else ThemeTokens.colors.textTertiary
 
-                    Box(
+                    Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(pillBg)
-                            .clickable {
-                                val nextPass = !acc.isPassThrough
-                                val nextTier = if (nextPass) LiquidTier.NONE else LiquidTier.LIQUID
-                                val nextNetWorth = if (nextPass) false else true
-                                onUpdateAccount(
-                                    acc.id, acc.path, acc.name, acc.category, acc.currency,
-                                    nextNetWorth, nextPass, acc.passThroughExpenseAccountId,
-                                    nextTier, acc.statementDay, acc.dueDay, acc.isArchived,
-                                )
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("toggle-pass-through-${acc.id}"),
+                            .background(ThemeTokens.colors.surfaceMuted)
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = if (isPass) "⚡ 转出即消费" else "○ 普通资产",
-                            style = TextStyle(fontSize = 11.sp, fontWeight = if (isPass) FontWeight.Bold else FontWeight.Normal, color = textCol),
-                        )
+                        // 🟢 流动主力
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (isOperating) ThemeTokens.colors.financeSoft else Color.Transparent)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        true, false, acc.passThroughExpenseAccountId,
+                                        LiquidTier.LIQUID, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .testTag("role-operating-${acc.id}"),
+                        ) {
+                            Text(
+                                text = "🟢 流动主力",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isOperating) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isOperating) ThemeTokens.colors.financeAccent else ThemeTokens.colors.textTertiary,
+                                ),
+                            )
+                        }
+
+                        // 🟡 沉淀资产
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (isSediment) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        acc.includeInNetWorth, false, acc.passThroughExpenseAccountId,
+                                        LiquidTier.NONE, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .testTag("role-sediment-${acc.id}"),
+                        ) {
+                            Text(
+                                text = "🟡 沉淀资产",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSediment) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSediment) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary,
+                                ),
+                            )
+                        }
+
+                        // ⚡ 转出即消费
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (isPass) Color(0xFFFFF3E0) else Color.Transparent)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        false, true, acc.passThroughExpenseAccountId,
+                                        LiquidTier.NONE, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .testTag("toggle-pass-through-${acc.id}"),
+                        ) {
+                            Text(
+                                text = "⚡ 转出即消费",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isPass) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isPass) Color(0xFFE65100) else ThemeTokens.colors.textTertiary,
+                                ),
+                            )
+                        }
+                    }
+
+                    // Secondary Net Worth toggle ONLY for Sediment (沉淀资产)
+                    if (isSediment) {
+                        val incNetWorth = acc.includeInNetWorth && !acc.isArchived
+                        val pillBg = if (incNetWorth) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surfaceMuted
+                        val textCol = if (incNetWorth) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(pillBg)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        !acc.includeInNetWorth, false, acc.passThroughExpenseAccountId,
+                                        LiquidTier.NONE, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("toggle-net-worth-${acc.id}"),
+                        ) {
+                            Text(
+                                text = if (incNetWorth) "✓ 计入净资产" else "✕ 排除净资产",
+                                style = TextStyle(fontSize = 11.sp, color = textCol),
+                            )
+                        }
                     }
                 }
 
-                // 2. Liquidity Toggle (Assets only)
-                if (acc.category == AccountCategory.ASSET && !acc.isPassThrough) {
-                    val isLiquid = acc.liquidTier == LiquidTier.LIQUID && !acc.isArchived
-                    val pillBg = if (isLiquid) ThemeTokens.colors.financeSoft else ThemeTokens.colors.surfaceMuted
-                    val textCol = if (isLiquid) ThemeTokens.colors.financeAccent else ThemeTokens.colors.textTertiary
-
-                    Box(
+                // 2. Liability Account Role Segment: [🔴 商业负债] [⚪ 个人借款]
+                if (acc.category == AccountCategory.LIABILITY) {
+                    val isCommercial = acc.includeInNetWorth && !acc.isArchived
+                    Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(pillBg)
-                            .clickable {
-                                val nextTier = if (acc.liquidTier == LiquidTier.LIQUID) LiquidTier.NONE else LiquidTier.LIQUID
-                                onUpdateAccount(
-                                    acc.id, acc.path, acc.name, acc.category, acc.currency,
-                                    acc.includeInNetWorth, acc.isPassThrough, acc.passThroughExpenseAccountId,
-                                    nextTier, acc.statementDay, acc.dueDay, acc.isArchived,
-                                )
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("toggle-liquid-${acc.id}"),
+                            .background(ThemeTokens.colors.surfaceMuted)
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = if (isLiquid) "● 计入流动性" else "○ 排除流动性",
-                            style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textCol),
-                        )
-                    }
-                }
+                        // 🔴 商业负债
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (isCommercial) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        true, false, acc.passThroughExpenseAccountId,
+                                        acc.liquidTier, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .testTag("role-commercial-${acc.id}"),
+                        ) {
+                            Text(
+                                text = "🔴 商业负债",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isCommercial) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isCommercial) ThemeTokens.colors.error else ThemeTokens.colors.textTertiary,
+                                ),
+                            )
+                        }
 
-                // 3. Net Worth Toggle (Assets & Liabilities)
-                if (acc.category == AccountCategory.ASSET || acc.category == AccountCategory.LIABILITY) {
-                    val incNetWorth = acc.includeInNetWorth && !acc.isArchived
-                    val pillBg = if (incNetWorth) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surfaceMuted
-                    val textCol = if (incNetWorth) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(pillBg)
-                            .clickable {
-                                onUpdateAccount(
-                                    acc.id, acc.path, acc.name, acc.category, acc.currency,
-                                    !acc.includeInNetWorth, acc.isPassThrough, acc.passThroughExpenseAccountId,
-                                    acc.liquidTier, acc.statementDay, acc.dueDay, acc.isArchived,
-                                )
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("toggle-net-worth-${acc.id}"),
-                    ) {
-                        Text(
-                            text = if (incNetWorth) "✓ 计入净资产" else "✕ 排除净资产",
-                            style = TextStyle(fontSize = 11.sp, color = textCol),
-                        )
+                        // ⚪ 个人借款
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (!isCommercial) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                                .clickable {
+                                    onUpdateAccount(
+                                        acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                        false, false, acc.passThroughExpenseAccountId,
+                                        acc.liquidTier, acc.statementDay, acc.dueDay, acc.isArchived,
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .testTag("role-informal-${acc.id}"),
+                        ) {
+                            Text(
+                                text = "⚪ 个人借款",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (!isCommercial) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (!isCommercial) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary,
+                                ),
+                            )
+                        }
                     }
                 }
 
@@ -627,6 +723,9 @@ private fun AccountHierarchyItemRow(
     }
 }
 
+private enum class AssetRoleChoice { OPERATING, SEDIMENT, PASS_THROUGH }
+private enum class LiabilityRoleChoice { COMMERCIAL, INFORMAL }
+
 @Composable
 private fun CreateAccountInlineCard(
     onCreate: (
@@ -644,9 +743,9 @@ private fun CreateAccountInlineCard(
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(AccountCategory.ASSET) }
     var currency by remember { mutableStateOf("CNY") }
-    var includeInNetWorth by remember { mutableStateOf(true) }
-    var isPassThrough by remember { mutableStateOf(false) }
-    var isLiquid by remember { mutableStateOf(true) }
+    var assetRole by remember { mutableStateOf(AssetRoleChoice.OPERATING) }
+    var sedimentIncludeNetWorth by remember { mutableStateOf(true) }
+    var liabilityRole by remember { mutableStateOf(LiabilityRoleChoice.COMMERCIAL) }
 
     EditorialCard(testTag = "finance-settings-create-account-card") {
         Row(
@@ -700,22 +799,127 @@ private fun CreateAccountInlineCard(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("计入流动资金 (Liquid Cash)", style = ThemeTokens.type.label)
-            Switch(checked = isLiquid, onCheckedChange = { isLiquid = it })
+        // Role-based configuration based on category
+        if (category == AccountCategory.ASSET) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("资产定位", style = ThemeTokens.type.label)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ThemeTokens.colors.surfaceMuted)
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (assetRole == AssetRoleChoice.OPERATING) ThemeTokens.colors.financeSoft else Color.Transparent)
+                            .clickable { assetRole = AssetRoleChoice.OPERATING }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "🟢 流动主力",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = if (assetRole == AssetRoleChoice.OPERATING) FontWeight.Bold else FontWeight.Normal,
+                                color = if (assetRole == AssetRoleChoice.OPERATING) ThemeTokens.colors.financeAccent else ThemeTokens.colors.textTertiary,
+                            ),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (assetRole == AssetRoleChoice.SEDIMENT) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                            .clickable { assetRole = AssetRoleChoice.SEDIMENT }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "🟡 沉淀资产",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = if (assetRole == AssetRoleChoice.SEDIMENT) FontWeight.Bold else FontWeight.Normal,
+                                color = if (assetRole == AssetRoleChoice.SEDIMENT) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary,
+                            ),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (assetRole == AssetRoleChoice.PASS_THROUGH) Color(0xFFFFF3E0) else Color.Transparent)
+                            .clickable { assetRole = AssetRoleChoice.PASS_THROUGH }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "⚡ 转出即消费",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = if (assetRole == AssetRoleChoice.PASS_THROUGH) FontWeight.Bold else FontWeight.Normal,
+                                color = if (assetRole == AssetRoleChoice.PASS_THROUGH) Color(0xFFE65100) else ThemeTokens.colors.textTertiary,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            if (assetRole == AssetRoleChoice.SEDIMENT) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("计入净资产统计 (Net Worth)", style = ThemeTokens.type.label)
+                    Switch(checked = sedimentIncludeNetWorth, onCheckedChange = { sedimentIncludeNetWorth = it })
+                }
+            }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("计入净资产统计 (Net Worth)", style = ThemeTokens.type.label)
-            Switch(checked = includeInNetWorth, onCheckedChange = { includeInNetWorth = it })
+        if (category == AccountCategory.LIABILITY) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("负债性质", style = ThemeTokens.type.label)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ThemeTokens.colors.surfaceMuted)
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (liabilityRole == LiabilityRoleChoice.COMMERCIAL) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                            .clickable { liabilityRole = LiabilityRoleChoice.COMMERCIAL }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "🔴 商业负债",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = if (liabilityRole == LiabilityRoleChoice.COMMERCIAL) FontWeight.Bold else FontWeight.Normal,
+                                color = if (liabilityRole == LiabilityRoleChoice.COMMERCIAL) ThemeTokens.colors.error else ThemeTokens.colors.textTertiary,
+                            ),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (liabilityRole == LiabilityRoleChoice.INFORMAL) ThemeTokens.colors.surfaceElevated else Color.Transparent)
+                            .clickable { liabilityRole = LiabilityRoleChoice.INFORMAL }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "⚪ 个人借款",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = if (liabilityRole == LiabilityRoleChoice.INFORMAL) FontWeight.Bold else FontWeight.Normal,
+                                color = if (liabilityRole == LiabilityRoleChoice.INFORMAL) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textTertiary,
+                            ),
+                        )
+                    }
+                }
+            }
         }
 
         Row(
@@ -725,8 +929,19 @@ private fun CreateAccountInlineCard(
             Button(
                 onClick = {
                     if (path.isNotBlank() && name.isNotBlank()) {
-                        val tier = if (isLiquid && category == AccountCategory.ASSET) LiquidTier.LIQUID else LiquidTier.NONE
-                        onCreate(path, name, category, currency, includeInNetWorth, isPassThrough, tier)
+                        val (incNetWorth, isPass, tier) = when (category) {
+                            AccountCategory.ASSET -> when (assetRole) {
+                                AssetRoleChoice.OPERATING -> Triple(true, false, LiquidTier.LIQUID)
+                                AssetRoleChoice.SEDIMENT -> Triple(sedimentIncludeNetWorth, false, LiquidTier.NONE)
+                                AssetRoleChoice.PASS_THROUGH -> Triple(false, true, LiquidTier.NONE)
+                            }
+                            AccountCategory.LIABILITY -> when (liabilityRole) {
+                                LiabilityRoleChoice.COMMERCIAL -> Triple(true, false, LiquidTier.LIQUID)
+                                LiabilityRoleChoice.INFORMAL -> Triple(false, false, LiquidTier.NONE)
+                            }
+                            else -> Triple(false, false, LiquidTier.NONE)
+                        }
+                        onCreate(path, name, category, currency, incNetWorth, isPass, tier)
                     }
                 },
                 enabled = path.isNotBlank() && name.isNotBlank(),

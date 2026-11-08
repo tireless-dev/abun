@@ -101,11 +101,15 @@ Subtabs:
 - **Dedicated Finance Settings Screen (`FinanceSettingsScreen`)**:
   - Accessible directly from the 4th tab of `FinanceTopBarSubnav` ("总览" | "明细" | "清算" | "设置").
   - Displays the full 5-root hierarchy with parent-child indentation.
-  - Per-account configuration toggles:
-    - `⚡ 转出即消费 (Pass-Through)`: For pocket money, family allowance, and meal stipend accounts (e.g., 工商银行、网商亲情卡、邮储银行). Marking an asset account as pass-through automatically sets `liquid_tier = 'None'` and `include_in_net_worth = 0`. Transfers from liquid bank accounts (like CMB) into pass-through accounts are treated as immediate consumption outflow, with zero phantom inflow.
-    - `● 计入流动性 / ○ 排除流动性 (`liquidTier`)`: Allows excluding locked, non-liquid accounts (e.g. 公积金 `HPF`, 医保个人账户 `MIPA`, 云鞍应收款 `Wanon`) from runway and safe-to-spend calculations.
-    - `✓ 计入净资产 / ✕ 排除净资产 (`includeInNetWorth`)`: Allows excluding informal personal borrowings (e.g. 父母借款 `Parents`, 个人借款 `Personal`) and locked assets from net worth calculations so the dashboard reflects actionable commercial solvency.
-    - `已归档 / 正常 (`isArchived`)`: Allows hiding and soft-deactivating closed accounts (e.g. 已结清的京东金融 `JD`).
+  - **Business-Role-Driven Account Configuration (方式 A: 业务角色分类交互)**:
+    - **资产账户 (`Assets`) 3 种业务定位**:
+      1. `🟢 流动主力`: 随用随取的商业活期银行卡（如招商银行）。自动设置 `liquidTier = LIQUID`, `includeInNetWorth = true`, `isPassThrough = false`。
+      2. `🟡 沉淀资产`: 封闭性、非即期可用的沉淀资金（如理财、固定资产，或公积金/医保）。自动设置 `liquidTier = NONE`。仅在此角色下显示次级 `[✓ 计入净资产 / ✕ 排除净资产]` 开关，满足用户如将公积金/医保/应收等排除在净资产之外的诉求。
+      3. `⚡ 转出即消费 (过桥)`: 零花钱、亲情卡、餐费卡等消费中转账户（如网商亲情卡、工行餐费、邮储备用金）。自动设置 `isPassThrough = true`, `liquidTier = NONE`, `includeInNetWorth = false`，不显示任何多余冗余开关。从流动账户划入即记为日常消费，杜绝虚假收入。
+    - **负债账户 (`Liabilities`) 2 种业务性质**:
+      1. `🔴 商业负债`: 信用卡、商业银行贷款。自动 `includeInNetWorth = true`，参与净资产负债统计并需硬性清偿。
+      2. `⚪ 个人借款`: 父母借款、亲友周转借款。自动 `includeInNetWorth = false`，作为表外人情借款排除在净资产统计外，看清真实商业负债率。
+    - `已归档 / 正常 (`isArchived`)`: 隐藏和停用已销户或结清账户（如已关闭的京东金融 `JD`）。
   - Inline sub-account creation card and Auto-Pad reconciliation drawer.
 - **`[Reconcile / Auto-Pad]`** action on any asset or liability account.
 
