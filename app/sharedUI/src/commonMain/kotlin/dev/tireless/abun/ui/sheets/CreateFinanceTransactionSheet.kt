@@ -304,7 +304,7 @@ fun CreateFinanceTransactionContent(
             OutlinedTextField(
                 value = fastWeightAmountText,
                 onValueChange = { fastWeightAmountText = it },
-                label = { Text("Cost in To-Currency @@ (${toAcc?.account?.currency.orEmpty()})") },
+                label = { Text("Cost in To-Currency @@ (${toAcc.account.currency})") },
                 modifier = Modifier.fillMaxWidth().testTag("finance-fast-weight-input"),
                 singleLine = true,
             )

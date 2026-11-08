@@ -238,11 +238,11 @@ class FinanceUiTest {
         assertEquals("Accessories", createdSummary)
         assertEquals(TransactionStatus.CLEARED, createdStatus)
         assertNotNull(createdSplits)
-        assertEquals(2, createdSplits!!.size)
+        assertEquals(2, createdSplits.size)
         // Verify double-entry balancing (-12000 and +12000)
-        assertEquals(-12000L, createdSplits!![0].amountMinor)
-        assertEquals(12000L, createdSplits!![1].amountMinor)
-        assertEquals(0L, createdSplits!!.sumOf { it.amountMinor })
+        assertEquals(-12000L, createdSplits[0].amountMinor)
+        assertEquals(12000L, createdSplits[1].amountMinor)
+        assertEquals(0L, createdSplits.sumOf { it.amountMinor })
     }
 
     @Test

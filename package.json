@@ -1,27 +1,23 @@
 {
   "name": "abun",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "private": true,
   "workspaces": [
     "app/webApp",
     "workers/api"
   ],
   "scripts": {
-    "build": "npm run build -w webApp",
-    "start": "npm run start -w webApp",
-    "dev:web": "npm run start -w webApp -- --host 127.0.0.1 --port 4173 --strictPort",
-    "dev:web:build": "npm run build -w webApp",
+    "build": "npm run build -w app/webApp",
+    "start": "npm run start -w app/webApp",
+    "dev:web": "npm run start -w app/webApp -- --host 127.0.0.1 --port 4173 --strictPort",
+    "dev:web:build": "npm run build -w app/webApp",
     "dev:api": "npm run dev -w workers/api -- --port 8080",
     "dev:supabase": "supabase --workdir ../supabase start && supabase --workdir ../supabase db reset",
     "supabase:status": "supabase --workdir ../supabase status",
-    "test:web": "npm run test:run -w webApp",
+    "test:web": "npm run test:run -w app/webApp",
     "local:verify": "npm run test:web && npm run api:test && npm run api:typecheck",
     "api:dev": "npm run dev -w workers/api",
     "api:test": "npm run test -w workers/api",
-    "api:typecheck": "npm run typecheck -w workers/api",
-    "api:cf-typegen": "npm run cf-typegen -w workers/api"
-  },
-  "devDependencies": {
-    "playwright": "^1.60.0"
+    "api:typecheck": "npm run typecheck -w workers/api"
   }
 }

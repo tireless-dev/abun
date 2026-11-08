@@ -17,11 +17,6 @@ class OtaManager(
 
     fun checkForUpdates(isManual: Boolean = false) {
         if (!BuildInfo.IS_DEV_BUILD) return
-        val currentVersionCode = client.getCurrentVersionCode()
-        if (currentVersionCode <= 0) {
-            handleNoUpdate(isManual)
-            return
-        }
         if (_status.value is OtaStatus.Downloading || _status.value is OtaStatus.Installing) return
 
         _status.value = OtaStatus.Checking(isManual)
@@ -37,6 +32,7 @@ class OtaManager(
                     return@launch
                 }
 
+                val currentVersionCode = client.getCurrentVersionCode()
                 val currentBuildId = BuildInfo.BUILD_IDENTIFIER
 
                 // Determine if newer:

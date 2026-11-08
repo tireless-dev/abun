@@ -78,4 +78,30 @@ describe("api worker smoke test", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
   });
+
+  it("returns worker version on /api/version and /version", async () => {
+    const handler = worker as ExportedHandler;
+    const fetchHandler = handler.fetch as NonNullable<ExportedHandler["fetch"]>;
+
+    const res1 = await fetchHandler(
+      new Request("http://example.com/api/version") as never,
+      {} as never,
+      {} as ExecutionContext,
+    );
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json() as { version: string; name: string; commit?: string; buildTime?: string };
+    expect(body1.version).toBe("0.0.0");
+    expect(body1.name).toBe("api");
+    expect(body1.commit).toMatch(/^(wip|[a-f0-9]+)$/);
+    expect(body1.buildTime).toMatch(/^\d{12}$/);
+
+    const res2 = await fetchHandler(
+      new Request("http://example.com/version") as never,
+      {} as never,
+      {} as ExecutionContext,
+    );
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json() as { version: string; name: string; commit?: string; buildTime?: string };
+    expect(body2.version).toBe(body1.version);
+  });
 });

@@ -13,6 +13,7 @@ import {
   type TaskResponse,
   type TaskStatus,
   createAbunApiClient,
+  formatApiVersion,
 } from '../api/client.ts';
 import './app.css';
 
@@ -233,6 +234,7 @@ export function App() {
   const [pomodoroSessions, setPomodoroSessions] = useState<PomodoroSessionResponse[]>([]);
   const [journalEntries, setJournalEntries] = useState<Array<TaskEventResponse & { taskTitle: string }>>([]);
   const [preferences, setPreferences] = useState<PreferencesState>(DEFAULT_PREFS);
+  const [apiVersion, setApiVersion] = useState<string | null>(null);
 
   const [taskDraft, setTaskDraft] = useState('');
   const [routineDraft, setRoutineDraft] = useState({ template_title: '', cron_schedule: '0 9 * * *', timezone: 'UTC' });
@@ -387,6 +389,14 @@ export function App() {
   }
 
   useEffect(() => () => pendingDeletes.forEach((d) => window.clearTimeout(d.timerId)), [pendingDeletes]);
+
+  useEffect(() => {
+    client.getVersion().then((res) => {
+      setApiVersion(formatApiVersion(res));
+    }).catch(() => {
+      // ignore
+    });
+  }, [client]);
 
   useEffect(() => {
     void loadAll();
@@ -562,6 +572,7 @@ export function App() {
             <button className="primary-action" disabled={working} onClick={() => void verifyOtp()}>Verify OTP</button>
           )}
           {error && <p className="error">{error}</p>}
+          {apiVersion && <p className="muted" style={{ fontSize: "0.75rem", marginTop: "1rem", textAlign: "center" }}>API v{apiVersion}</p>}
         </section>
       </main>
     );

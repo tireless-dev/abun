@@ -70,6 +70,9 @@ class AbunAppController(
         scope.launch {
             restoreSessionOnStartup()
         }
+        scope.launch {
+            fetchApiVersion()
+        }
         if (loginPreferenceStore.isAutoUpdateEnabled()) {
             otaManager.checkForUpdates(isManual = false)
         }
@@ -89,6 +92,20 @@ class AbunAppController(
 
     fun dismissOta() {
         otaManager.dismiss()
+    }
+
+    fun refreshApiVersion() {
+        scope.launch {
+            fetchApiVersion()
+        }
+    }
+
+    private suspend fun fetchApiVersion() {
+        runCatching {
+            authRemoteApi.fetchApiVersion()
+        }.onSuccess { response ->
+            _state.value = _state.value.copy(apiVersion = response.formatForDisplay())
+        }
     }
 
     fun isAutoUpdateEnabled(): Boolean = loginPreferenceStore.isAutoUpdateEnabled()

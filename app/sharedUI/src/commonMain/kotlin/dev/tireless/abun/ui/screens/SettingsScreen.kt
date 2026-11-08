@@ -450,6 +450,12 @@ internal fun SettingsScreenContent(
                 text = "Current Build: ${BuildInfo.BUILD_IDENTIFIER}",
                 style = ThemeTokens.type.bodyMuted,
             )
+            state.apiVersion?.let { apiVersion ->
+                Text(
+                    text = "API Version: v$apiVersion",
+                    style = ThemeTokens.type.bodyMuted,
+                )
+            }
 
             when (val status = otaStatus) {
                 is OtaStatus.UpdateAvailable -> {

@@ -1,5 +1,7 @@
 import java.io.File
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -13,25 +15,14 @@ plugins {
 kotlin {
     iosArm64()
     iosSimulatorArm64()
-    
+
     jvm()
-    
-    js {
-        outputModuleName = "sharedLogic"
-        browser()
-        binaries.library()
-        generateTypeScriptDefinitions()
-        compilerOptions {
-            target = "es2015"
-            optIn.add("kotlin.js.ExperimentalJsExport")
-        }
-    }
-    
-    androidLibrary {
+
+    android {
        namespace = "dev.tireless.abun.sharedLogic"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
        minSdk = libs.versions.android.minSdk.get().toInt()
-    
+
        compilerOptions {
            jvmTarget = JvmTarget.JVM_11
        }
@@ -42,7 +33,7 @@ kotlin {
            isIncludeAndroidResources = true
        }
     }
-    
+
     sourceSets {
         commonMain {
             kotlin.srcDir(layout.buildDirectory.dir("generated/source/buildInfo"))
@@ -62,7 +53,6 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.clientMock)
-            implementation(libs.sqldelight.sqliteDriver)
         }
         androidMain.dependencies {
             implementation(libs.androidx.core.ktx)
@@ -78,9 +68,8 @@ kotlin {
             implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.sqliteDriver)
         }
-        jsMain.dependencies {
-            implementation(libs.wrappers.browser)
-            implementation(libs.sqldelight.webDriver)
+        jvmTest.dependencies {
+            implementation(libs.sqldelight.sqliteDriver)
         }
     }
 }
@@ -102,28 +91,72 @@ abstract class GenerateBuildInfoTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val now = LocalDateTime.now()
-        val timestamp = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"))
         val root = File(rootDirPath.get())
-        val commitHash = runCatching {
-            val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
-                .directory(root)
-                .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                .start()
-            process.waitFor()
-            process.inputStream.bufferedReader().readText().trim()
-        }.getOrDefault("unknown")
+        val pkgFile = File(root, "package.json")
+        val baseVersion = runCatching {
+            val content = pkgFile.readText()
+            val match = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"").find(content)
+            match?.groupValues?.get(1) ?: "0.0.0"
+        }.getOrDefault("0.0.0")
 
-        val isDirty = runCatching {
+        val statusOutput = runCatching {
             val process = ProcessBuilder("git", "status", "--porcelain")
                 .directory(root)
                 .redirectOutput(ProcessBuilder.Redirect.PIPE)
                 .start()
             process.waitFor()
-            process.inputStream.bufferedReader().readText().isNotBlank()
-        }.getOrDefault(false)
+            process.inputStream.bufferedReader().readText()
+        }.getOrDefault("")
 
-        val buildId = if (isDirty) "${timestamp}-wip" else "${timestamp}-${commitHash}"
+        val isDirty = statusOutput.trim().isNotBlank()
+
+        val buildId: String
+        if (isDirty) {
+            var maxMtime = 0L
+            for (line in statusOutput.lines()) {
+                val trimmed = line.trim()
+                if (trimmed.length > 3) {
+                    val filePath = trimmed.substring(2).trim()
+                    val actualPath = if (filePath.contains(" -> ")) {
+                        filePath.substringAfter(" -> ").trim()
+                    } else {
+                        filePath
+                    }
+                    val file = File(root, actualPath)
+                    if (file.exists()) {
+                        val mtime = file.lastModified()
+                        if (mtime > maxMtime) maxMtime = mtime
+                    }
+                }
+            }
+            if (maxMtime == 0L) maxMtime = System.currentTimeMillis()
+            val timestamp = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(maxMtime),
+                ZoneId.systemDefault()
+            ).format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"))
+            buildId = "$baseVersion-$timestamp-wip"
+        } else {
+            val commitTime = runCatching {
+                val process = ProcessBuilder("git", "log", "-1", "--format=%cd", "--date=format:%Y%m%d%H%M")
+                    .directory(root)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .start()
+                process.waitFor()
+                process.inputStream.bufferedReader().readText().trim()
+            }.getOrDefault("")
+
+            val commitHash = runCatching {
+                val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+                    .directory(root)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .start()
+                process.waitFor()
+                process.inputStream.bufferedReader().readText().trim()
+            }.getOrDefault("unknown")
+
+            val timestamp = if (commitTime.isNotBlank()) commitTime else LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"))
+            buildId = "$baseVersion-$timestamp-$commitHash"
+        }
 
         val file = outputDir.get().asFile.resolve("dev/tireless/abun/core/ota/BuildInfo.kt")
         file.parentFile.mkdirs()
@@ -132,7 +165,7 @@ abstract class GenerateBuildInfoTask : DefaultTask() {
             package dev.tireless.abun.core.ota
 
             object BuildInfo {
-                const val VERSION_NAME: String = "0.0.0"
+                const val VERSION_NAME: String = "$baseVersion"
                 const val BUILD_IDENTIFIER: String = "$buildId"
                 const val IS_DEV_BUILD: Boolean = true
                 const val OTA_CHECK_URL: String = "https://ota.tireless.dev/abun/latest.json"

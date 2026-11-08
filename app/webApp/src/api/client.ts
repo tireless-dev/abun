@@ -14,6 +14,22 @@ export type PomodoroSessionState = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type PomodoroTaskUpdate = 'NONE' | 'PROGRESS' | 'COMPLETE' | 'CANCEL';
 export type PreferenceValueType = 'STRING' | 'INT' | 'ENUM';
 
+export interface ApiVersionResponse {
+  name?: string;
+  version: string;
+  commit?: string;
+  buildTime?: string;
+}
+
+export function formatApiVersion(info?: ApiVersionResponse | null): string {
+  if (!info) return "";
+  const { version, commit, buildTime } = info;
+  if (!commit && !buildTime) return version;
+  const timePart = buildTime ? `-${buildTime}` : "";
+  const suffix = commit === "wip" || !commit ? "wip" : commit;
+  return `${version}${timePart}-${suffix}`;
+}
+
 export interface AuthSessionResponse {
   access_token: string;
   access_token_expires_at: string;
@@ -326,6 +342,7 @@ export function createAbunApiClient(options: ApiClientOptions = {}) {
       request<PomodoroSessionResponse>(`/api/pomodoro-sessions/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     deletePomodoroSession: (id: string) => request<PomodoroSessionResponse>(`/api/pomodoro-sessions/${id}`, { method: 'DELETE' }),
 
+    getVersion: () => request<ApiVersionResponse>("/api/version"),
     getJournal: (date: string) => request<TaskEventResponse[]>(`/api/journals/${encodeURIComponent(date)}`),
   };
 }

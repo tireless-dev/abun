@@ -1468,6 +1468,7 @@ class SharedLogicDesktopTest {
                         "/auth/verify" -> AppJson.encodeToString(authVerifyResponse)
                         "/auth/refresh" -> AppJson.encodeToString(authRefreshResponse)
                         "/auth/logout" -> ""
+                        "/api/version" -> """{"version":"0.0.0","name":"api","commit":"470a79a","buildTime":"202611081035"}"""
                         "/api/sync/preferences" -> AppJson.encodeToString(PullResponse(items = emptyList<SyncPreference>(), nextCursor = 0, hasMore = false))
                         "/api/sync/routines" -> AppJson.encodeToString(PullResponse(items = emptyList<String>(), nextCursor = 0, hasMore = false))
                         "/api/sync/tasks" -> AppJson.encodeToString(PullResponse(items = emptyList<dev.tireless.abun.sync.SyncTask>(), nextCursor = 0, hasMore = false))
@@ -1608,5 +1609,12 @@ class SharedLogicDesktopTest {
         override fun createDriver(): SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also {
             AbunDatabase.Schema.create(it)
         }
+    }
+
+    @Test
+    fun `controller loads api version on startup`() = runTest {
+        val controller = testController()
+        waitFor { controller.state.value.apiVersion != null }
+        assertEquals("0.0.0-202611081035-470a79a", controller.state.value.apiVersion)
     }
 }

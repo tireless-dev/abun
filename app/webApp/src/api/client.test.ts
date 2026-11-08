@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createAbunApiClient } from './client.ts';
+import { createAbunApiClient, formatApiVersion } from './client.ts';
 
 describe('createAbunApiClient auth contract', () => {
   it('uses the generic auth routes and otp_email payloads', async () => {
@@ -73,5 +73,28 @@ describe('createAbunApiClient auth contract', () => {
     expect(await client.listTasks()).toEqual([]);
     expect(refreshBearerToken).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+  it("fetches api version without requiring auth", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("https://abun.tireless.dev/api/version");
+      return Response.json({ version: "0.0.0", name: "api" });
+    });
+
+    const client = createAbunApiClient({
+      baseUrl: "https://abun.tireless.dev",
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const res = await client.getVersion();
+    expect(res).toEqual({ version: "0.0.0", name: "api" });
+  });
+
+  it("formats clean and dirty api versions", () => {
+    expect(formatApiVersion({ version: "0.0.0", commit: "470a79a", buildTime: "202611081035" }))
+      .toBe("0.0.0-202611081035-470a79a");
+    expect(formatApiVersion({ version: "0.0.0", commit: "wip", buildTime: "202611081220" }))
+      .toBe("0.0.0-202611081220-wip");
+    expect(formatApiVersion({ version: "0.0.0" }))
+      .toBe("0.0.0");
   });
 });

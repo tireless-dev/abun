@@ -1,7 +1,8 @@
 {
-  "name": "webApp",
-  "version": "1.0.0",
-  "description": "Web application that uses Kotlin Multiplatform Library",
+  "name": "abun",
+  "private": true,
+  "version": "0.0.0",
+  "description": "abun web",
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",

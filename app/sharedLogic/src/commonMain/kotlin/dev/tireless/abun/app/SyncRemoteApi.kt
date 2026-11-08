@@ -57,6 +57,21 @@ data class AuthLogoutRequest(
 )
 
 @Serializable
+data class ApiVersionResponse(
+    val name: String? = null,
+    val version: String,
+    val commit: String? = null,
+    val buildTime: String? = null,
+)
+
+fun ApiVersionResponse.formatForDisplay(): String {
+    if (commit.isNullOrBlank() && buildTime.isNullOrBlank()) return version
+    val timePart = if (!buildTime.isNullOrBlank()) "-$buildTime" else ""
+    val suffix = if (commit == "wip" || commit.isNullOrBlank()) "wip" else commit
+    return "$version$timePart-$suffix"
+}
+
+@Serializable
 data class AuthSessionResponse(
     @SerialName("access_token") val accessToken: String,
     @SerialName("access_token_expires_at") val accessTokenExpiresAt: String,
@@ -79,6 +94,9 @@ class AuthRemoteApi(
     private val baseUrl: String,
     private val client: HttpClient,
 ) {
+    suspend fun fetchApiVersion(): ApiVersionResponse =
+        expectJson(client.get("$baseUrl/api/version"))
+
     suspend fun requestOtp(email: String) {
         expectNoContent(
             client.post("$baseUrl/auth/request") {

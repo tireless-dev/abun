@@ -1,3 +1,4 @@
+import { API_NAME, API_VERSION, API_COMMIT, API_BUILD_TIME } from "../version";
 import {
   hasDbUrl,
   type WorkerEnv,
@@ -89,6 +90,16 @@ export async function routeRequest(
   if (isSiteRead && (url.pathname === "/app" || url.pathname.startsWith("/app/"))) {
     return serveAppAsset(request, env);
   }
+
+  if (isSiteRead && (url.pathname === "/api/version" || url.pathname === "/version")) {
+    return json({
+      version: API_VERSION,
+      name: API_NAME,
+      commit: API_COMMIT,
+      buildTime: API_BUILD_TIME,
+    });
+  }
+
 
   if (method === "POST" && url.pathname === "/auth/request") {
     const body = await readJsonBody(request);

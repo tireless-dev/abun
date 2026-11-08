@@ -1,5 +1,15 @@
 package dev.tireless.abun
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -517,6 +527,24 @@ fun App() {
     var isCommandSheetExpanded by remember { mutableStateOf(false) }
     val otaStatus by controller.otaStatus.collectAsState()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME -> {
+                    if (controller.isAutoUpdateEnabled()) {
+                        controller.checkForUpdates(isManual = false)
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(otaStatus) {
         if (otaStatus is OtaStatus.UpdateAvailable && (otaStatus as OtaStatus.UpdateAvailable).showToast) {
             kotlinx.coroutines.delay(3000L)
@@ -727,14 +755,17 @@ fun App() {
                     )
                 }
 
-                if (otaStatus is OtaStatus.UpdateAvailable && (otaStatus as OtaStatus.UpdateAvailable).showToast) {
-                    val updateInfo = (otaStatus as OtaStatus.UpdateAvailable).info
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(padding)
-                            .padding(ThemeTokens.spacing.mdDp),
-                    ) {
+                AnimatedVisibility(
+                    visible = otaStatus is OtaStatus.UpdateAvailable && (otaStatus as OtaStatus.UpdateAvailable).showToast,
+                    enter = fadeIn(tween(250)) + slideInVertically(tween(250)) { it },
+                    exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(padding)
+                        .padding(ThemeTokens.spacing.mdDp),
+                ) {
+                    val updateInfo = (otaStatus as? OtaStatus.UpdateAvailable)?.info
+                    if (updateInfo != null) {
                         OtaToastCard(
                             info = updateInfo,
                             onUpdate = controller::triggerOtaDownload,

@@ -198,6 +198,7 @@ data class AppUiState(
     val syncState: SyncStateView = SyncStateView(),
     val auth: AuthViewState = AuthViewState(),
     val financeView: FinanceViewState = FinanceViewState(),
+    val apiVersion: String? = null,
 )
 
 enum class SyncScope(val wireName: String) {
