@@ -446,8 +446,38 @@ private fun AccountHierarchyItemRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 1. Liquidity Toggle (Assets only)
+                // 1. Pass-Through Toggle (Assets only - 转出即消费)
                 if (acc.category == AccountCategory.ASSET) {
+                    val isPass = acc.isPassThrough
+                    val pillBg = if (isPass) Color(0xFFFFF3E0) else ThemeTokens.colors.surfaceMuted
+                    val textCol = if (isPass) Color(0xFFE65100) else ThemeTokens.colors.textTertiary
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(pillBg)
+                            .clickable {
+                                val nextPass = !acc.isPassThrough
+                                val nextTier = if (nextPass) LiquidTier.NONE else LiquidTier.LIQUID
+                                val nextNetWorth = if (nextPass) false else true
+                                onUpdateAccount(
+                                    acc.id, acc.path, acc.name, acc.category, acc.currency,
+                                    nextNetWorth, nextPass, acc.passThroughExpenseAccountId,
+                                    nextTier, acc.statementDay, acc.dueDay, acc.isArchived,
+                                )
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("toggle-pass-through-${acc.id}"),
+                    ) {
+                        Text(
+                            text = if (isPass) "⚡ 转出即消费" else "○ 普通资产",
+                            style = TextStyle(fontSize = 11.sp, fontWeight = if (isPass) FontWeight.Bold else FontWeight.Normal, color = textCol),
+                        )
+                    }
+                }
+
+                // 2. Liquidity Toggle (Assets only)
+                if (acc.category == AccountCategory.ASSET && !acc.isPassThrough) {
                     val isLiquid = acc.liquidTier == LiquidTier.LIQUID && !acc.isArchived
                     val pillBg = if (isLiquid) ThemeTokens.colors.financeSoft else ThemeTokens.colors.surfaceMuted
                     val textCol = if (isLiquid) ThemeTokens.colors.financeAccent else ThemeTokens.colors.textTertiary
@@ -474,7 +504,7 @@ private fun AccountHierarchyItemRow(
                     }
                 }
 
-                // 2. Net Worth Toggle (Assets & Liabilities)
+                // 3. Net Worth Toggle (Assets & Liabilities)
                 if (acc.category == AccountCategory.ASSET || acc.category == AccountCategory.LIABILITY) {
                     val incNetWorth = acc.includeInNetWorth && !acc.isArchived
                     val pillBg = if (incNetWorth) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surfaceMuted
