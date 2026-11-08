@@ -75,6 +75,46 @@ ROOT_ACCOUNT_MAP = {
 
 NAMESPACE_ABUN = uuid.UUID("3d4b6840-b8ec-4638-9cf2-1e9bf439e6a0")
 
+ACCOUNT_SPECIAL_CONFIG = {
+    "Assets:Growth:HPF": {
+        "name": "公积金",
+        "liquid_tier": "None",
+        "include_in_net_worth": 0,
+    },
+    "Assets:Growth:MIPA": {
+        "name": "医保个人账户",
+        "liquid_tier": "None",
+        "include_in_net_worth": 0,
+    },
+    "Assets:Receivables:Wanon": {
+        "name": "云鞍应收",
+        "liquid_tier": "None",
+        "include_in_net_worth": 0,
+    },
+    "Liabilities:Borrowing:Parents": {
+        "name": "父母借款",
+        "liquid_tier": "None",
+        "include_in_net_worth": 0,
+    },
+    "Liabilities:Borrowing:Personal": {
+        "name": "个人借款",
+        "liquid_tier": "None",
+        "include_in_net_worth": 0,
+    },
+    "Assets:Current:CMB": {"name": "招商银行"},
+    "Assets:Current:ICBC": {"name": "工商银行"},
+    "Assets:Current:PSBC": {"name": "邮储银行"},
+    "Assets:Current:MYBank": {"name": "网商银行"},
+    "Assets:Cash": {"name": "现金"},
+    "Liabilities:CreditCard:CMB": {"name": "招商信用卡"},
+    "Liabilities:CreditCard:CMBC": {"name": "民生信用卡"},
+    "Liabilities:CreditCard:GZCB": {"name": "广州银行信用卡"},
+    "Liabilities:Loans:CMB": {"name": "招行闪电贷"},
+    "Liabilities:Loans:Wechat": {"name": "微粒贷"},
+    "Liabilities:Loans:Jiebei": {"name": "借呗"},
+    "Liabilities:Loans:JD": {"name": "京东金融", "liquid_tier": "None", "include_in_net_worth": 0},
+}
+
 
 def minor_scale(currency: str) -> int:
     curr = currency.upper()
@@ -231,16 +271,21 @@ def main():
             stmt_day = 10
             due_day = 28
 
+        acc_config = ACCOUNT_SPECIAL_CONFIG.get(acc, {})
+        display_name = acc_config.get("name", last_seg)
+        inc_net_worth = acc_config.get("include_in_net_worth", 0 if is_archived else (1 if cat in ("Asset", "Liability") else 0))
+        resolved_tier = acc_config.get("liquid_tier", "None" if is_archived else tier)
+
         accounts_to_create[acc] = {
             "id": generate_account_id(acc),
             "path": acc,
-            "name": last_seg,
+            "name": display_name,
             "category": cat,
             "currency": primary_curr,
-            "include_in_net_worth": 1 if cat in ("Asset", "Liability") else 0,
+            "include_in_net_worth": inc_net_worth,
             "is_pass_through": 0,
             "pass_through_expense_account_id": None,
-            "liquid_tier": tier,
+            "liquid_tier": resolved_tier,
             "statement_day": stmt_day,
             "due_day": due_day,
             "is_archived": is_archived,
@@ -257,19 +302,24 @@ def main():
             primary_curr, tier = resolve_account_currency_and_tier(acc, None, all_accounts_in_tx[acc])
             last_seg = acc.split(":")[-1]
             cat = infer_account_category(acc)
+            is_archived = 1 if acc in close_directives else 0
+            acc_config = ACCOUNT_SPECIAL_CONFIG.get(acc, {})
+            display_name = acc_config.get("name", last_seg)
+            inc_net_worth = acc_config.get("include_in_net_worth", 0 if is_archived else (1 if cat in ("Asset", "Liability") else 0))
+            resolved_tier = acc_config.get("liquid_tier", "None" if is_archived else tier)
             accounts_to_create[acc] = {
                 "id": generate_account_id(acc),
                 "path": acc,
-                "name": last_seg,
+                "name": display_name,
                 "category": cat,
                 "currency": primary_curr,
-                "include_in_net_worth": 1 if cat in ("Asset", "Liability") else 0,
+                "include_in_net_worth": inc_net_worth,
                 "is_pass_through": 0,
                 "pass_through_expense_account_id": None,
-                "liquid_tier": tier,
+                "liquid_tier": resolved_tier,
                 "statement_day": None,
                 "due_day": None,
-                "is_archived": 0,
+                "is_archived": is_archived,
                 "is_deleted": 0,
                 "hlc_map": "{}",
                 "dirty_fields": "[]",
@@ -501,6 +551,13 @@ def main():
 
         try:
             cursor.execute("BEGIN TRANSACTION;")
+
+            # Clean existing records to prevent stale ghost entries on re-import
+            cursor.execute("DELETE FROM finance_split_clearing_group;")
+            cursor.execute("DELETE FROM finance_split;")
+            cursor.execute("DELETE FROM finance_transaction;")
+            cursor.execute("DELETE FROM finance_clearing_group;")
+            cursor.execute("DELETE FROM finance_account;")
 
             # Insert Accounts
             acc_rows = [

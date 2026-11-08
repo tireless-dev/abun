@@ -257,6 +257,7 @@ class AppNavigationTest {
             AppRoute.CombinedRepayment.route to "combined-repayment-sheet",
             AppRoute.AmortizationWizard.route to "amortization-wizard-sheet",
             AppRoute.FinanceAccounts.route to "finance-accounts-sheet-content",
+            AppRoute.FinanceSettings.route to "finance-settings-screen",
         )
 
         routesToTest.forEach { (route, testTag) ->

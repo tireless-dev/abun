@@ -57,6 +57,7 @@ import dev.tireless.abun.ui.SwissCardHeader
 import dev.tireless.abun.ui.screens.ClearingHubScreen
 import dev.tireless.abun.ui.screens.FinanceCockpitScreen
 import dev.tireless.abun.ui.screens.FinanceLedgerScreen
+import dev.tireless.abun.ui.screens.FinanceSettingsScreen
 import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.SettingsScreen
 import dev.tireless.abun.ui.screens.TasksScreen
@@ -122,6 +123,20 @@ fun AppNavHost(
     onDeleteFinanceTransaction: (String) -> Unit = {},
     onAutoPadAccountBalance: (String, Long) -> Unit = { _, _ -> },
     onCreateFinanceAccount: (String, String, AccountCategory, String, Boolean, Boolean, LiquidTier) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdateFinanceAccount: (
+        id: String,
+        path: String,
+        name: String,
+        category: AccountCategory,
+        currency: String,
+        includeInNetWorth: Boolean,
+        isPassThrough: Boolean,
+        passThroughExpenseAccountId: String?,
+        liquidTier: LiquidTier,
+        statementDay: Int?,
+        dueDay: Int?,
+        isArchived: Boolean,
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onDeleteFinanceAccount: (String) -> Unit = {},
     onRepayCreditStatement: (clearingGroupId: String, fundingAccountId: String, date: String) -> Unit = { _, _, _ -> },
     onRepayLoanTranche: (transactionId: String) -> Unit = {},
@@ -383,6 +398,15 @@ fun AppNavHost(
                 onAutoPad = onAutoPadAccountBalance,
                 onCreateAccount = onCreateFinanceAccount,
                 onDeleteAccount = onDeleteFinanceAccount,
+            )
+        }
+        composable(AppRoute.FinanceSettings.route) {
+            FinanceSettingsScreen(
+                state = state,
+                onUpdateAccount = onUpdateFinanceAccount,
+                onCreateAccount = onCreateFinanceAccount,
+                onDeleteAccount = onDeleteFinanceAccount,
+                onAutoPad = onAutoPadAccountBalance,
             )
         }
         composable(AppRoute.CreateTask.route) {

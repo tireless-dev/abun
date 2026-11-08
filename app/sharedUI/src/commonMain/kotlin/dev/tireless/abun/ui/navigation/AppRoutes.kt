@@ -19,6 +19,7 @@ sealed class AppRoute(val route: String) {
     data object CombinedRepayment : AppRoute("combined-repayment")
     data object AmortizationWizard : AppRoute("amortization-wizard")
     data object FinanceCockpit : AppRoute("finance-cockpit")
+    data object FinanceSettings : AppRoute("finance-settings")
     data object CreateBudgetRule : AppRoute("create-budget-rule")
     data object TaskDetail : AppRoute("task-detail/{taskId}") {
         const val ARG_TASK_ID = "taskId"
@@ -33,6 +34,7 @@ sealed class AppRoute(val route: String) {
         const val FinanceCockpitRoute = "finance-cockpit"
         const val FinanceLedgerRoute = "finance"
         const val ClearingHubRoute = "debt-clearing-hub"
+        const val FinanceSettingsRoute = "finance-settings"
         const val NotesRoute = "notes"
         const val ThingsRoute = "things"
     }
@@ -41,6 +43,7 @@ sealed class AppRoute(val route: String) {
 val FinanceCockpitRoute: String = AppRoute.FinanceCockpit.route
 val FinanceLedgerRoute: String = AppRoute.Finance.route
 val ClearingHubRoute: String = AppRoute.DebtClearingHub.route
+val FinanceSettingsRoute: String = AppRoute.FinanceSettings.route
 val NotesRoute: String = AppRoute.Notes.route
 val ThingsRoute: String = AppRoute.Things.route
 
@@ -64,6 +67,7 @@ fun appTabForRoute(route: String?): AppTab = when {
     route == AppRoute.CreateFinanceTransaction.route -> AppTab.FINANCE
     route == AppRoute.FinanceAccounts.route -> AppTab.FINANCE
     route == AppRoute.DebtClearingHub.route -> AppTab.FINANCE
+    route == AppRoute.FinanceSettings.route -> AppTab.FINANCE
     route == AppRoute.CombinedRepayment.route -> AppTab.FINANCE
     route == AppRoute.AmortizationWizard.route -> AppTab.FINANCE
     route == AppRoute.Settings.route -> AppTab.SETTINGS

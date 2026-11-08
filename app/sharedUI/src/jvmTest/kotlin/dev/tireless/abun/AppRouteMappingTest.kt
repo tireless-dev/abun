@@ -33,6 +33,7 @@ class AppRouteMappingTest {
         assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.CombinedRepayment.route))
         assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.AmortizationWizard.route))
         assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.FinanceCockpit.route))
+        assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.FinanceSettings.route))
         assertEquals(AppTab.FINANCE, appTabForRoute(AppRoute.CreateBudgetRule.route))
     }
 }

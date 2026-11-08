@@ -151,10 +151,11 @@ class FinanceViewDeriver(private val store: LocalStore) {
             }
         }
 
-        val netWorth = accountViews.filter { it.account.includeInNetWorth && it.account.currency == "CNY" }.sumOf { it.balanceMinor }
+        val netWorth = accountViews.filter { it.account.includeInNetWorth && !it.account.isArchived && it.account.currency == "CNY" }.sumOf { it.balanceMinor }
         val liquidAssets = accountViews.filter {
             it.account.category == AccountCategory.ASSET &&
             it.account.liquidTier == LiquidTier.LIQUID &&
+            !it.account.isArchived &&
             it.account.currency == "CNY"
         }.sumOf { it.balanceMinor }
 
@@ -236,7 +237,7 @@ class FinanceViewDeriver(private val store: LocalStore) {
         } else 0L
 
         val liquidAccountIds = accountsById.values
-            .filter { it.category == AccountCategory.ASSET && it.liquidTier == LiquidTier.LIQUID }
+            .filter { it.category == AccountCategory.ASSET && it.liquidTier == LiquidTier.LIQUID && !it.isArchived && it.currency == "CNY" }
             .map { it.id }
             .toSet()
 

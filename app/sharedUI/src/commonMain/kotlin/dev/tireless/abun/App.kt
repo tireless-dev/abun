@@ -156,10 +156,12 @@ private fun FinanceTopBarSubnav(
         Triple("总览", AppRoute.FinanceCockpit.route, "finance-subtab-cockpit"),
         Triple("明细", AppRoute.Finance.route, "finance-subtab-ledger"),
         Triple("清算", AppRoute.DebtClearingHub.route, "finance-subtab-clearing"),
+        Triple("设置", AppRoute.FinanceSettings.route, "finance-subtab-settings"),
     )
     val activeRoute = when (currentRoute) {
         AppRoute.Finance.route -> AppRoute.Finance.route
         AppRoute.DebtClearingHub.route -> AppRoute.DebtClearingHub.route
+        AppRoute.FinanceSettings.route -> AppRoute.FinanceSettings.route
         else -> AppRoute.FinanceCockpit.route
     }
 
@@ -713,6 +715,22 @@ fun App() {
                                 includeInNetWorth = includeInNetWorth,
                                 isPassThrough = isPassThrough,
                                 liquidTier = liquidTier,
+                            )
+                        },
+                        onUpdateFinanceAccount = { id, path, name, category, currency, includeInNetWorth, isPassThrough, passThroughExpenseAccountId, liquidTier, statementDay, dueDay, isArchived ->
+                            controller.updateFinanceAccount(
+                                id = id,
+                                path = path,
+                                name = name,
+                                category = category,
+                                currency = currency,
+                                includeInNetWorth = includeInNetWorth,
+                                isPassThrough = isPassThrough,
+                                passThroughExpenseAccountId = passThroughExpenseAccountId,
+                                liquidTier = liquidTier,
+                                statementDay = statementDay,
+                                dueDay = dueDay,
+                                isArchived = isArchived,
                             )
                         },
                         onDeleteFinanceAccount = controller::deleteFinanceAccount,

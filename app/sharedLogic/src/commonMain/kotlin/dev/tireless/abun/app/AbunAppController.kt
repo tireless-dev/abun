@@ -716,6 +716,37 @@ class AbunAppController(
         refresh()
     }
 
+    fun updateFinanceAccount(
+        id: String,
+        path: String,
+        name: String,
+        category: AccountCategory,
+        currency: String = "CNY",
+        includeInNetWorth: Boolean = true,
+        isPassThrough: Boolean = false,
+        passThroughExpenseAccountId: String? = null,
+        liquidTier: LiquidTier = LiquidTier.LIQUID,
+        statementDay: Int? = null,
+        dueDay: Int? = null,
+        isArchived: Boolean = false,
+    ) {
+        store.financeAccountStore.updateFinanceAccount(
+            id = id,
+            path = path,
+            name = name,
+            category = category,
+            currency = currency,
+            includeInNetWorth = includeInNetWorth,
+            isPassThrough = isPassThrough,
+            passThroughExpenseAccountId = passThroughExpenseAccountId,
+            liquidTier = liquidTier,
+            statementDay = statementDay,
+            dueDay = dueDay,
+            isArchived = isArchived,
+        )
+        refresh()
+    }
+
     fun deleteFinanceAccount(id: String) {
         store.financeAccountStore.deleteFinanceAccount(id)
         refresh()

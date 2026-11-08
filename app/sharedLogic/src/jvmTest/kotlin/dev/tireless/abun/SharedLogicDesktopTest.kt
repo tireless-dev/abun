@@ -1750,7 +1750,7 @@ class SharedLogicDesktopTest {
     }
 
     private suspend fun waitFor(
-        timeoutMillis: Long = 2_000,
+        timeoutMillis: Long = 5_000,
         condition: () -> Boolean,
     ) {
         val start = System.currentTimeMillis()

@@ -31,6 +31,7 @@ import dev.tireless.abun.ui.navigation.AppRoute
 import dev.tireless.abun.ui.screens.ClearingHubScreen
 import dev.tireless.abun.ui.screens.FinanceCockpitScreen
 import dev.tireless.abun.ui.screens.FinanceLedgerScreen
+import dev.tireless.abun.ui.screens.FinanceSettingsScreen
 import dev.tireless.abun.ui.screens.HomeScreen
 import dev.tireless.abun.ui.screens.SettingsScreen
 import dev.tireless.abun.ui.screens.TasksScreen
@@ -188,6 +189,26 @@ class SnapshotDumpTest {
                     onRepayStatement = {},
                     onRepayLoanTranche = {},
                     onDeleteAmortizationPlan = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun dumpFinanceSettings() {
+        if (System.getProperty("abun.dumpSnapshots") != "true") return
+        val state = populatedFinanceScreenshotState(selectedTab = AppTab.FINANCE)
+        dumpSnapshot("finance_settings") {
+            SnapshotScreenFrame(
+                state = state,
+                currentRoute = AppRoute.FinanceSettings.route,
+            ) {
+                FinanceSettingsScreen(
+                    state = state,
+                    onUpdateAccount = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    onCreateAccount = { _, _, _, _, _, _, _ -> },
+                    onDeleteAccount = {},
+                    onAutoPad = { _, _ -> },
                 )
             }
         }
