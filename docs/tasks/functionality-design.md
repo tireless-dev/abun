@@ -5,13 +5,15 @@
 This document describes the user-facing behavior of the tasks module. It is the PRD-level reference for how task planning, daily execution, and historical review should work from a user perspective.
 
 UI implementation note:
-- current shared task surfaces use direct Material 3 components for sheets, forms, segmented selectors, buttons, and app chrome
-- current task surfaces follow the shared editorial Material 3 language: neutral-first color, spacious 8/16/24/32 rhythm, flat outlined cards, muted status tags, and low-noise app chrome
-- top-level shared UI routing now uses Compose Navigation for `Day`, `Tasks`, and `Settings`, while the task subtabs inside `Tasks` remain state-driven
-- shared implementation ownership is now split by responsibility: route surfaces live in `ui/screens`, reusable task and routine presentation lives in `ui/components`, and create/edit modal flows live in `ui/sheets`
+- current shared task surfaces follow the **Swiss Precision & Restraint (B1)** editorial Material 3 language: warm stone canvas (`#F4F1EA`), crisp 4dp grid rhythm, flat outlined cards (`SwissBentoCard`), hairline dividers, and high-contrast typography
+- navigation replaces legacy bottom tab rows and FABs with the bottom-floating **Floating Command Pill** (`FloatingCommandPill`):
+  - on `Dashboard`: primary action is `+ Capture`
+  - on `Tasks`: primary action dynamically reflects the active subtab (`+ 新建任务` for Tasks, `+ 新建例程` for Routines, `+ 开始专注` / `🍅 专注中` for Pomodoro)
+- sub-navigation within `Tasks` uses an inline 3-segment pill title bar selector (`TaskTopBarSubtabSelector`) offering instant switching between `任务` (Tasks), `例程` (Routines), and `番茄` (Pomodoro)
+- top-level shared UI routing uses Compose Navigation with clean decoupled route screens in `ui/screens`, reusable components in `ui/components`, and modal flows in `ui/sheets`
 - the `Tasks` first-level filter selector is compact and icon-first: every option keeps its icon visible, while only the active filter expands to show its text label
-- the task-instance list now sits directly on the shared page surface instead of inside a nested task-list card with duplicate headings
-- this is an implementation detail only; the user-facing workflows below are unchanged by the shared UI package reorganization
+- the task-instance list sits directly on the shared page surface with flat cards and lightweight hierarchy indicators
+- this design ensures rapid capture, zero visual noise, and immediate tactile access to tasks, routines, and focus sessions
 
 ## Primary User Jobs
 
@@ -74,8 +76,9 @@ Filter rule:
 
 Subtab structure:
 
-- `Tasks`: task instances and task management
-- `Routines`: routine definitions only
+- `Tasks` (`任务`): task instances, status execution, and hierarchy management
+- `Routines` (`例程`): recurring routine definitions and manual run triggers
+- `Pomodoro` (`番茄`): focus timer session, duration selection, and daily completed session log
 
 ### Report/Review
 

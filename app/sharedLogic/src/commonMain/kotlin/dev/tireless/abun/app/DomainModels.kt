@@ -3,10 +3,19 @@ package dev.tireless.abun.app
 import dev.tireless.abun.sync.TaskEventType
 import dev.tireless.abun.sync.TaskStatus
 
+enum class AppModule {
+    TASKS,
+    FINANCE,
+    NOTES,
+    THINGS,
+}
+
 enum class AppTab {
     TODAY,
     TASKS,
     FINANCE,
+    NOTES,
+    THINGS,
     SETTINGS,
 }
 
@@ -158,6 +167,7 @@ data class PreferencesViewState(
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
     val blankTitlePolicy: BlankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
     val rolloverTime: String = "02:00",
+    val enabledModules: Set<AppModule> = AppModule.entries.toSet(),
 )
 
 data class TodayViewState(

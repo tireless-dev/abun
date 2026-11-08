@@ -40,6 +40,7 @@ private const val PREF_APP_TIMEZONE_OVERRIDE = "app.timezone_override"
 private const val PREF_APP_DATE_FORMAT = "app.date_format"
 private const val PREF_APP_THEME_PREFERENCE = "app.theme_preference"
 val PREF_APP_ROLLOVER_TIME = "app.rollover_time"
+private const val PREF_APP_ENABLED_MODULES = "app.enabled_modules"
 
 class LocalStore(
     internal val database: AbunDatabase,
@@ -125,6 +126,7 @@ class LocalStore(
         dateFormat: DateFormatPreference,
         themePreference: ThemePreference,
         rolloverTime: String,
+        enabledModules: Set<AppModule> = preferences().enabledModules,
     ) {
         persistPreferences(
             PreferencesViewState(
@@ -138,7 +140,16 @@ class LocalStore(
                 themePreference = themePreference,
                 blankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
                 rolloverTime = rolloverTime,
+                enabledModules = enabledModules,
             ),
+        )
+    }
+
+    fun updateEnabledModules(enabledModules: Set<AppModule>) {
+        persistPreferenceEntry(
+            PREF_APP_ENABLED_MODULES,
+            enabledModules.joinToString(",") { it.name },
+            PreferenceValueType.STRING,
         )
     }
 
@@ -1134,6 +1145,7 @@ class LocalStore(
         persistPreferenceEntry(PREF_APP_DATE_FORMAT, preferences.dateFormat.name, PreferenceValueType.ENUM)
         persistPreferenceEntry(PREF_APP_ROLLOVER_TIME, preferences.rolloverTime, PreferenceValueType.STRING)
         persistPreferenceEntry(PREF_TASK_BLANK_TITLE_POLICY, preferences.blankTitlePolicy.name, PreferenceValueType.ENUM)
+        persistPreferenceEntry(PREF_APP_ENABLED_MODULES, preferences.enabledModules.joinToString(",") { it.name }, PreferenceValueType.STRING)
     }
 
     private fun persistPreferenceEntry(key: String, value: String?, valueType: PreferenceValueType) {
@@ -1687,7 +1699,24 @@ private fun List<MutableSyncRow<LocalPreference>>.toPreferencesViewState(): Pref
         themePreference = ThemePreference.SYSTEM,
         blankTitlePolicy = byKey[PREF_TASK_BLANK_TITLE_POLICY]?.entity?.value?.let(BlankTitlePolicy::valueOf) ?: BlankTitlePolicy.REJECT_BLANK,
         rolloverTime = byKey[PREF_APP_ROLLOVER_TIME]?.entity?.value ?: "02:00",
+        enabledModules = parseEnabledModules(byKey[PREF_APP_ENABLED_MODULES]?.entity?.value),
     )
+}
+
+private fun parseEnabledModules(value: String?): Set<AppModule> {
+    if (value == null) return AppModule.entries.toSet()
+    if (value.isEmpty()) return emptySet()
+    return try {
+        value.split(",")
+            .mapNotNull { name ->
+                val trimmed = name.trim()
+                if (trimmed.isEmpty()) null
+                else runCatching { AppModule.valueOf(trimmed) }.getOrNull()
+            }
+            .toSet()
+    } catch (_: Exception) {
+        AppModule.entries.toSet()
+    }
 }
 
 private fun Boolean.toLong(): Long = if (this) 1 else 0

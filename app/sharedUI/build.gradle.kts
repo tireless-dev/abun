@@ -1,11 +1,11 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -66,7 +66,6 @@ kotlin {
             implementation(kotlin("test"))
             implementation(compose.desktop.currentOs)
             implementation(libs.compose.uiTest)
-            implementation(libs.roborazzi.composeDesktop)
         }
         iosMain.dependencies {
             implementation(libs.ktor.clientDarwin)
@@ -80,3 +79,24 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+
+tasks.named<Test>("jvmTest") {
+    exclude("**/SnapshotDumpTest*")
+}
+
+val jvmTestTask = tasks.named<Test>("jvmTest")
+
+tasks.register<Test>("dumpSnapshots") {
+    group = "verification"
+    description = "Renders and dumps desktop UI snapshot images to build/snapshots."
+    dependsOn(tasks.named("jvmTestClasses"))
+    testClassesDirs = jvmTestTask.get().testClassesDirs
+    classpath = jvmTestTask.get().classpath
+    filter {
+        includeTestsMatching("dev.tireless.abun.SnapshotDumpTest")
+    }
+    systemProperty("abun.dumpSnapshots", "true")
+    systemProperty("abun.snapshotsDir", layout.buildDirectory.dir("snapshots").get().asFile.absolutePath)
+    outputs.upToDateWhen { false }
+}
+

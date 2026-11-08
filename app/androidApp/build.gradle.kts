@@ -18,6 +18,9 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
 }
 
 android {
@@ -28,8 +31,8 @@ android {
         applicationId = "dev.tireless.abun"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
+        versionName = "0.0.0"
     }
     packaging {
         resources {

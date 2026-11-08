@@ -6,6 +6,8 @@ import dev.tireless.abun.finance.BudgetScopeType
 import dev.tireless.abun.finance.ClearingGroupType
 import dev.tireless.abun.finance.LiquidTier
 import dev.tireless.abun.finance.TransactionStatus
+import dev.tireless.abun.ota.OtaManager
+import dev.tireless.abun.ota.OtaStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +47,11 @@ class AbunAppController(
         localStore = store,
         remoteApi = remoteApi,
     )
+    val otaManager = OtaManager(
+        client = dependencies.otaClient,
+        scope = scope,
+    )
+    val otaStatus: StateFlow<OtaStatus> = otaManager.status
 
     private val _state = MutableStateFlow(
         AppUiState(
@@ -63,6 +70,31 @@ class AbunAppController(
         scope.launch {
             restoreSessionOnStartup()
         }
+        if (loginPreferenceStore.isAutoUpdateEnabled()) {
+            otaManager.checkForUpdates(isManual = false)
+        }
+    }
+
+    fun checkForUpdates(isManual: Boolean = false) {
+        otaManager.checkForUpdates(isManual = isManual)
+    }
+
+    fun triggerOtaDownload() {
+        otaManager.startDownload()
+    }
+
+    fun dismissOtaToast() {
+        otaManager.dismissToast()
+    }
+
+    fun dismissOta() {
+        otaManager.dismiss()
+    }
+
+    fun isAutoUpdateEnabled(): Boolean = loginPreferenceStore.isAutoUpdateEnabled()
+
+    fun setAutoUpdateEnabled(enabled: Boolean) {
+        loginPreferenceStore.setAutoUpdateEnabled(enabled)
     }
 
     fun skipLogin() {
@@ -376,6 +408,32 @@ class AbunAppController(
         themePreference: ThemePreference,
         rolloverTime: String,
     ) {
+        updatePreferences(
+            titlePrefix = titlePrefix,
+            defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
+            focusMinutes = focusMinutes,
+            shortBreakMinutes = shortBreakMinutes,
+            longBreakMinutes = longBreakMinutes,
+            timezoneOverride = timezoneOverride,
+            dateFormat = dateFormat,
+            themePreference = themePreference,
+            rolloverTime = rolloverTime,
+            enabledModules = _state.value.preferences.enabledModules,
+        )
+    }
+
+    fun updatePreferences(
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+        themePreference: ThemePreference,
+        rolloverTime: String,
+        enabledModules: Set<AppModule>,
+    ) {
         store.updatePreferences(
             titlePrefix = titlePrefix,
             defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
@@ -386,8 +444,63 @@ class AbunAppController(
             dateFormat = dateFormat,
             themePreference = themePreference,
             rolloverTime = rolloverTime,
+            enabledModules = enabledModules,
         )
         refresh()
+        requestSync()
+    }
+
+    fun savePreferences(
+        titlePrefix: String = _state.value.preferences.titlePrefix,
+        defaultAlarmLeadMinutes: Int = _state.value.preferences.defaultAlarmLeadMinutes,
+        focusMinutes: Int = _state.value.preferences.focusMinutes,
+        shortBreakMinutes: Int = _state.value.preferences.shortBreakMinutes,
+        longBreakMinutes: Int = _state.value.preferences.longBreakMinutes,
+        timezoneOverride: String = _state.value.preferences.timezoneOverride,
+        dateFormat: DateFormatPreference = _state.value.preferences.dateFormat,
+        themePreference: ThemePreference = _state.value.preferences.themePreference,
+        rolloverTime: String = _state.value.preferences.rolloverTime,
+        enabledModules: Set<AppModule> = _state.value.preferences.enabledModules,
+    ) {
+        store.updatePreferences(
+            titlePrefix = titlePrefix,
+            defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
+            focusMinutes = focusMinutes,
+            shortBreakMinutes = shortBreakMinutes,
+            longBreakMinutes = longBreakMinutes,
+            timezoneOverride = timezoneOverride,
+            dateFormat = dateFormat,
+            themePreference = themePreference,
+            rolloverTime = rolloverTime,
+            enabledModules = enabledModules,
+        )
+        refreshState()
+        requestSync()
+    }
+
+    fun refreshState() = refresh()
+
+    fun setModuleEnabled(module: AppModule, enabled: Boolean) {
+        val currentModules = _state.value.preferences.enabledModules
+        val updatedSet = if (enabled) {
+            currentModules + module
+        } else {
+            if (currentModules.size <= 1 && currentModules.contains(module)) {
+                return
+            }
+            currentModules - module
+        }
+        store.updateEnabledModules(updatedSet)
+        val tabDisabled = when (module) {
+            AppModule.TASKS -> _state.value.selectedTab == AppTab.TASKS
+            AppModule.FINANCE -> _state.value.selectedTab == AppTab.FINANCE
+            AppModule.NOTES -> _state.value.selectedTab == AppTab.NOTES
+            AppModule.THINGS -> _state.value.selectedTab == AppTab.THINGS
+        }
+        if (!enabled && tabDisabled) {
+            _state.value = _state.value.copy(selectedTab = AppTab.TODAY)
+        }
+        refreshState()
         requestSync()
     }
 

@@ -1,7 +1,32 @@
 package dev.tireless.abun.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -24,6 +49,10 @@ import dev.tireless.abun.finance.AmortizationMethod
 import dev.tireless.abun.finance.BudgetScopeType
 import dev.tireless.abun.finance.LiquidTier
 import dev.tireless.abun.finance.TransactionStatus
+import dev.tireless.abun.ota.OtaStatus
+import dev.tireless.abun.ui.EditorialPill
+import dev.tireless.abun.ui.SwissBentoCard
+import dev.tireless.abun.ui.SwissCardHeader
 import dev.tireless.abun.ui.screens.ClearingHubScreen
 import dev.tireless.abun.ui.screens.FinanceCockpitScreen
 import dev.tireless.abun.ui.screens.FinanceLedgerScreen
@@ -42,6 +71,7 @@ import dev.tireless.abun.ui.sheets.RoutineActionsSheet
 import dev.tireless.abun.ui.sheets.StartPomodoroSheet
 import dev.tireless.abun.ui.sheets.TaskActionsSheet
 import dev.tireless.abun.ui.sheets.taskCreateContextFor
+import dev.tireless.abun.ui.theme.ThemeTokens
 
 @Composable
 fun AppNavHost(
@@ -113,6 +143,11 @@ fun AppNavHost(
     onSelectFinanceRunwayHorizon: (Int) -> Unit = {},
     onCreateBudgetRule: (String, BudgetScopeType, String, Long, String, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onDeleteBudgetRule: (String) -> Unit = {},
+    otaStatus: OtaStatus = OtaStatus.Idle,
+    isAutoUpdateEnabled: Boolean = true,
+    onManualCheckUpdate: () -> Unit = {},
+    onTriggerOtaUpdate: () -> Unit = {},
+    onUpdateAutoUpdateEnabled: (Boolean) -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -142,11 +177,126 @@ fun AppNavHost(
         composable(AppRoute.Settings.route) {
             SettingsScreen(
                 state = state,
+                otaStatus = otaStatus,
+                isAutoUpdateEnabled = isAutoUpdateEnabled,
+                onManualCheckUpdate = onManualCheckUpdate,
+                onTriggerOtaUpdate = onTriggerOtaUpdate,
+                onUpdateAutoUpdateEnabled = onUpdateAutoUpdateEnabled,
                 onUpdateThemePreference = onUpdateThemePreference,
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,
             )
+        }
+        composable(AppRoute.Notes.route) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SwissBentoCard(
+                    testTag = "notes-bento-journal",
+                ) {
+                    SwissCardHeader(
+                        title = "NOTES · JOURNAL",
+                        accentDotColor = ThemeTokens.colors.notesAccent,
+                        trailingText = state.selectedDate,
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .height(56.dp)
+                                .background(ThemeTokens.colors.notesAccent),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Daily notes, fleeting thoughts & log entries.",
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    color = ThemeTokens.colors.textPrimary,
+                                ),
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                EditorialPill(
+                                    text = "[[daily-review]]",
+                                    backgroundColor = ThemeTokens.colors.notesSoft,
+                                    textColor = ThemeTokens.colors.notesAccent,
+                                )
+                                EditorialPill(
+                                    text = "[[workspace-sync]]",
+                                    backgroundColor = ThemeTokens.colors.notesSoft,
+                                    textColor = ThemeTokens.colors.notesAccent,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        composable(AppRoute.Things.route) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SwissBentoCard(
+                    testTag = "things-bento-assets",
+                ) {
+                    SwissCardHeader(
+                        title = "THINGS · ASSETS",
+                        accentDotColor = ThemeTokens.colors.thingsAccent,
+                        trailingText = "142 ITEMS",
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "142",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ThemeTokens.colors.textPrimary,
+                        ),
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        repeat(2) { rowIdx ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                repeat(6) { colIdx ->
+                                    val dotIndex = rowIdx * 6 + colIdx
+                                    val isPlum = dotIndex < 10
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isPlum) ThemeTokens.colors.thingsAccent else ThemeTokens.colors.subnavTrack,
+                                            ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "All connected · 0 alerts",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = ThemeTokens.colors.textSecondary,
+                        ),
+                    )
+                }
+            }
         }
         composable(AppRoute.FinanceCockpit.route) {
             FinanceCockpitScreen(

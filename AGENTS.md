@@ -33,11 +33,32 @@ Every implementation must include documentation updates before it is considered 
 # Verify shared UI components
 ./gradlew :app:sharedUI:jvmTest
 
+# Visual inspection / on-demand UI snapshot dump (renders core screens to app/sharedUI/build/snapshots/*.png)
+./gradlew :app:sharedUI:dumpSnapshots
+
 # Verify desktop specific logic
 ./gradlew :app:desktopApp:test
 
 # Verify core logic (common)
 ./gradlew :core:jvmTest
+```
+
+### OTA Auto-Update & Distribution (Android)
+
+The Android target includes an OTA (Over-The-Air) self-update mechanism:
+- **Server**: `https://ota.tireless.dev/abun/` (Hosted on `coco@io.tireless.dev:/srv/ota.tireless.dev/abun`)
+- **Metadata URL**: `https://ota.tireless.dev/abun/latest.json`
+- **Latest APK Download**: `https://ota.tireless.dev/abun/abun-latest.apk`
+- **Mobile Web Portal**: `https://ota.tireless.dev/abun/`
+- **Archive Directory**: `https://ota.tireless.dev/abun/apks/` (Retains strictly the **latest 3** versions)
+
+#### How AI Agents Should Trigger OTA Updates:
+```bash
+# Build & Publish fresh debug APK with auto-incremented versionCode:
+./scripts/publish-ota.sh -b -m "Brief description of the changes"
+
+# Upload existing build without rebuilding:
+./scripts/publish-ota.sh -m "Upload existing build"
 ```
 
 ### Web App / Worker Follow-Through

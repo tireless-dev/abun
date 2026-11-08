@@ -1,3 +1,6 @@
+import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -41,6 +44,9 @@ kotlin {
     }
     
     sourceSets {
+        commonMain {
+            kotlin.srcDir(layout.buildDirectory.dir("generated/source/buildInfo"))
+        }
         commonMain.dependencies {
             api(projects.core)
             implementation(libs.kotlinx.coroutines.core)
@@ -59,8 +65,10 @@ kotlin {
             implementation(libs.sqldelight.sqliteDriver)
         }
         androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
             implementation(libs.ktor.clientOkHttp)
             implementation(libs.sqldelight.androidDriver)
+            implementation(libs.shizuku.api)
         }
         iosMain.dependencies {
             implementation(libs.ktor.clientDarwin)
@@ -83,4 +91,63 @@ sqldelight {
             packageName.set("dev.tireless.abun.db")
         }
     }
+}
+
+abstract class GenerateBuildInfoTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    abstract val rootDirPath: Property<String>
+
+    @TaskAction
+    fun generate() {
+        val now = LocalDateTime.now()
+        val timestamp = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"))
+        val root = File(rootDirPath.get())
+        val commitHash = runCatching {
+            val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+                .directory(root)
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .start()
+            process.waitFor()
+            process.inputStream.bufferedReader().readText().trim()
+        }.getOrDefault("unknown")
+
+        val isDirty = runCatching {
+            val process = ProcessBuilder("git", "status", "--porcelain")
+                .directory(root)
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .start()
+            process.waitFor()
+            process.inputStream.bufferedReader().readText().isNotBlank()
+        }.getOrDefault(false)
+
+        val buildId = if (isDirty) "${timestamp}-wip" else "${timestamp}-${commitHash}"
+
+        val file = outputDir.get().asFile.resolve("dev/tireless/abun/core/ota/BuildInfo.kt")
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package dev.tireless.abun.core.ota
+
+            object BuildInfo {
+                const val VERSION_NAME: String = "0.0.0"
+                const val BUILD_IDENTIFIER: String = "$buildId"
+                const val IS_DEV_BUILD: Boolean = true
+                const val OTA_CHECK_URL: String = "https://ota.tireless.dev/abun/latest.json"
+            }
+            """.trimIndent()
+        )
+    }
+}
+
+val generateBuildInfo = tasks.register<GenerateBuildInfoTask>("generateBuildInfo") {
+    outputDir.set(layout.buildDirectory.dir("generated/source/buildInfo"))
+    rootDirPath.set(rootDir.absolutePath)
+    outputs.upToDateWhen { false }
+}
+
+tasks.matching { it.name.contains("compile", ignoreCase = true) || it.name.startsWith("pre") }.configureEach {
+    dependsOn(generateBuildInfo)
 }

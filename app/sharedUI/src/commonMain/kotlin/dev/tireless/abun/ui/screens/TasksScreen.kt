@@ -2,6 +2,8 @@ package dev.tireless.abun.ui.screens
 
 import androidx.compose.runtime.Composable
 import dev.tireless.abun.app.AppUiState
+import dev.tireless.abun.app.PomodoroPhase
+import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.RoutineListItemView
 import dev.tireless.abun.app.TaskListFilter
 import dev.tireless.abun.app.TaskListItemView
@@ -18,6 +20,9 @@ internal fun TasksScreen(
     onCreateRoutine: () -> Unit,
     onOpenRoutine: (RoutineListItemView) -> Unit,
     onRunRoutine: (RoutineListItemView) -> Unit,
+    onStartPomodoro: ((String?, PomodoroPhase) -> Unit)? = null,
+    onCompletePomodoro: ((String, PomodoroTaskUpdate) -> Unit)? = null,
+    onStopPomodoro: ((String) -> Unit)? = null,
 ) {
     when (state.selectedTaskSubTab) {
         TaskSubTab.TASKS -> TaskListScreen(
@@ -36,6 +41,9 @@ internal fun TasksScreen(
             state = state,
             liveNow = liveNow,
             onOpenStart = onOpenStartPomodoro,
+            onStartPomodoro = onStartPomodoro,
+            onCompletePomodoro = onCompletePomodoro,
+            onStopPomodoro = onStopPomodoro,
         )
     }
 }

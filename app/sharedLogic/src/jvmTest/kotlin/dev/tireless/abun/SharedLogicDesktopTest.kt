@@ -6,6 +6,8 @@ import dev.tireless.abun.app.AbunAppController
 import dev.tireless.abun.app.AlarmListItemView
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.AppJson
+import dev.tireless.abun.app.AppModule
+import dev.tireless.abun.app.AppTab
 import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AuthMode
 import dev.tireless.abun.app.DateFormatPreference
@@ -780,6 +782,7 @@ class SharedLogicDesktopTest {
                 "app.date_format",
                 "app.rollover_time",
                 "task.blank_title_policy",
+                "app.enabled_modules",
             ),
             store.dirtyPreferences().map { it.key }.toSet(),
         )
@@ -797,6 +800,32 @@ class SharedLogicDesktopTest {
         val second = testController(loginPreferenceStore = localPreferenceStore)
 
         assertEquals(ThemePreference.DARK, second.state.value.preferences.themePreference)
+    }
+
+    @Test
+    fun `enabled modules defaults to all and can be updated`() {
+        val store = testStore()
+        assertEquals(AppModule.entries.toSet(), store.preferences().enabledModules)
+
+        store.updateEnabledModules(setOf(AppModule.TASKS, AppModule.FINANCE))
+        assertEquals(setOf(AppModule.TASKS, AppModule.FINANCE), store.preferences().enabledModules)
+    }
+
+    @Test
+    fun `controller setModuleEnabled toggles module and resets tab to today if disabled`() = runTest {
+        val controller = testController()
+        controller.selectTab(AppTab.FINANCE)
+        assertEquals(AppTab.FINANCE, controller.state.value.selectedTab)
+
+        controller.setModuleEnabled(AppModule.FINANCE, false)
+        assertFalse(controller.state.value.preferences.enabledModules.contains(AppModule.FINANCE))
+        assertEquals(AppTab.TODAY, controller.state.value.selectedTab)
+
+        // Cannot disable the last remaining module
+        controller.setModuleEnabled(AppModule.TASKS, false)
+        controller.setModuleEnabled(AppModule.NOTES, false)
+        controller.setModuleEnabled(AppModule.THINGS, false)
+        assertTrue(controller.state.value.preferences.enabledModules.isNotEmpty())
     }
 
     @Test
@@ -1116,6 +1145,7 @@ class SharedLogicDesktopTest {
 
         controller.updateLoginEmail(TestSharedAccount.EMAIL)
         controller.requestEmailOtp()
+        waitFor { controller.state.value.auth.otpRequested }
         controller.verifyEmailOtp(TestSharedAccount.OTP)
         waitFor { loginPreferenceStore.authSession()?.accessToken == "access-1" }
 
@@ -1155,6 +1185,7 @@ class SharedLogicDesktopTest {
 
         controller.updateLoginEmail(TestSharedAccount.EMAIL)
         controller.requestEmailOtp()
+        waitFor { controller.state.value.auth.otpRequested }
         controller.verifyEmailOtp(TestSharedAccount.OTP)
 
         waitFor { controller.state.value.syncState.lastSyncedAt != null }

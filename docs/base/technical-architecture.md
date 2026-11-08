@@ -28,6 +28,7 @@ The client is responsible for:
 - rendering UI from local state
 - validating and applying local writes
 - persisting module data in SQLite
+- managing modular workspace configuration (`app.enabled_modules` preference supporting TASKS, FINANCE, NOTES, THINGS) allowing dynamic activation of domain modules and automatic navigation fallback when a workspace is disabled
 - persisting local-only runtime preferences such as login-guide omission, device theme preference, and the current per-device auth session in platform preference storage when the state must survive app restarts without syncing to the server
 - tracking dirty state for synced resources
 - treating the shared auth/session controller and session manager as the source of truth for login, startup restore, refresh, logout, and guest fallback behavior across Android, iOS, and Desktop
@@ -133,3 +134,15 @@ Base docs define shared mechanisms. Module docs define domain meaning. If a stat
 - The shared layer should stay intentionally small: it exists to enforce consistent layout and surface language, not to wrap every Material 3 control.
 - Shared top app bar chrome may host lightweight shared selectors for screen-scoped sub-navigation when the switched content replaces the main body surface rather than filtering a small local region.
 - Shared appearance mode is preference-driven and must support `System`, `Light`, and `Dark` from the shared settings flow rather than through platform-specific toggles.
+
+## OTA Distribution & Auto-Update Runtime
+
+- **Server Endpoint**: `https://ota.tireless.dev/abun/latest.json` (server path: `coco@io.tireless.dev:/srv/ota.tireless.dev/abun`).
+- **Release Automation**: `scripts/publish-ota.sh` compiles debug APKs (`./gradlew :app:sharedLogic:generateBuildInfo :app:androidApp:assembleDebug -PversionCode=...`), extracts metadata, generates `latest.json` and a mobile-friendly download portal (`index.html`), syncs artifacts via `rsync`, and maintains a rolling archive retaining strictly the latest 3 builds.
+- **Client Architecture**:
+  - `dev.tireless.abun.ota.OtaManager` coordinates update checking, comparing remote `versionCode` and commit hash against `BuildInfo.BUILD_IDENTIFIER`.
+  - Android installation uses a dual-path installer:
+    1. **Shizuku silent install**: Executes `pm install -r <apkPath>` without user prompts when Shizuku binder is active and authorized.
+    2. **System FileProvider fallback**: Invokes Android's standard package installer via `FileProvider` (`dev.tireless.abun.fileprovider`) and `Intent.ACTION_VIEW`.
+  - Desktop (JVM), iOS, and Web targets provide no-op stubs so cross-platform compilation remains consistent.
+  - Settings UI exposes current Build ID, manual update check, and an auto-update toggle; the app displays an editorial toast when an update is detected and a 2.dp bottom progress indicator during download.

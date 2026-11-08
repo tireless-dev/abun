@@ -1,6 +1,7 @@
 package dev.tireless.abun.app
 
 import app.cash.sqldelight.db.SqlDriver
+import dev.tireless.abun.ota.PlatformOtaClient
 import io.ktor.client.HttpClient
 import kotlinx.datetime.LocalDate
 
@@ -42,6 +43,8 @@ interface LoginPreferenceStore {
     fun authSession(): AuthSession?
     fun setAuthSession(session: AuthSession)
     fun clearAuthSession()
+    fun isAutoUpdateEnabled(): Boolean = true
+    fun setAutoUpdateEnabled(enabled: Boolean) {}
 }
 
 data class AppDependencies(
@@ -53,4 +56,5 @@ data class AppDependencies(
     val timeProvider: TimeProvider,
     val serverBaseUrl: String,
     val logger: AppLogger = DefaultAppLogger,
+    val otaClient: PlatformOtaClient = PlatformOtaClient(),
 )

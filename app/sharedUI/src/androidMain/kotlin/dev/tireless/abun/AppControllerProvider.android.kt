@@ -96,11 +96,18 @@ private class AndroidLoginPreferenceStore(context: android.content.Context) : Lo
             remove(AUTH_REFRESH_EXPIRES_AT_KEY)
         }.apply()
     }
+
+    override fun isAutoUpdateEnabled(): Boolean = preferences.getBoolean(AUTO_UPDATE_ENABLED_KEY, true)
+
+    override fun setAutoUpdateEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(AUTO_UPDATE_ENABLED_KEY, enabled).apply()
+    }
 }
 
 private const val PREFERENCE_FILE = "abun.local.preferences"
 private const val LOGIN_OMITTED_KEY = "app.auth.login_omitted"
 private const val THEME_PREFERENCE_KEY = "app.theme_preference"
+private const val AUTO_UPDATE_ENABLED_KEY = "app.ota.auto_update_enabled"
 private const val AUTH_USER_ID_KEY = "app.auth.user_id"
 private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"
 private const val AUTH_ACCESS_EXPIRES_AT_KEY = "app.auth.access_token_expires_at"

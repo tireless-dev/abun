@@ -10,6 +10,14 @@ Design philosophy:
 - **Zero-friction grouping**: 90% of `ClearingGroup` bindings (such as monthly credit card statements) happen automatically via account billing rules rather than manual tag picking.
 - **Forward-looking peace of mind**: The primary dashboard answers *"How much can I safely spend today?"* and *"Will I run short on any upcoming bill date?"* before showing historical charts.
 
+UI implementation note:
+- follows the **Swiss Precision & Restraint (B1)** editorial Material 3 design system: warm stone canvas (`#F4F1EA`), flat outlined cards (`SwissBentoCard`), hairline dividers (`SwissHairlineDivider`), 3-column metric strips (`SwissMetricStrip`), and high-contrast monospace metrics
+- top bar sub-navigation uses the inline 3-segment pill subnav (`TopBarSegmentedSubnav`):
+  - `总览` (Overview / Runway Cockpit): Unboxed Safe-to-Spend hero, 3-metric strip (Liquid Assets, Commitments, Guardrails), Guardrail Pacing cards with time-vs-spend dual needles, and Cashflow Agenda with 30D/90D horizon selector
+  - `明细` (Ledger & Transactions): Standard cards vs Plain-text Beancount double-entry toggle, primary status/account filters, and Auto-Pad reconciliation
+  - `清算` (Clearing & Debt Hub): Total Unsettled Obligations hero, credit card statement repayment cards, and loan amortization installment schedules
+- bottom navigation utilizes the centered **Floating Command Pill** (`FloatingCommandPill`), where the right action pill is persistently wired to `+ 记一笔` (Create Balanced Transaction Sheet)
+
 ---
 
 ## Primary User Jobs

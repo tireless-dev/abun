@@ -21,7 +21,23 @@ data class AppColors(
     val success: Color,
     val warning: Color,
     val error: Color,
+    val onSurfaceVariant: Color = textSecondary,
+    val canvas: Color = background,
+    val cardBorder: Color = border,
+    val hairline: Color = border,
+    val pillSurface: Color = Color(0xFF111315),
+    val subnavTrack: Color = surfaceMuted,
+    val tasksAccent: Color = primary,
+    val tasksSoft: Color = surfaceElevated,
+    val financeAccent: Color = success,
+    val financeSoft: Color = surfaceElevated,
+    val notesAccent: Color = warning,
+    val notesSoft: Color = surfaceElevated,
+    val thingsAccent: Color = primary,
+    val thingsSoft: Color = surfaceElevated,
 )
+
+typealias AppSemanticColors = AppColors
 
 internal val LightColorScheme = lightColorScheme(
     primary = Color(0xFF3F4EAE),
@@ -81,18 +97,35 @@ internal val DarkColorScheme = darkColorScheme(
     surfaceContainerHigh = Color(0xFF26292E),
 )
 
-internal fun appColors(colorScheme: ColorScheme): AppColors = AppColors(
-    background = colorScheme.background,
-    surface = colorScheme.surface,
-    surfaceElevated = colorScheme.surfaceContainer,
-    surfaceMuted = colorScheme.surfaceContainerHigh,
-    textPrimary = colorScheme.onSurface,
-    textSecondary = colorScheme.onSurfaceVariant,
-    textTertiary = colorScheme.outline,
-    border = colorScheme.outlineVariant,
-    borderStrong = colorScheme.outline,
-    primary = colorScheme.primary,
-    success = Color(0xFF3D6B55),
-    warning = Color(0xFF7D6432),
-    error = colorScheme.error,
-)
+internal fun appColors(colorScheme: ColorScheme): AppColors {
+    val isDark = colorScheme.background == DarkColorScheme.background
+    return AppColors(
+        background = colorScheme.background,
+        surface = colorScheme.surface,
+        surfaceElevated = colorScheme.surfaceContainer,
+        surfaceMuted = colorScheme.surfaceContainerHigh,
+        textPrimary = colorScheme.onSurface,
+        textSecondary = colorScheme.onSurfaceVariant,
+        textTertiary = colorScheme.outline,
+        border = colorScheme.outlineVariant,
+        borderStrong = colorScheme.outline,
+        primary = colorScheme.primary,
+        success = Color(0xFF3D6B55),
+        warning = Color(0xFF7D6432),
+        error = colorScheme.error,
+        onSurfaceVariant = colorScheme.onSurfaceVariant,
+        canvas = if (isDark) Color(0xFF111315) else Color(0xFFF7F7F4),
+        cardBorder = if (isDark) Color(0xFF282C32) else Color(0xFFE4E4DE),
+        hairline = if (isDark) Color(0xFF22252A) else Color(0xFFEFEFEA),
+        pillSurface = if (isDark) Color(0xFF22262C) else Color(0xFF111315),
+        subnavTrack = if (isDark) Color(0xFF1E2227) else Color(0xFFEAE9E3),
+        tasksAccent = if (isDark) Color(0xFF7B8CE8) else Color(0xFF3B4CCA),
+        tasksSoft = if (isDark) Color(0xFF1F2442) else Color(0xFFEEF0FF),
+        financeAccent = if (isDark) Color(0xFF4DB89E) else Color(0xFF1E7E6B),
+        financeSoft = if (isDark) Color(0xFF16332D) else Color(0xFFE8F5F1),
+        notesAccent = if (isDark) Color(0xFFE5A247) else Color(0xFFC47D1B),
+        notesSoft = if (isDark) Color(0xFF382914) else Color(0xFFFDF3E4),
+        thingsAccent = if (isDark) Color(0xFFC97A96) else Color(0xFF8F4762),
+        thingsSoft = if (isDark) Color(0xFF361D27) else Color(0xFFF9EDF2),
+    )
+}
