@@ -15,6 +15,15 @@ To prevent floating-point rounding errors across Kotlin (JVM/Android/iOS/JS), SQ
   - Zero-decimal currencies (`JPY`, `KRW`, `VND`): scaled by $10^0$ (`¥1000 JPY` $\rightarrow$ `1000`).
   - 3-decimal currencies (`BHD`, `KWD`, `OMR`): scaled by $10^3$.
   - High-precision crypto currencies: `USDT` scaled by $10^6$ (`1.009241 USDT` $\rightarrow$ `1009241`), `ETH` scaled by $10^8$ (`1.60999095 ETH` $\rightarrow$ `160999095`).
+- **Input Precision & ISO Validation**:
+  - The UI and input parser (`FinanceCurrencies.toMinorUnitsFromDecimalString`) enforce strict ISO 4217 decimal constraints.
+  - Fractions exceeding the currency's standard precision (e.g. `2.001 CNY`) are rejected at the input and validation layer.
+- **Dynamic Display Formatting**:
+  - Standard fiat displays 2 decimal places with currency symbols (`¥100.50`, `$20.00`). Zero-decimal currencies display integer values (`¥1,000 JPY`).
+  - High-precision crypto displays a minimum of 2 decimal places and dynamically expands up to its maximum precision when fractional amounts exist (`0.61253 USDT`, `1.60999095 ETH`).
+- **Realized Balance & Balance Sheet Aggregation**:
+  - Only transactions in `CLEARED` status contribute to realized account balances and the balance sheet overview. Future installments and transactions marked `SCHEDULED` are tracked separately in cash flow projections.
+  - Liquid assets (`liquidAssets`) and net worth aggregations on the main dashboard reflect cleared balances matching the portfolio's anchor currency (`CNY`), while foreign currency and crypto accounts are itemized individually in their native units.
 - **Cross-Currency Balancing Weights (`weight_amount_minor`, `weight_currency`)**:
   - Every `finance_split` stores both its native account amount (`amount_minor`, `currency`) and its transaction-balancing weight (`weight_amount_minor`, `weight_currency`).
   - For single-currency splits, `weight_amount_minor = amount_minor` and `weight_currency = currency`.

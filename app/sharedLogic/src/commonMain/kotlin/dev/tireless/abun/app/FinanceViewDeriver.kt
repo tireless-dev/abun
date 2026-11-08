@@ -38,9 +38,15 @@ class FinanceViewDeriver(private val store: LocalStore) {
             allSplits.filter { it.id in splitIds }
         }
 
+        val allTxs = store.queries.selectAllFinanceTransactions(store.financeLedgerStore::mapFinanceTransactionRow).executeAsList()
+        val allTxsById = allTxs.associateBy { it.id }
+
         val accountViews = accounts.map { acc ->
             val splits = splitsByAccount[acc.id].orEmpty()
-            val balance = splits.sumOf { it.amountMinor }
+            val clearedSplits = splits.filter { split ->
+                allTxsById[split.transactionId]?.status == TransactionStatus.CLEARED
+            }
+            val balance = clearedSplits.sumOf { it.amountMinor }
             FinanceAccountViewItem(
                 account = acc,
                 balanceMinor = balance,
@@ -48,9 +54,6 @@ class FinanceViewDeriver(private val store: LocalStore) {
                 splitCount = splits.size,
             )
         }
-
-        val allTxs = store.queries.selectAllFinanceTransactions(store.financeLedgerStore::mapFinanceTransactionRow).executeAsList()
-        val allTxsById = allTxs.associateBy { it.id }
 
         val clearingGroupViews = allClearingGroups.map { cg ->
             val splits = splitsByCgId[cg.id].orEmpty()
@@ -148,9 +151,11 @@ class FinanceViewDeriver(private val store: LocalStore) {
             }
         }
 
-        val netWorth = accountViews.filter { it.account.includeInNetWorth }.sumOf { it.balanceMinor }
+        val netWorth = accountViews.filter { it.account.includeInNetWorth && it.account.currency == "CNY" }.sumOf { it.balanceMinor }
         val liquidAssets = accountViews.filter {
-            it.account.category == AccountCategory.ASSET && it.account.liquidTier == LiquidTier.LIQUID
+            it.account.category == AccountCategory.ASSET &&
+            it.account.liquidTier == LiquidTier.LIQUID &&
+            it.account.currency == "CNY"
         }.sumOf { it.balanceMinor }
 
         val allPlans = store.queries.selectAllFinanceAmortizationPlans(store.financeLedgerStore::mapFinanceAmortizationPlanRow).executeAsList()

@@ -12,6 +12,7 @@ Features:
 """
 
 import argparse
+from collections import defaultdict
 import datetime
 from decimal import Decimal
 import os
@@ -83,7 +84,7 @@ def minor_scale(currency: str) -> int:
         return 3
     if curr == "USDT":
         return 6
-    if curr == "ETH":
+    if curr in ("ETH", "BTC"):
         return 8
     return 2
 
@@ -112,12 +113,40 @@ def infer_account_category(account_path: str) -> str:
     }.get(root, "Asset")
 
 
-def infer_liquid_tier(account_path: str) -> str:
-    if account_path.startswith("Assets:Current") or account_path.startswith("Assets:Wallet") or account_path == "Assets:Cash":
-        return "Liquid"
-    if account_path.startswith("Assets:Growth") or account_path.startswith("Assets:FixedAssets"):
-        return "SemiLiquid"
-    return "None"
+def resolve_account_currency_and_tier(acc_path: str, declared_currencies, used_currencies: set):
+    if acc_path in ROOT_ACCOUNT_MAP:
+        return ROOT_ACCOUNT_MAP[acc_path]["currency"], ROOT_ACCOUNT_MAP[acc_path]["liquid_tier"]
+
+    # 1. Primary currency resolution
+    if declared_currencies:
+        curr = list(declared_currencies)[0]
+    elif used_currencies:
+        if "USDT" in used_currencies and not any(c in used_currencies for c in ("CNY", "USD")):
+            curr = "USDT"
+        elif "ETH" in used_currencies and not any(c in used_currencies for c in ("CNY", "USD")):
+            curr = "ETH"
+        elif "USD" in used_currencies and "CNY" not in used_currencies:
+            curr = "USD"
+        elif "SGD" in used_currencies and "CNY" not in used_currencies:
+            curr = "SGD"
+        elif "GBP" in used_currencies and "CNY" not in used_currencies:
+            curr = "GBP"
+        else:
+            curr = "CNY"
+    else:
+        curr = "CNY"
+
+    # 2. Liquid tier resolution: crypto and volatile assets are not liquid cash
+    if curr in ("USDT", "ETH") or "Crypto" in acc_path:
+        tier = "None"
+    elif acc_path.startswith("Assets:Current") or acc_path.startswith("Assets:Wallet") or acc_path == "Assets:Cash":
+        tier = "Liquid"
+    elif acc_path.startswith("Assets:Growth") or acc_path.startswith("Assets:FixedAssets"):
+        tier = "SemiLiquid"
+    else:
+        tier = "None"
+
+    return curr, tier
 
 
 def main():
@@ -150,12 +179,12 @@ def main():
     open_directives = [e for e in entries if type(e).__name__ == "Open"]
     close_directives = {e.account: e.date for e in entries if type(e).__name__ == "Close"}
     
-    # Collect all unique accounts referenced in postings
-    all_accounts_in_tx = set()
+    # Collect all unique accounts and used currencies referenced in postings
+    all_accounts_in_tx = defaultdict(set)
     for e in entries:
         if type(e).__name__ == "Transaction":
             for p in e.postings:
-                all_accounts_in_tx.add(p.account)
+                all_accounts_in_tx[p.account].add(p.units.currency)
 
     accounts_to_create = {}
 
@@ -186,12 +215,10 @@ def main():
         acc = op.account
         if acc in accounts_to_create:
             continue
-        currencies = op.currencies or ["CNY"]
-        primary_curr = list(currencies)[0] if currencies else "CNY"
+        primary_curr, tier = resolve_account_currency_and_tier(acc, op.currencies, all_accounts_in_tx[acc])
         # Determine name from last segment
         last_seg = acc.split(":")[-1]
         cat = infer_account_category(acc)
-        tier = infer_liquid_tier(acc)
         is_archived = 1 if acc in close_directives else 0
         
         # Check credit card statement / due day defaults
@@ -227,6 +254,7 @@ def main():
     # Ensure any account in transactions is also registered
     for acc in all_accounts_in_tx:
         if acc not in accounts_to_create:
+            primary_curr, tier = resolve_account_currency_and_tier(acc, None, all_accounts_in_tx[acc])
             last_seg = acc.split(":")[-1]
             cat = infer_account_category(acc)
             accounts_to_create[acc] = {
@@ -234,11 +262,11 @@ def main():
                 "path": acc,
                 "name": last_seg,
                 "category": cat,
-                "currency": "CNY",
+                "currency": primary_curr,
                 "include_in_net_worth": 1 if cat in ("Asset", "Liability") else 0,
                 "is_pass_through": 0,
                 "pass_through_expense_account_id": None,
-                "liquid_tier": infer_liquid_tier(acc),
+                "liquid_tier": tier,
                 "statement_day": None,
                 "due_day": None,
                 "is_archived": 0,
@@ -303,7 +331,7 @@ def main():
         tx_counter += 1
         tx_date_str = entry.date.isoformat()
         is_cleared = entry.date <= today_date
-        status = "Cleared" if is_cleared else "Scheduled"
+        status = "CLEARED" if is_cleared else "SCHEDULED"
         payee = entry.payee or ""
         summary = entry.narration or ""
         if entry.flag == "P":
@@ -381,7 +409,6 @@ def main():
             tx_splits.append(split_record)
 
         # Enforce exact double-entry zero sum for any auto-interpolated split
-        from collections import defaultdict
         weight_sums = defaultdict(int)
         for s in tx_splits:
             weight_sums[s["weight_currency"]] += s["weight_amount_minor"]
@@ -450,7 +477,7 @@ def main():
     elapsed = time.time() - start_time
     print(f"\nProcessing completed in {elapsed:.2f}s:")
     print(f"  • Accounts to insert       : {len(accounts_to_create)}")
-    print(f"  • Transactions to insert   : {len(transactions)} ({sum(1 for t in transactions if t['status'] == 'Cleared')} Cleared, {sum(1 for t in transactions if t['status'] == 'Scheduled')} Scheduled)")
+    print(f"  • Transactions to insert   : {len(transactions)} ({sum(1 for t in transactions if t['status'] == 'CLEARED')} Cleared, {sum(1 for t in transactions if t['status'] == 'SCHEDULED')} Scheduled)")
     print(f"  • Splits to insert         : {len(splits)}")
     print(f"  • Clearing Groups (from ^) : {len(clearing_groups)}")
     print(f"  • Split-Group Bindings     : {len(split_clearing_groups)}")

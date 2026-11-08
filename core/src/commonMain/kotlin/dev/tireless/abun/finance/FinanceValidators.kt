@@ -16,15 +16,20 @@ data class ClearingGroupEvaluation(
 )
 
 object FinanceCurrencies {
-    fun minorUnitScale(currency: String): Int {
+    /**
+     * Standard ISO 4217 and crypto decimal precision allowed for input and validation.
+     */
+    fun standardDecimals(currency: String): Int {
         return when (currency.uppercase()) {
             "JPY", "KRW", "VND", "CLP", "PYG" -> 0
             "BHD", "JOD", "KWD", "OMR", "TND" -> 3
             "USDT" -> 6
-            "ETH" -> 8
-            else -> 2 // Default for CNY, USD, EUR, HKD, GBP, SGD, THB, etc.
+            "ETH", "BTC" -> 8
+            else -> 2 // Default ISO 4217 for CNY, USD, EUR, HKD, GBP, SGD, THB, etc.
         }
     }
+
+    fun minorUnitScale(currency: String): Int = standardDecimals(currency)
 
     fun toMinorUnits(majorAmount: Double, currency: String): Long {
         val scale = minorUnitScale(currency)
@@ -41,6 +46,12 @@ object FinanceCurrencies {
         val parts = unsignedStr.split(".")
         val intPart = parts[0].ifEmpty { "0" }.toLong()
         val fracRaw = if (parts.size > 1) parts[1] else ""
+
+        // Strict ISO input validation: rejects invalid fractions (e.g. 2.001 CNY)
+        if (fracRaw.length > scale && fracRaw.substring(scale).any { it != '0' }) {
+            throw IllegalArgumentException("Amount '$amountStr' exceeds maximum allowed $scale decimal places for $currency")
+        }
+
         val fracPadded = fracRaw.take(scale).padEnd(scale, '0')
         val fracPart = if (scale > 0 && fracPadded.isNotEmpty()) fracPadded.toLong() else 0L
         val factor = 10.0.pow(scale).roundToLong()
@@ -69,15 +80,20 @@ object FinanceCurrencies {
             "GBP" -> "£"
             "JPY" -> "¥"
             "HKD" -> "HK$"
+            "SGD" -> "S$"
             else -> ""
         }
 
         val intStr = integerPart.toString().reversed().chunked(3).joinToString(",").reversed()
-        val formattedNumber = if (scale > 0) {
-            val fracStr = fractionPart.toString().padStart(scale, '0')
-            "$intStr.$fracStr"
-        } else {
+        val formattedNumber = if (scale == 0) {
             intStr
+        } else {
+            val fracFull = fractionPart.toString().padStart(scale, '0')
+            val minDec = minOf(2, scale)
+            val baseFrac = fracFull.take(minDec).padEnd(minDec, '0')
+            val extraFrac = fracFull.substring(minDec).trimEnd('0')
+            val finalFrac = "$baseFrac$extraFrac"
+            "$intStr.$finalFrac"
         }
 
         val sign = if (isNegative) "-" else ""

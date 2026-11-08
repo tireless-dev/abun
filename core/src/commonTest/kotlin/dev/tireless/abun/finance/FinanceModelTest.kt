@@ -8,20 +8,36 @@ import kotlin.test.assertTrue
 class FinanceModelTest {
 
     @Test
-    fun `currency scale and minor unit conversions handle crypto and fiat correctly`() {
+    fun `currency scale and ISO precision constraints work correctly`() {
         assertEquals(2, FinanceCurrencies.minorUnitScale("CNY"))
         assertEquals(2, FinanceCurrencies.minorUnitScale("USD"))
-        assertEquals(0, FinanceCurrencies.minorUnitScale("JPY"))
-        assertEquals(3, FinanceCurrencies.minorUnitScale("KWD"))
-        assertEquals(6, FinanceCurrencies.minorUnitScale("USDT"))
-        assertEquals(8, FinanceCurrencies.minorUnitScale("ETH"))
+        assertEquals(2, FinanceCurrencies.standardDecimals("CNY"))
+        assertEquals(2, FinanceCurrencies.standardDecimals("USD"))
+        assertEquals(0, FinanceCurrencies.standardDecimals("JPY"))
+        assertEquals(3, FinanceCurrencies.standardDecimals("KWD"))
+        assertEquals(6, FinanceCurrencies.standardDecimals("USDT"))
+        assertEquals(8, FinanceCurrencies.standardDecimals("ETH"))
 
-        // Decimal string conversion tests
-        assertEquals(10050L, FinanceCurrencies.toMinorUnitsFromDecimalString("100.50", "CNY"))
-        assertEquals(-337885L, FinanceCurrencies.toMinorUnitsFromDecimalString("-3,378.85", "CNY"))
-        assertEquals(612530L, FinanceCurrencies.toMinorUnitsFromDecimalString("0.61253", "USDT"))
-        assertEquals(160999095L, FinanceCurrencies.toMinorUnitsFromDecimalString("1.60999095", "ETH"))
-        assertEquals(-495100L, FinanceCurrencies.toMinorUnitsFromDecimalString("-0.004951", "ETH"))
+        // Decimal string conversion tests in standard minor units
+        assertEquals(10_050L, FinanceCurrencies.toMinorUnitsFromDecimalString("100.50", "CNY"))
+        assertEquals(-337_885L, FinanceCurrencies.toMinorUnitsFromDecimalString("-3,378.85", "CNY"))
+        assertEquals(612_530L, FinanceCurrencies.toMinorUnitsFromDecimalString("0.61253", "USDT"))
+        assertEquals(160_999_095L, FinanceCurrencies.toMinorUnitsFromDecimalString("1.60999095", "ETH"))
+        assertEquals(-495_100L, FinanceCurrencies.toMinorUnitsFromDecimalString("-0.004951", "ETH"))
+
+        // Format tests: default 2 decimals, dynamic expansion for crypto
+        assertEquals("¥100.50", FinanceCurrencies.format(10_050L, "CNY"))
+        assertEquals("¥2.00", FinanceCurrencies.format(200L, "CNY"))
+        assertEquals("¥1,000", FinanceCurrencies.format(1000L, "JPY"))
+        assertEquals("0.61253 USDT", FinanceCurrencies.format(612_530L, "USDT", includeCurrencyCode = true))
+        assertEquals("10.50 USDT", FinanceCurrencies.format(10_500_000L, "USDT", includeCurrencyCode = true))
+        assertEquals("1.60999095 ETH", FinanceCurrencies.format(160_999_095L, "ETH", includeCurrencyCode = true))
+
+        // Input validation test: 2.001 CNY must fail
+        val exception = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            FinanceCurrencies.toMinorUnitsFromDecimalString("2.001", "CNY")
+        }
+        assertTrue(exception.message!!.contains("exceeds maximum allowed 2 decimal places for CNY"))
     }
 
     @Test
@@ -37,7 +53,7 @@ class FinanceModelTest {
                 id = "s-1",
                 transactionId = "tx-1",
                 accountId = "acc-bank",
-                amountMinor = -10050L, // -100.50 CNY
+                amountMinor = -10_050L, // -100.50 CNY
                 currency = "CNY",
                 narration = "Debit card payment",
             ),
@@ -45,7 +61,7 @@ class FinanceModelTest {
                 id = "s-2",
                 transactionId = "tx-1",
                 accountId = "acc-expense",
-                amountMinor = 10050L, // +100.50 CNY
+                amountMinor = 10_050L, // +100.50 CNY
                 currency = "CNY",
                 narration = "Food and groceries",
             ),
@@ -67,14 +83,14 @@ class FinanceModelTest {
                 id = "s-1",
                 transactionId = "tx-2",
                 accountId = "acc-bank",
-                amountMinor = -10000L,
+                amountMinor = -10_000L,
                 currency = "CNY",
             ),
             FinanceSplit(
                 id = "s-2",
                 transactionId = "tx-2",
                 accountId = "acc-expense",
-                amountMinor = 9000L,
+                amountMinor = 9_000L,
                 currency = "CNY",
             ),
         )
@@ -102,7 +118,7 @@ class FinanceModelTest {
                 id = "s-1",
                 transactionId = "tx-draft",
                 accountId = "acc-expense",
-                amountMinor = 5000L,
+                amountMinor = 5_000L,
                 currency = "CNY",
             ),
         )
@@ -123,9 +139,9 @@ class FinanceModelTest {
                 id = "s-fx-1",
                 transactionId = "tx-fx",
                 accountId = "acc-saas",
-                amountMinor = 2000L, // 20.00 USD
+                amountMinor = 2_000L, // 20.00 USD
                 currency = "USD",
-                weightAmountMinor = 14520L, // 145.20 CNY
+                weightAmountMinor = 14_520L, // 145.20 CNY
                 weightCurrency = "CNY",
                 narration = "ChatGPT Plus $20",
             ),
@@ -133,9 +149,9 @@ class FinanceModelTest {
                 id = "s-fx-2",
                 transactionId = "tx-fx",
                 accountId = "acc-credit-card",
-                amountMinor = -14520L, // -145.20 CNY
+                amountMinor = -14_520L, // -145.20 CNY
                 currency = "CNY",
-                weightAmountMinor = -14520L,
+                weightAmountMinor = -14_520L,
                 weightCurrency = "CNY",
                 narration = "Card posted in CNY",
             ),
@@ -157,16 +173,16 @@ class FinanceModelTest {
                 id = "s-1",
                 transactionId = "tx-bad-sign",
                 accountId = "acc-saas",
-                amountMinor = 2000L, // Positive USD
+                amountMinor = 2_000L, // Positive USD
                 currency = "USD",
-                weightAmountMinor = -14520L, // Contradictory Negative CNY weight!
+                weightAmountMinor = -14_520L, // Contradictory Negative CNY weight!
                 weightCurrency = "CNY",
             ),
             FinanceSplit(
                 id = "s-2",
                 transactionId = "tx-bad-sign",
                 accountId = "acc-credit-card",
-                amountMinor = 14520L,
+                amountMinor = 14_520L,
                 currency = "CNY",
             ),
         )
