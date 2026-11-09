@@ -165,20 +165,23 @@ fun editorialStatusColors(
     status: TaskStatus,
     colors: AppColors,
 ): EditorialStatusColors = when (status) {
-    TaskStatus.IN_PROGRESS -> EditorialStatusColors(
-        container = Color(0xFFE8EEF8),
-        content = Color(0xFF435D93),
-    )
-    TaskStatus.PENDING -> EditorialStatusColors(
-        container = Color(0xFFF4EFE2),
-        content = Color(0xFF7D6432),
-    )
-    TaskStatus.COMPLETED -> EditorialStatusColors(
-        container = Color(0xFFEAF2EC),
-        content = Color(0xFF3D6B55),
-    )
+    TaskStatus.IN_PROGRESS -> if (colors.isDark) {
+        EditorialStatusColors(container = colors.tasksSoft, content = colors.tasksAccent)
+    } else {
+        EditorialStatusColors(container = Color(0xFFE8EEF8), content = Color(0xFF435D93))
+    }
+    TaskStatus.PENDING -> if (colors.isDark) {
+        EditorialStatusColors(container = colors.notesSoft, content = colors.notesAccent)
+    } else {
+        EditorialStatusColors(container = Color(0xFFF4EFE2), content = Color(0xFF7D6432))
+    }
+    TaskStatus.COMPLETED -> if (colors.isDark) {
+        EditorialStatusColors(container = colors.financeSoft, content = colors.financeAccent)
+    } else {
+        EditorialStatusColors(container = Color(0xFFEAF2EC), content = Color(0xFF3D6B55))
+    }
     TaskStatus.CANCELLED -> EditorialStatusColors(
-        container = Color(0xFFF5E8E8),
+        container = if (colors.isDark) colors.surfaceMuted else Color(0xFFF5E8E8),
         content = colors.error,
     )
     TaskStatus.UNKNOWN -> EditorialStatusColors(

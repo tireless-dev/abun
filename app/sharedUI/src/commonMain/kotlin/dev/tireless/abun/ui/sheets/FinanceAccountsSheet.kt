@@ -193,10 +193,10 @@ private fun AccountCardItem(
                     horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp),
                 ) {
                     if (acc.liquidTier == LiquidTier.LIQUID) {
-                        AccountBadge("Liquid Runway", Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                        AccountBadge("Liquid Runway", ThemeTokens.colors.financeSoft, ThemeTokens.colors.financeAccent)
                     }
                     if (acc.isPassThrough) {
-                        AccountBadge("Pass-Through", Color(0xFFFFF3E0), Color(0xFFE65100))
+                        AccountBadge("Pass-Through", ThemeTokens.colors.passThroughSoft, ThemeTokens.colors.passThroughAccent)
                     }
                     if (acc.includeInNetWorth) {
                         AccountBadge("Net Worth", ThemeTokens.colors.surfaceMuted, ThemeTokens.colors.textSecondary)

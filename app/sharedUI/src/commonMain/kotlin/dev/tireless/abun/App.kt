@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -53,6 +55,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold as MaterialScaffold
@@ -789,7 +792,8 @@ fun App() {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(padding)
-                        .padding(ThemeTokens.spacing.mdDp),
+                        .padding(horizontal = ThemeTokens.spacing.mdDp)
+                        .padding(bottom = 76.dp),
                 ) {
                     val updateInfo = (otaStatus as? OtaStatus.UpdateAvailable)?.info
                     if (updateInfo != null) {
@@ -854,32 +858,68 @@ private fun OtaToastCard(
         shape = RoundedCornerShape(ThemeTokens.radii.mediumDp),
         color = ThemeTokens.colors.surface,
         border = BorderStroke(1.dp, ThemeTokens.colors.border),
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onUpdate),
+            .clickable(onClick = onUpdate)
+            .testTag("ota-toast-card"),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = ThemeTokens.spacing.mdDp, vertical = ThemeTokens.spacing.smDp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(ThemeTokens.colors.primary),
+                    )
+                    Text(
+                        text = "New update available",
+                        style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold),
+                        color = ThemeTokens.colors.textPrimary,
+                    )
+                }
                 Text(
-                    text = "New update available",
-                    style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold),
-                    color = ThemeTokens.colors.textPrimary,
+                    text = "v${info.versionName} (${info.versionCode}-${info.commit})",
+                    style = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ThemeTokens.colors.textSecondary,
+                    ),
                 )
-                Text(
-                    text = "Build ${info.commit} · v${info.versionName}",
-                    style = ThemeTokens.type.bodyMuted,
-                )
+                if (info.changelog.isNotBlank()) {
+                    Text(
+                        text = info.changelog,
+                        style = ThemeTokens.type.bodyMuted,
+                        maxLines = 1,
+                    )
+                }
             }
-            Button(
-                onClick = onUpdate,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            Spacer(modifier = Modifier.width(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text("Update", style = ThemeTokens.type.label.withMaterialContentColor())
+                TextButton(
+                    onClick = onDismiss,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("Dismiss", style = ThemeTokens.type.label, color = ThemeTokens.colors.textTertiary)
+                }
+                Button(
+                    onClick = onUpdate,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text("Update", style = ThemeTokens.type.label.withMaterialContentColor())
+                }
             }
         }
     }

@@ -730,10 +730,10 @@ private fun SwissClearingGroupPill(name: String, status: ClearingGroupStatus) {
 @Composable
 private fun SwissTxStatusBadge(status: TransactionStatus) {
     val (bg, textCol, label) = when (status) {
-        TransactionStatus.CLEARED -> Triple(ThemeTokens.colors.surfaceMuted, ThemeTokens.colors.textTertiary, "*")
-        TransactionStatus.DRAFT -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "DRAFT")
-        TransactionStatus.SCHEDULED -> Triple(Color(0xFFE8EAF6), Color(0xFF283593), "SCHED")
-        TransactionStatus.VOID -> Triple(ThemeTokens.colors.surfaceMuted, ThemeTokens.colors.textTertiary, "VOID")
+        TransactionStatus.CLEARED -> Triple(ThemeTokens.colors.statusClearedSoft, ThemeTokens.colors.statusClearedAccent, "*")
+        TransactionStatus.DRAFT -> Triple(ThemeTokens.colors.statusDraftSoft, ThemeTokens.colors.statusDraftAccent, "DRAFT")
+        TransactionStatus.SCHEDULED -> Triple(ThemeTokens.colors.statusScheduledSoft, ThemeTokens.colors.statusScheduledAccent, "SCHED")
+        TransactionStatus.VOID -> Triple(ThemeTokens.colors.statusClearedSoft, ThemeTokens.colors.statusClearedAccent, "VOID")
     }
 
     Box(

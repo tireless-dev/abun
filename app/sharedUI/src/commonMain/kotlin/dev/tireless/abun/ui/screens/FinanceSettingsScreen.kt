@@ -518,7 +518,7 @@ private fun AccountHierarchyItemRow(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (isPass) Color(0xFFFFF3E0) else Color.Transparent)
+                                .background(if (isPass) ThemeTokens.colors.passThroughSoft else Color.Transparent)
                                 .clickable {
                                     onUpdateAccount(
                                         acc.id, acc.path, acc.name, acc.category, acc.currency,
@@ -534,7 +534,7 @@ private fun AccountHierarchyItemRow(
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (isPass) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isPass) Color(0xFFE65100) else ThemeTokens.colors.textTertiary,
+                                    color = if (isPass) ThemeTokens.colors.passThroughAccent else ThemeTokens.colors.textTertiary,
                                 ),
                             )
                         }
@@ -851,7 +851,7 @@ private fun CreateAccountInlineCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(if (assetRole == AssetRoleChoice.PASS_THROUGH) Color(0xFFFFF3E0) else Color.Transparent)
+                            .background(if (assetRole == AssetRoleChoice.PASS_THROUGH) ThemeTokens.colors.passThroughSoft else Color.Transparent)
                             .clickable { assetRole = AssetRoleChoice.PASS_THROUGH }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
@@ -860,7 +860,7 @@ private fun CreateAccountInlineCard(
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (assetRole == AssetRoleChoice.PASS_THROUGH) FontWeight.Bold else FontWeight.Normal,
-                                color = if (assetRole == AssetRoleChoice.PASS_THROUGH) Color(0xFFE65100) else ThemeTokens.colors.textTertiary,
+                                color = if (assetRole == AssetRoleChoice.PASS_THROUGH) ThemeTokens.colors.passThroughAccent else ThemeTokens.colors.textTertiary,
                             ),
                         )
                     }

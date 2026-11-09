@@ -62,31 +62,48 @@ Sub-navigation within workspaces evolves from legacy top-app-bar dropdown select
 
 ### Color
 
+- **WCAG 2.1 AA Contrast Standard**:
+  - All text colors (`textPrimary`, `textSecondary`, `textTertiary`) must achieve a contrast ratio of at least **4.5:1** against `surface`, `background`, `surfaceElevated`, and `surfaceMuted` in both Light and Dark themes.
+  - Verified and guarded against regressions via automated mathematical tests in `ColorContrastTest.kt`.
 - Light Theme Anchors (Warm Stone / Swiss Precision):
-  - Canvas: `#F4F1EA`
+  - Canvas: `#F7F7F4`
   - Background: `#FAFAF7`
   - Surface: `#FFFFFF`
-  - Surface Elevated: `#F8F6F0`
-  - Card Border: `#E5E0D8`
-  - Subnav Track: `#EBE7DE`
-  - Pill Surface: `#181A1D`
-  - Text Primary: `#111315`
-  - Text Secondary: `#5C6470`
+  - Surface Elevated: `#F7F6F1`
+  - Surface Muted: `#F2F1EB`
+  - Card Border: `#E2E8F0`
+  - Subnav Track: `#EAE9E3`
+  - Pill Surface: `#111315`
+  - Text Primary: `#0F172A` (Slate 900, 17.5:1 contrast)
+  - Text Secondary: `#475569` (Slate 600, 7.5:1 contrast)
+  - Text Tertiary: `#5B6B82` (Slate 550, 5.4:1 contrast, strictly >= 4.5:1)
 - Dark Theme Anchors:
-  - Canvas: `#161719`
+  - Canvas: `#111315`
   - Background: `#111315`
-  - Surface: `#1A1C1E`
-  - Surface Elevated: `#22252A`
-  - Card Border: `#282A2E`
-  - Subnav Track: `#22252A`
-  - Pill Surface: `#181A1D`
-  - Text Primary: `#EDEDED`
-  - Text Secondary: `#8A919E`
+  - Surface: `#181A1D`
+  - Surface Elevated: `#202327`
+  - Surface Muted: `#26292E`
+  - Card Border: `#282C32`
+  - Subnav Track: `#1E2227`
+  - Pill Surface: `#22262C`
+  - Text Primary: `#F8FAFC` (Slate 50, 14.0:1 contrast)
+  - Text Secondary: `#CBD5E1` (Slate 300, 9.8:1 contrast)
+  - Text Tertiary: `#94A3B8` (Slate 400, 6.8:1 contrast on surface, strictly >= 4.5:1)
+- Semantic Status & Role Tokens (Never hardcode ad-hoc badge colors):
+  - Pass-Through / Warning: `passThroughSoft` + `passThroughAccent` (Light: `#FEF3C7` / `#B45309`, Dark: `#382914` / `#FBBF24`)
+  - Status Cleared: `statusClearedSoft` + `statusClearedAccent` (Light: `#F2F1EB` / `#5B6B82`, Dark: `#26292E` / `#94A3B8`)
+  - Status Draft: `statusDraftSoft` + `statusDraftAccent`
+  - Status Scheduled: `statusScheduledSoft` + `statusScheduledAccent` (Light: `#EFF6FF` / `#1D4ED8`, Dark: `#172554` / `#93C5FD`)
 - Module Accents:
-  - Tasks Accent: `#4F46E5` (Indigo)
-  - Finance Accent: `#059669` / `#10B981` (Emerald)
-  - Notes Accent: `#D97706` (Amber)
-  - Things Accent: `#7C3AED` (Purple)
+  - Tasks Accent: `#7B8CE8` (Dark) / `#3B4CCA` (Light)
+  - Finance Accent: `#4DB89E` (Dark) / `#0F766E` (Light)
+  - Notes Accent: `#FBBF24` (Dark) / `#B45309` (Light)
+  - Things Accent: `#C97A96` (Dark) / `#8F4762` (Light)
+
+### Bottom Action Pill Overlay & Toast Clearance
+
+- The centered `FloatingCommandPill` sits at `Alignment.BottomCenter` with `padding(bottom = 12.dp)` and a height footprint of ~48dp (top edge at ~60dp from screen bottom).
+- Any floating banner, toast, or action prompt (such as `OtaToastCard` or `FloatingCommandSheet`) anchored at `BottomCenter` must apply `.padding(bottom = 76.dp)` (or higher) to sit cleanly above the pill and guarantee zero visual overlap.
 
 ### Typography
 

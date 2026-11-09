@@ -515,7 +515,7 @@ internal fun SettingsScreenContent(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
                             Text(
-                                text = "New update available: v${status.info.versionName} (${status.info.commit})",
+                                text = "New update available: v${status.info.versionName} (${status.info.versionCode}-${status.info.commit})",
                                 style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold),
                             )
                             if (status.info.changelog.isNotBlank()) {
