@@ -695,6 +695,11 @@ fun App() {
                         },
                         onSelectFinanceFilter = controller::selectFinanceFilter,
                         onToggleFinanceViewMode = controller::toggleFinanceLedgerViewMode,
+                        onToggleFinanceSortOrder = controller::toggleFinanceSortOrder,
+                        onToggleFinanceIncludeFuture = controller::toggleFinanceIncludeFuture,
+                        onSelectFinanceDateRange = controller::setFinanceDateRangePreset,
+                        onSelectFinanceAccounts = controller::setFinanceAccountFilter,
+                        onLoadMoreFinanceTransactions = controller::loadMoreFinanceTransactions,
                         onCreateFinanceTransaction = { txDate, summary, payee, status, splits ->
                             controller.createFinanceTransaction(
                                 txDate = txDate,

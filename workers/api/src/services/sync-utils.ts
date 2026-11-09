@@ -42,6 +42,20 @@ export async function nextServerVersion(db: DbClient): Promise<number> {
   return next;
 }
 
+export async function reserveServerVersions(db: DbClient, count: number): Promise<number> {
+  if (count <= 0) return 0;
+  const result = await db.query(
+    `select next_value from sync_server_version where id = 1 for update`,
+  );
+  const current = Number(result.rows[0]?.next_value ?? 0);
+  const next = current + count;
+  await db.query(
+    `update sync_server_version set next_value = $1 where id = 1`,
+    [next],
+  );
+  return current;
+}
+
 export async function hasOwnedRecord(
   db: DbClient,
   tableName: string,

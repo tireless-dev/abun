@@ -325,7 +325,7 @@ class FinanceStoreTest {
         val food = accounts.first { it.path == "Expenses:Food" }
 
         val txId = store.financeLedgerStore.createFinanceTransaction(
-            txDate = "2026-11-05",
+            txDate = "2026-05-25",
             summary = "Lunch",
             payee = "Subway",
             splits = listOf(
@@ -616,5 +616,71 @@ class FinanceStoreTest {
         store.financeAccountStore.deleteBudgetRule(foodRule.id)
         assertNull(store.financeAccountStore.financeBudgetRule(foodRule.id))
         assertEquals(1, store.financeAccountStore.financeBudgetRules().size)
+    }
+
+    @Test
+    fun `ledger filtering future records, sorting order, and pagination lifecycle`() {
+        val store = createTestStore()
+        store.financeAccountStore.loadPredefinedFinanceAccounts()
+        val accounts = store.financeAccountStore.financeAccounts()
+        val bank = accounts.first { it.path == "Assets:Bank:Default" }
+        val food = accounts.first { it.path == "Expenses:Food" }
+
+        // Today is 2026-05-25 per testTimeProvider
+        // Create 3 transactions: past (2026-05-20), today (2026-05-25), and future (2026-06-01)
+        store.financeLedgerStore.createFinanceTransaction(
+            txDate = "2026-05-20",
+            summary = "Past coffee",
+            splits = listOf(
+                FinanceSplitDraft(accountId = bank.id, amountMinor = -2000L),
+                FinanceSplitDraft(accountId = food.id, amountMinor = 2000L),
+            ),
+        )
+        store.financeLedgerStore.createFinanceTransaction(
+            txDate = "2026-05-25",
+            summary = "Today lunch",
+            splits = listOf(
+                FinanceSplitDraft(accountId = bank.id, amountMinor = -3000L),
+                FinanceSplitDraft(accountId = food.id, amountMinor = 3000L),
+            ),
+        )
+        store.financeLedgerStore.createFinanceTransaction(
+            txDate = "2026-06-01",
+            summary = "Future dinner",
+            splits = listOf(
+                FinanceSplitDraft(accountId = bank.id, amountMinor = -5000L),
+                FinanceSplitDraft(accountId = food.id, amountMinor = 5000L),
+            ),
+        )
+
+        // 1. Default (includeFuture = false, sortAscending = false DESC):
+        // Future transaction must be excluded by default!
+        val defaultView = store.financeViewDeriver.deriveFinanceViewState(includeFuture = false, sortAscending = false)
+        assertEquals(2, defaultView.transactions.size)
+        assertEquals("Today lunch", defaultView.transactions[0].transaction.summary)
+        assertEquals("Past coffee", defaultView.transactions[1].transaction.summary)
+
+        // 2. Chronological ASC (includeFuture = false, sortAscending = true ASC):
+        // Oldest first up to today
+        val ascView = store.financeViewDeriver.deriveFinanceViewState(includeFuture = false, sortAscending = true)
+        assertEquals(2, ascView.transactions.size)
+        assertEquals("Past coffee", ascView.transactions[0].transaction.summary)
+        assertEquals("Today lunch", ascView.transactions[1].transaction.summary)
+
+        // 3. Include future = true (sortAscending = false DESC):
+        // Future transaction is at the top
+        val futureDescView = store.financeViewDeriver.deriveFinanceViewState(includeFuture = true, sortAscending = false)
+        assertEquals(3, futureDescView.transactions.size)
+        assertEquals("Future dinner", futureDescView.transactions[0].transaction.summary)
+        assertEquals("Today lunch", futureDescView.transactions[1].transaction.summary)
+        assertEquals("Past coffee", futureDescView.transactions[2].transaction.summary)
+
+        // 4. Include future = true (sortAscending = true ASC):
+        // Future transaction is at the bottom
+        val futureAscView = store.financeViewDeriver.deriveFinanceViewState(includeFuture = true, sortAscending = true)
+        assertEquals(3, futureAscView.transactions.size)
+        assertEquals("Past coffee", futureAscView.transactions[0].transaction.summary)
+        assertEquals("Today lunch", futureAscView.transactions[1].transaction.summary)
+        assertEquals("Future dinner", futureAscView.transactions[2].transaction.summary)
     }
 }

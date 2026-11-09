@@ -184,19 +184,22 @@ class DatabaseAlarmSyncService implements AlarmSyncServiceLike {
   }
 
   async push(userId: string, items: SyncAlarm[]): Promise<SyncAlarm[]> {
-    const results: SyncAlarm[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncAlarm[] = [];
+      for (const incoming of items) {
         if (!(await this.tasks.exists(userId, incoming.task_id))) {
           throw new Error("task_id does not belong to current user");
         }
         const existing = await selectOneAlarm(tx, userId, incoming.id);
-        if (!existing) return insertNewAlarm(tx, userId, incoming);
-        return mergeExistingAlarm(tx, userId, existing, incoming);
-      });
-      results.push(result);
-    }
-    return results;
+        if (!existing) {
+          results.push(await insertNewAlarm(tx, userId, incoming));
+        } else {
+          results.push(await mergeExistingAlarm(tx, userId, existing, incoming));
+        }
+      }
+      return results;
+    });
   }
 }
 

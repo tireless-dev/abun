@@ -121,14 +121,17 @@ fun FinanceSettingsScreen(
         matchesCategory && matchesSearch
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(ThemeTokens.spacing.lgDp)
             .testTag("finance-settings-screen"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
         // 1. Header & Metric Overview
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
@@ -322,6 +325,7 @@ fun FinanceSettingsScreen(
                 }
             }
         }
+    }
     }
 }
 

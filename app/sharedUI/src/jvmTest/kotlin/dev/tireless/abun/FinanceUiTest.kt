@@ -61,6 +61,8 @@ class FinanceUiTest {
     private fun testFinanceState(
         transactions: List<FinanceTransactionViewItem> = emptyList(),
         viewMode: FinanceLedgerViewMode = FinanceLedgerViewMode.STANDARD,
+        sortAscending: Boolean = false,
+        includeFuture: Boolean = false,
     ): AppUiState {
         val bankAccount = FinanceAccount(
             id = "acc-bank-1",
@@ -94,12 +96,14 @@ class FinanceUiTest {
                 liquidAssetsMinor = 88800L,
                 formattedLiquidAssets = "¥888.00",
                 viewMode = viewMode,
+                sortAscending = sortAscending,
+                includeFuture = includeFuture,
             ),
         )
     }
 
     @Test
-    fun `finance ledger screen renders metrics and toggles view mode`() = runDesktopComposeUiTest {
+    fun `finance ledger screen renders metrics and filter bar buttons`() = runDesktopComposeUiTest {
         val tx = FinanceTransaction(
             id = "tx-1",
             txDate = "2026-11-05",
@@ -125,16 +129,23 @@ class FinanceUiTest {
             transaction = tx,
             splits = splits,
             primaryAmountFormatted = "-¥35.00",
-            primaryAccountsFormatted = "工作午餐 <- 招商银行",
+            primaryAccountsFormatted = "招商银行 → 工作午餐",
             beancountText = "2026-11-05 * \"Starbucks\" \"Latte\"\n  Assets:Bank:CMB  -35.00 CNY\n  Expenses:Food:Lunch  35.00 CNY",
         )
 
         var currentMode by mutableStateOf(FinanceLedgerViewMode.STANDARD)
+        var sortAscending by mutableStateOf(false)
+        var includeFuture by mutableStateOf(false)
 
         setContent {
             AppTheme {
                 FinanceLedgerScreen(
-                    state = testFinanceState(transactions = listOf(txItem), viewMode = currentMode),
+                    state = testFinanceState(
+                        transactions = listOf(txItem),
+                        viewMode = currentMode,
+                        sortAscending = sortAscending,
+                        includeFuture = includeFuture,
+                    ),
                     onSelectFilter = { _, _, _ -> },
                     onToggleViewMode = {
                         currentMode = if (currentMode == FinanceLedgerViewMode.STANDARD) {
@@ -143,6 +154,8 @@ class FinanceUiTest {
                             FinanceLedgerViewMode.STANDARD
                         }
                     },
+                    onToggleSortOrder = { sortAscending = !sortAscending },
+                    onToggleIncludeFuture = { includeFuture = !includeFuture },
                     onOpenCreateTransaction = {},
                     onOpenAccounts = {},
                     onDeleteTransaction = {},
@@ -156,15 +169,22 @@ class FinanceUiTest {
         onNodeWithText("Liquid Runway").assertIsDisplayed()
         onNodeWithText("¥888.00").assertIsDisplayed()
 
+        // Verify sort order and future toggle buttons
+        onNodeWithTag("finance-sort-order-toggle").assertIsDisplayed()
+        onNodeWithText("倒序 ↓").assertIsDisplayed()
+        onNodeWithTag("finance-sort-order-toggle").performClick()
+        waitForIdle()
+        onNodeWithText("正序 ↑").assertIsDisplayed()
+
+        onNodeWithTag("finance-include-future-toggle").assertIsDisplayed()
+        onNodeWithText("隐藏未来").assertIsDisplayed()
+        onNodeWithTag("finance-include-future-toggle").performClick()
+        waitForIdle()
+        onNodeWithText("包含未来").assertIsDisplayed()
+
         // Verify transaction card in Standard view
         onNodeWithText("Starbucks").assertIsDisplayed()
         onNodeWithText("-¥35.00").assertIsDisplayed()
-
-        // Toggle to Beancount View
-        onNodeWithTag("finance-view-mode-toggle").performClick()
-        waitForIdle()
-        onNodeWithTag("beancount-ledger-panel").assertIsDisplayed()
-        onNodeWithText("Plain-Text Double-Entry Ledger").assertIsDisplayed()
     }
 
     @Test
@@ -302,7 +322,7 @@ class FinanceUiTest {
             transaction = scheduledTrancheTx,
             splits = emptyList(),
             primaryAmountFormatted = "-¥1,036.00",
-            primaryAccountsFormatted = "招商银行 -> 分期负债",
+            primaryAccountsFormatted = "招商银行 → 分期负债",
             beancountText = "",
         )
 

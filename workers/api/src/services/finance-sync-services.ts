@@ -9,6 +9,7 @@ import type {
 import {
   dedupe,
   nextServerVersion,
+  reserveServerVersions,
   parseStringMap,
   shouldAcceptIncoming,
   stringOrUndefined,
@@ -243,14 +244,20 @@ export class DatabaseFinanceAccountSyncService implements MutableSyncService<Syn
   }
 
   async push(userId: string, items: SyncFinanceAccount[]): Promise<SyncFinanceAccount[]> {
-    const results: SyncFinanceAccount[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_account where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToAccount(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_account where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToAccount(r)]));
+      const results: SyncFinanceAccount[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceAccount = {
             ...cloneAccount(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -287,7 +294,8 @@ export class DatabaseFinanceAccountSyncService implements MutableSyncService<Syn
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneAccount(existing);
@@ -306,10 +314,11 @@ export class DatabaseFinanceAccountSyncService implements MutableSyncService<Syn
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceAccount = {
           ...merged,
@@ -346,11 +355,10 @@ export class DatabaseFinanceAccountSyncService implements MutableSyncService<Syn
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -371,14 +379,20 @@ export class DatabaseFinanceExchangeRateSyncService implements MutableSyncServic
   }
 
   async push(userId: string, items: SyncFinanceExchangeRate[]): Promise<SyncFinanceExchangeRate[]> {
-    const results: SyncFinanceExchangeRate[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_exchange_rate where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToExchangeRate(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_exchange_rate where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToExchangeRate(r)]));
+      const results: SyncFinanceExchangeRate[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceExchangeRate = {
             ...cloneExchangeRate(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -408,7 +422,8 @@ export class DatabaseFinanceExchangeRateSyncService implements MutableSyncServic
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneExchangeRate(existing);
@@ -427,10 +442,11 @@ export class DatabaseFinanceExchangeRateSyncService implements MutableSyncServic
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceExchangeRate = {
           ...merged,
@@ -459,11 +475,10 @@ export class DatabaseFinanceExchangeRateSyncService implements MutableSyncServic
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -484,14 +499,20 @@ export class DatabaseFinanceClearingGroupSyncService implements MutableSyncServi
   }
 
   async push(userId: string, items: SyncFinanceClearingGroup[]): Promise<SyncFinanceClearingGroup[]> {
-    const results: SyncFinanceClearingGroup[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_clearing_group where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToClearingGroup(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_clearing_group where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToClearingGroup(r)]));
+      const results: SyncFinanceClearingGroup[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceClearingGroup = {
             ...cloneClearingGroup(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -524,7 +545,8 @@ export class DatabaseFinanceClearingGroupSyncService implements MutableSyncServi
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneClearingGroup(existing);
@@ -543,10 +565,11 @@ export class DatabaseFinanceClearingGroupSyncService implements MutableSyncServi
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceClearingGroup = {
           ...merged,
@@ -579,11 +602,10 @@ export class DatabaseFinanceClearingGroupSyncService implements MutableSyncServi
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -604,14 +626,20 @@ export class DatabaseFinanceTransactionSyncService implements MutableSyncService
   }
 
   async push(userId: string, items: SyncFinanceTransaction[]): Promise<SyncFinanceTransaction[]> {
-    const results: SyncFinanceTransaction[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_transaction where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToTransaction(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_transaction where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToTransaction(r)]));
+      const results: SyncFinanceTransaction[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceTransaction = {
             ...cloneTransaction(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -643,7 +671,8 @@ export class DatabaseFinanceTransactionSyncService implements MutableSyncService
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneTransaction(existing);
@@ -662,10 +691,11 @@ export class DatabaseFinanceTransactionSyncService implements MutableSyncService
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceTransaction = {
           ...merged,
@@ -697,11 +727,10 @@ export class DatabaseFinanceTransactionSyncService implements MutableSyncService
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -722,14 +751,20 @@ export class DatabaseFinanceSplitSyncService implements MutableSyncService<SyncF
   }
 
   async push(userId: string, items: SyncFinanceSplit[]): Promise<SyncFinanceSplit[]> {
-    const results: SyncFinanceSplit[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_split where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToSplit(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_split where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToSplit(r)]));
+      const results: SyncFinanceSplit[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceSplit = {
             ...cloneSplit(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -763,7 +798,8 @@ export class DatabaseFinanceSplitSyncService implements MutableSyncService<SyncF
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneSplit(existing);
@@ -782,10 +818,11 @@ export class DatabaseFinanceSplitSyncService implements MutableSyncService<SyncF
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceSplit = {
           ...merged,
@@ -818,11 +855,10 @@ export class DatabaseFinanceSplitSyncService implements MutableSyncService<SyncF
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -843,14 +879,20 @@ export class DatabaseFinanceSplitClearingGroupSyncService implements MutableSync
   }
 
   async push(userId: string, items: SyncFinanceSplitClearingGroup[]): Promise<SyncFinanceSplitClearingGroup[]> {
-    const results: SyncFinanceSplitClearingGroup[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_split_clearing_group where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToSplitClearingGroup(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_split_clearing_group where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToSplitClearingGroup(r)]));
+      const results: SyncFinanceSplitClearingGroup[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceSplitClearingGroup = {
             ...cloneSplitClearingGroup(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -876,7 +918,8 @@ export class DatabaseFinanceSplitClearingGroupSyncService implements MutableSync
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneSplitClearingGroup(existing);
@@ -895,10 +938,11 @@ export class DatabaseFinanceSplitClearingGroupSyncService implements MutableSync
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceSplitClearingGroup = {
           ...merged,
@@ -924,11 +968,10 @@ export class DatabaseFinanceSplitClearingGroupSyncService implements MutableSync
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -949,14 +992,20 @@ export class DatabaseFinanceAmortizationPlanSyncService implements MutableSyncSe
   }
 
   async push(userId: string, items: SyncFinanceAmortizationPlan[]): Promise<SyncFinanceAmortizationPlan[]> {
-    const results: SyncFinanceAmortizationPlan[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_amortization_plan where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToAmortizationPlan(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_amortization_plan where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToAmortizationPlan(r)]));
+      const results: SyncFinanceAmortizationPlan[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceAmortizationPlan = {
             ...cloneAmortizationPlan(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -996,7 +1045,8 @@ export class DatabaseFinanceAmortizationPlanSyncService implements MutableSyncSe
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneAmortizationPlan(existing);
@@ -1015,10 +1065,11 @@ export class DatabaseFinanceAmortizationPlanSyncService implements MutableSyncSe
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceAmortizationPlan = {
           ...merged,
@@ -1058,11 +1109,10 @@ export class DatabaseFinanceAmortizationPlanSyncService implements MutableSyncSe
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 
@@ -1083,14 +1133,20 @@ export class DatabaseFinanceBudgetRuleSyncService implements MutableSyncService<
   }
 
   async push(userId: string, items: SyncFinanceBudgetRule[]): Promise<SyncFinanceBudgetRule[]> {
-    const results: SyncFinanceBudgetRule[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
-        const existingRes = await tx.query(`select * from finance_budget_rule where user_id = $1 and id = $2`, [userId, incoming.id]);
-        const existing = existingRes.rows[0] ? rowToBudgetRule(existingRes.rows[0]) : null;
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      let verCursor = await reserveServerVersions(tx, items.length);
+      const existingRes = await tx.query(
+        `select * from finance_budget_rule where user_id = $1 and id = ANY($2)`,
+        [userId, items.map((i) => i.id)],
+      );
+      const existingMap = new Map(existingRes.rows.map((r) => [r.id as string, rowToBudgetRule(r)]));
+      const results: SyncFinanceBudgetRule[] = [];
+      for (const incoming of items) {
+        const existing = existingMap.get(incoming.id) ?? null;
         if (!existing) {
           const now = new Date().toISOString();
-          const nextVer = await nextServerVersion(tx);
+          const nextVer = ++verCursor;
           const canonical: SyncFinanceBudgetRule = {
             ...cloneBudgetRule(incoming),
             is_deleted: incoming.is_deleted ?? false,
@@ -1123,7 +1179,8 @@ export class DatabaseFinanceBudgetRuleSyncService implements MutableSyncService<
               canonical.created_at ?? now,
             ],
           );
-          return canonical;
+          results.push(canonical);
+          continue;
         }
 
         let merged = cloneBudgetRule(existing);
@@ -1142,10 +1199,11 @@ export class DatabaseFinanceBudgetRuleSyncService implements MutableSyncService<
         }
 
         if (accepted.length === 0) {
-          return { ...merged, accepted_fields: [], rejected_fields: rejected };
+          results.push({ ...merged, accepted_fields: [], rejected_fields: rejected });
+          continue;
         }
 
-        const nextVer = await nextServerVersion(tx);
+        const nextVer = ++verCursor;
         const now = new Date().toISOString();
         const updated: SyncFinanceBudgetRule = {
           ...merged,
@@ -1177,11 +1235,10 @@ export class DatabaseFinanceBudgetRuleSyncService implements MutableSyncService<
             updated.id,
           ],
         );
-        return updated;
-      });
-      results.push(result);
-    }
-    return results;
+        results.push(updated);
+      }
+      return results;
+    });
   }
 }
 

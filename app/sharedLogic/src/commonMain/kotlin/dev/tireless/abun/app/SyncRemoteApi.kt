@@ -144,41 +144,41 @@ class AuthRemoteApi(
     }
 }
 
-class SyncRemoteApi(
+open class SyncRemoteApi(
     private val baseUrl: String,
     private val client: HttpClient,
     private val accessTokenProvider: AccessTokenProvider,
     private val logger: AppLogger = DefaultAppLogger,
 ) {
-    suspend fun pullPreferences(cursor: Long, limit: Int): PullResponse<SyncPreference> = pull("preferences", cursor, limit)
-    suspend fun pullRoutines(cursor: Long, limit: Int): PullResponse<SyncRoutine> = pull("routines", cursor, limit)
-    suspend fun pullTasks(cursor: Long, limit: Int): PullResponse<SyncTask> = pull("tasks", cursor, limit)
-    suspend fun pullAlarms(cursor: Long, limit: Int): PullResponse<SyncAlarm> = pull("alarms", cursor, limit)
-    suspend fun pullTaskEvents(cursor: Long, limit: Int): PullResponse<SyncTaskEvent> = pull("task-events", cursor, limit)
-    suspend fun pullPomodoroSessions(cursor: Long, limit: Int): PullResponse<SyncPomodoroSession> = pull("pomodoro-sessions", cursor, limit)
-    suspend fun pullFinanceAccounts(cursor: Long, limit: Int): PullResponse<SyncFinanceAccount> = pull("finance-accounts", cursor, limit)
-    suspend fun pullFinanceExchangeRates(cursor: Long, limit: Int): PullResponse<SyncFinanceExchangeRate> = pull("finance-exchange-rates", cursor, limit)
-    suspend fun pullFinanceClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceClearingGroup> = pull("finance-clearing-groups", cursor, limit)
-    suspend fun pullFinanceTransactions(cursor: Long, limit: Int): PullResponse<SyncFinanceTransaction> = pull("finance-transactions", cursor, limit)
-    suspend fun pullFinanceSplits(cursor: Long, limit: Int): PullResponse<SyncFinanceSplit> = pull("finance-splits", cursor, limit)
-    suspend fun pullFinanceSplitClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceSplitClearingGroup> = pull("finance-split-clearing-groups", cursor, limit)
-    suspend fun pullFinanceAmortizationPlans(cursor: Long, limit: Int): PullResponse<SyncFinanceAmortizationPlan> = pull("finance-amortization-plans", cursor, limit)
-    suspend fun pullFinanceBudgetRules(cursor: Long, limit: Int): PullResponse<SyncFinanceBudgetRule> = pull("finance-budget-rules", cursor, limit)
+    open suspend fun pullPreferences(cursor: Long, limit: Int): PullResponse<SyncPreference> = pull("preferences", cursor, limit)
+    open suspend fun pullRoutines(cursor: Long, limit: Int): PullResponse<SyncRoutine> = pull("routines", cursor, limit)
+    open suspend fun pullTasks(cursor: Long, limit: Int): PullResponse<SyncTask> = pull("tasks", cursor, limit)
+    open suspend fun pullAlarms(cursor: Long, limit: Int): PullResponse<SyncAlarm> = pull("alarms", cursor, limit)
+    open suspend fun pullTaskEvents(cursor: Long, limit: Int): PullResponse<SyncTaskEvent> = pull("task-events", cursor, limit)
+    open suspend fun pullPomodoroSessions(cursor: Long, limit: Int): PullResponse<SyncPomodoroSession> = pull("pomodoro-sessions", cursor, limit)
+    open suspend fun pullFinanceAccounts(cursor: Long, limit: Int): PullResponse<SyncFinanceAccount> = pull("finance-accounts", cursor, limit)
+    open suspend fun pullFinanceExchangeRates(cursor: Long, limit: Int): PullResponse<SyncFinanceExchangeRate> = pull("finance-exchange-rates", cursor, limit)
+    open suspend fun pullFinanceClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceClearingGroup> = pull("finance-clearing-groups", cursor, limit)
+    open suspend fun pullFinanceTransactions(cursor: Long, limit: Int): PullResponse<SyncFinanceTransaction> = pull("finance-transactions", cursor, limit)
+    open suspend fun pullFinanceSplits(cursor: Long, limit: Int): PullResponse<SyncFinanceSplit> = pull("finance-splits", cursor, limit)
+    open suspend fun pullFinanceSplitClearingGroups(cursor: Long, limit: Int): PullResponse<SyncFinanceSplitClearingGroup> = pull("finance-split-clearing-groups", cursor, limit)
+    open suspend fun pullFinanceAmortizationPlans(cursor: Long, limit: Int): PullResponse<SyncFinanceAmortizationPlan> = pull("finance-amortization-plans", cursor, limit)
+    open suspend fun pullFinanceBudgetRules(cursor: Long, limit: Int): PullResponse<SyncFinanceBudgetRule> = pull("finance-budget-rules", cursor, limit)
 
-    suspend fun pushPreferences(items: List<SyncPreference>): List<SyncPreference> = push("preferences", items)
-    suspend fun pushRoutines(items: List<SyncRoutine>): List<SyncRoutine> = push("routines", items)
-    suspend fun pushTasks(items: List<SyncTask>): List<SyncTask> = push("tasks", items)
-    suspend fun pushAlarms(items: List<SyncAlarm>): List<SyncAlarm> = push("alarms", items)
-    suspend fun pushTaskEvents(items: List<SyncTaskEvent>): List<SyncTaskEvent> = push("task-events", items)
-    suspend fun pushPomodoroSessions(items: List<SyncPomodoroSession>): List<SyncPomodoroSession> = push("pomodoro-sessions", items)
-    suspend fun pushFinanceAccounts(items: List<SyncFinanceAccount>): List<SyncFinanceAccount> = push("finance-accounts", items)
-    suspend fun pushFinanceExchangeRates(items: List<SyncFinanceExchangeRate>): List<SyncFinanceExchangeRate> = push("finance-exchange-rates", items)
-    suspend fun pushFinanceClearingGroups(items: List<SyncFinanceClearingGroup>): List<SyncFinanceClearingGroup> = push("finance-clearing-groups", items)
-    suspend fun pushFinanceTransactions(items: List<SyncFinanceTransaction>): List<SyncFinanceTransaction> = push("finance-transactions", items)
-    suspend fun pushFinanceSplits(items: List<SyncFinanceSplit>): List<SyncFinanceSplit> = push("finance-splits", items)
-    suspend fun pushFinanceSplitClearingGroups(items: List<SyncFinanceSplitClearingGroup>): List<SyncFinanceSplitClearingGroup> = push("finance-split-clearing-groups", items)
-    suspend fun pushFinanceAmortizationPlans(items: List<SyncFinanceAmortizationPlan>): List<SyncFinanceAmortizationPlan> = push("finance-amortization-plans", items)
-    suspend fun pushFinanceBudgetRules(items: List<SyncFinanceBudgetRule>): List<SyncFinanceBudgetRule> = push("finance-budget-rules", items)
+    open suspend fun pushPreferences(items: List<SyncPreference>): List<SyncPreference> = push("preferences", items)
+    open suspend fun pushRoutines(items: List<SyncRoutine>): List<SyncRoutine> = push("routines", items)
+    open suspend fun pushTasks(items: List<SyncTask>): List<SyncTask> = push("tasks", items)
+    open suspend fun pushAlarms(items: List<SyncAlarm>): List<SyncAlarm> = push("alarms", items)
+    open suspend fun pushTaskEvents(items: List<SyncTaskEvent>): List<SyncTaskEvent> = push("task-events", items)
+    open suspend fun pushPomodoroSessions(items: List<SyncPomodoroSession>): List<SyncPomodoroSession> = push("pomodoro-sessions", items)
+    open suspend fun pushFinanceAccounts(items: List<SyncFinanceAccount>): List<SyncFinanceAccount> = push("finance-accounts", items)
+    open suspend fun pushFinanceExchangeRates(items: List<SyncFinanceExchangeRate>): List<SyncFinanceExchangeRate> = push("finance-exchange-rates", items)
+    open suspend fun pushFinanceClearingGroups(items: List<SyncFinanceClearingGroup>): List<SyncFinanceClearingGroup> = push("finance-clearing-groups", items)
+    open suspend fun pushFinanceTransactions(items: List<SyncFinanceTransaction>): List<SyncFinanceTransaction> = push("finance-transactions", items)
+    open suspend fun pushFinanceSplits(items: List<SyncFinanceSplit>): List<SyncFinanceSplit> = push("finance-splits", items)
+    open suspend fun pushFinanceSplitClearingGroups(items: List<SyncFinanceSplitClearingGroup>): List<SyncFinanceSplitClearingGroup> = push("finance-split-clearing-groups", items)
+    open suspend fun pushFinanceAmortizationPlans(items: List<SyncFinanceAmortizationPlan>): List<SyncFinanceAmortizationPlan> = push("finance-amortization-plans", items)
+    open suspend fun pushFinanceBudgetRules(items: List<SyncFinanceBudgetRule>): List<SyncFinanceBudgetRule> = push("finance-budget-rules", items)
 
     private suspend inline fun <reified T> pull(resource: String, cursor: Long, limit: Int): PullResponse<T> =
         executeAuthorizedRequest {
@@ -231,6 +231,12 @@ class SyncRemoteApi(
             }
             logger.info(message = "sync.remote.request.retrying_after_unauthorized")
             block(accessTokenProvider.validAccessToken(forceRefresh = true))
+        } catch (error: Throwable) {
+            logger.error(
+                message = "sync.remote.request.unexpected_error",
+                throwable = error,
+            )
+            throw error
         }
     }
 }

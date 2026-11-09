@@ -208,21 +208,20 @@ export class DatabaseTaskSyncService implements TaskSyncServiceLike {
   }
 
   async push(userId: string, items: SyncTask[]): Promise<SyncTask[]> {
-    const results: SyncTask[] = [];
-
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncTask[] = [];
+      for (const incoming of items) {
         await validateTaskOwnership(tx, userId, incoming.parent_id, incoming.routine_id);
         const existing = await selectOneTask(tx, userId, incoming.id);
         if (!existing) {
-          return insertNewTask(tx, userId, incoming);
+          results.push(await insertNewTask(tx, userId, incoming));
+        } else {
+          results.push(await mergeExistingTask(tx, userId, existing, incoming));
         }
-        return mergeExistingTask(tx, userId, existing, incoming);
-      });
-      results.push(result);
-    }
-
-    return results;
+      }
+      return results;
+    });
   }
 
   async exists(userId: string, id: string): Promise<boolean> {

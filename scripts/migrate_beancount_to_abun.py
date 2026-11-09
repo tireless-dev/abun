@@ -230,6 +230,9 @@ def main():
     else:
         print(f"Beancount loader completed successfully with 0 errors! Total AST entries: {len(entries)}")
 
+    now_ts = int(time.time() * 1000)
+    default_hlc = f"{now_ts:013d}-0001-migrator"
+
     # 2. Extract Accounts
     open_directives = [e for e in entries if type(e).__name__ == "Open"]
     close_directives = {e.account: e.date for e in entries if type(e).__name__ == "Close"}
@@ -259,9 +262,9 @@ def main():
             "due_day": None,
             "is_archived": 0,
             "is_deleted": 0,
-            "hlc_map": "{}",
-            "dirty_fields": "[]",
-            "is_dirty": 0,
+            "hlc_map": f'{{"core":"{default_hlc}"}}',
+            "dirty_fields": '["core"]',
+            "is_dirty": 1,
             "server_version": 0,
         }
 
@@ -305,9 +308,9 @@ def main():
             "due_day": due_day,
             "is_archived": is_archived,
             "is_deleted": 0,
-            "hlc_map": "{}",
-            "dirty_fields": "[]",
-            "is_dirty": 0,
+            "hlc_map": f'{{"core":"{default_hlc}"}}',
+            "dirty_fields": '["core"]',
+            "is_dirty": 1,
             "server_version": 0,
         }
 
@@ -336,9 +339,9 @@ def main():
                 "due_day": None,
                 "is_archived": is_archived,
                 "is_deleted": 0,
-                "hlc_map": "{}",
-                "dirty_fields": "[]",
-                "is_dirty": 0,
+                "hlc_map": f'{{"core":"{default_hlc}"}}',
+                "dirty_fields": '["core"]',
+                "is_dirty": 1,
                 "server_version": 0,
             }
 
@@ -359,7 +362,6 @@ def main():
     tx_counter = 0
     split_counter = 0
 
-    now_ts = int(time.time() * 1000)
 
     for entry_idx, entry in enumerate(entries):
         ename = type(entry).__name__
@@ -414,9 +416,9 @@ def main():
             "source_plan_id": None,
             "period_index": None,
             "is_deleted": 0,
-            "hlc_map": "{}",
-            "dirty_fields": "[]",
-            "is_dirty": 0,
+            "hlc_map": f'{{"core":"{default_hlc}"}}',
+            "dirty_fields": '["core"]',
+            "is_dirty": 1,
             "server_version": 0,
             "created_at": now_ts,
             "updated_at": now_ts,
@@ -464,9 +466,9 @@ def main():
                 "sort_order": p_idx,
                 "is_automatic": bool(getattr(post, "meta", {}) and post.meta.get("__automatic__")),
                 "is_deleted": 0,
-                "hlc_map": "{}",
-                "dirty_fields": "[]",
-                "is_dirty": 0,
+                "hlc_map": f'{{"core":"{default_hlc}"}}',
+                "dirty_fields": '["core"]',
+                "is_dirty": 1,
                 "server_version": 0,
                 "created_at": now_ts,
                 "updated_at": now_ts,
@@ -517,9 +519,9 @@ def main():
                         "status": "Active",
                         "settled_at": None,
                         "is_deleted": 0,
-                        "hlc_map": "{}",
-                        "dirty_fields": "[]",
-                        "is_dirty": 0,
+                        "hlc_map": f'{{"core":"{default_hlc}"}}',
+                        "dirty_fields": '["core"]',
+                        "is_dirty": 1,
                         "server_version": 0,
                         "created_at": now_ts,
                         "updated_at": now_ts,
@@ -531,9 +533,9 @@ def main():
                     "split_id": split_id,
                     "clearing_group_id": cg_id,
                     "is_deleted": 0,
-                    "hlc_map": "{}",
-                    "dirty_fields": "[]",
-                    "is_dirty": 0,
+                    "hlc_map": f'{{"core":"{default_hlc}"}}',
+                    "dirty_fields": '["core"]',
+                    "is_dirty": 1,
                     "server_version": 0,
                     "created_at": now_ts,
                     "updated_at": now_ts,

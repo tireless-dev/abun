@@ -1445,6 +1445,38 @@ class SharedLogicDesktopTest {
         assertTrue(requests.contains("POST /auth/logout"))
     }
 
+    @Test
+    fun `finance account modifications automatically request sync and push dirty accounts`() = runTest {
+        val loginPreferenceStore = TestLoginPreferenceStore().apply {
+            setAuthSession(
+                AuthSession(
+                    userId = "persisted-user",
+                    accessToken = "persisted-access",
+                    accessTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                    refreshToken = "persisted-refresh",
+                    refreshTokenExpiresAtEpochMillis = Long.MAX_VALUE,
+                ),
+            )
+        }
+        val requests = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val controller = testController(
+            loginPreferenceStore = loginPreferenceStore,
+            requestLog = requests,
+        )
+
+        waitFor { controller.state.value.auth.mode == AuthMode.AUTHENTICATED && controller.state.value.syncState.syncReady }
+
+        controller.createFinanceAccount(
+            path = "Assets:Current:NewCard",
+            name = "New Card",
+            category = dev.tireless.abun.finance.AccountCategory.ASSET,
+            currency = "CNY",
+        )
+
+        waitFor { requests.any { it == "POST /api/sync/finance-accounts" } }
+        assertTrue(requests.any { it == "POST /api/sync/finance-accounts" })
+    }
+
     private fun testStore(
         timeProvider: TimeProvider = testTimeProvider(),
         idGenerator: IdGenerator = testIdGenerator(),

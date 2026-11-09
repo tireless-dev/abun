@@ -18,6 +18,15 @@ enum class FinanceLedgerFilter {
     BY_CLEARING_GROUP,
 }
 
+enum class FinanceDateRangePreset(val label: String) {
+    ALL("全部日期"),
+    THIS_MONTH("本月"),
+    LAST_MONTH("上月"),
+    LAST_30_DAYS("近30天"),
+    LAST_90_DAYS("近90天"),
+    THIS_YEAR("本年"),
+}
+
 enum class FinanceLedgerViewMode {
     STANDARD,
     BEANCOUNT,
@@ -98,10 +107,19 @@ data class FinanceViewState(
     val formattedLiquidAssets: String = "¥0.00",
     val selectedFilter: FinanceLedgerFilter = FinanceLedgerFilter.ALL,
     val filterAccountId: String? = null,
+    val filterAccountIds: Set<String> = emptySet(),
+    val dateRangePreset: FinanceDateRangePreset = FinanceDateRangePreset.ALL,
     val filterClearingGroupId: String? = null,
     val viewMode: FinanceLedgerViewMode = FinanceLedgerViewMode.STANDARD,
     val canLoadPredefinedAccounts: Boolean = false,
     val hasSubAccountsOrRecords: Boolean = false,
+    val sortAscending: Boolean = false,
+    val includeFuture: Boolean = false,
+    val loadedPageCount: Int = 1,
+    val totalTransactionCount: Int = 0,
+    val hasMoreTransactions: Boolean = false,
+    val scheduledTransactions: List<FinanceTransactionViewItem> = emptyList(),
+    val draftCount: Int = 0,
 ) {
     val currentRunwayProjection: CashflowRunwayProjection?
         get() = if (runwayHorizonDays == 30) runwayProjection30 else runwayProjection90

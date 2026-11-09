@@ -235,19 +235,22 @@ class DatabasePomodoroSessionSyncService implements PomodoroSessionSyncServiceLi
   }
 
   async push(userId: string, items: SyncPomodoroSession[]): Promise<SyncPomodoroSession[]> {
-    const results: SyncPomodoroSession[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncPomodoroSession[] = [];
+      for (const incoming of items) {
         if (incoming.task_id && !(await this.tasks.exists(userId, incoming.task_id))) {
           throw new Error("task_id does not belong to current user");
         }
         const existing = await selectOnePomodoroSession(tx, userId, incoming.id);
-        if (!existing) return insertNewPomodoroSession(tx, userId, incoming);
-        return mergeExistingPomodoroSession(tx, userId, existing, incoming);
-      });
-      results.push(result);
-    }
-    return results;
+        if (!existing) {
+          results.push(await insertNewPomodoroSession(tx, userId, incoming));
+        } else {
+          results.push(await mergeExistingPomodoroSession(tx, userId, existing, incoming));
+        }
+      }
+      return results;
+    });
   }
 }
 

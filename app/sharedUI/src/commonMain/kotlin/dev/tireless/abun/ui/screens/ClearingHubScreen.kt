@@ -274,7 +274,7 @@ fun ClearingHubScreen(
                     if (index > 0) {
                         SwissHairlineDivider(modifier = Modifier.padding(vertical = 12.dp))
                     }
-                    val nextTrancheTx = finance.transactions
+                    val nextTrancheTx = (finance.scheduledTransactions.ifEmpty { finance.transactions })
                         .map { it.transaction }
                         .firstOrNull { it.sourcePlanId == plan.plan.id && it.status == TransactionStatus.SCHEDULED }
 

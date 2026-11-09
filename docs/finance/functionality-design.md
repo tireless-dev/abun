@@ -61,15 +61,28 @@ The chronological record and management surface for transactions.
 
 Capabilities:
 
-- **Dual Presentation Mode**:
-  - **Standard Mode**: Clean editorial cards showing payee, summary, net impact, account badges, and clearing group pills.
-  - **Ledger / Beancount Mode**: Expandable multi-line view showing every `Split`, its signed amount, account path, split-level `narration`, and bound `ClearingGroup` badges.
-- **Primary Filters**:
-  - `All`
-  - `Drafts (Inbox)` (incomplete transactions with $<2$ splits or unbalanced amounts)
-  - `Scheduled (Future)`
-  - `By Account`
-  - `By Clearing Group`
+- **Single Focused Standard Editorial View**:
+  - Eliminated Beancount raw syntax view and obsolete view mode toggle from the ledger screen in favor of a clean, responsive double-entry card presentation.
+  - Accounts flow is displayed from **Source to Target** (`$fromPath → $toPath`, e.g. `招商银行 → 工作午餐`) using standard Unicode arrow `→` (U+2192), intuitively reflecting the transfer of value.
+- **Infinite Scroll & Paged Loading (`LazyColumn` 分页按需加载)**:
+  - Paginated slicing with Compose `LazyColumn` (page size of 40 records).
+  - Swiping near the boundary triggers seamless loading of earlier/older batches without lag or memory strain across thousands of directives.
+- **Strictly Hide Future Records by Default (`默认隐藏未来数据`)**:
+  - Transactions dated `txDate > today` are excluded from the default ledger view to keep daily review focused strictly on realized historical and today's transactions.
+  - A quick toggle button (`[包含未来 / 隐藏未来]`, `testTag="finance-include-future-toggle"`) allows users to reveal future scheduled entries on demand.
+  - Even when future entries are shown, they are placed outside the initial visible viewport, requiring the user to pull them into view.
+- **Bi-Directional Chronological Ordering (`时间正序 / 倒序`)**:
+  - Supports toggling between **倒序 ↓ (Reverse-Chronological: newest first)** and **正序 ↑ (Chronological: oldest first)** via `[正序 ↑ / 倒序 ↓]` (`testTag="finance-sort-order-toggle"`), placed on the far left of the filter toolbar with consistent neutral styling in both states.
+  - **In Chronological (正序 ↑)**: Default visible viewport lands directly on the latest past/today transactions; pulling down loads and reveals earlier historical records; future records (if enabled) reside below the fold, pulled up to view.
+  - **In Reverse-Chronological (倒序 ↓)**: Default visible viewport lands on today's transactions; scrolling down reveals older history; future records (if enabled) reside above the top fold, pulled down to view.
+- **Streamlined Filter Toolbar (精简过滤体系)**:
+  - Removed redundant "草稿" (Draft) and "计划中" (Scheduled) filter chips/banners, and moved account structure management ("科目管理") exclusively into the Settings screen.
+  - Standardized the 5-element filter toolbar:
+    1. **排序切换**: `[正序 ↑ / 倒序 ↓]`
+    2. **未来交易开关**: `[包含未来 / 隐藏未来]`
+    3. **日期范围选择**: `[日期范围 ▾]` (全部、本月、上月、最近30天、最近90天、本年度)
+    4. **账户多选筛选**: `[账户筛选 ▾]` (支持按名称/路径搜索、一键全选、清空和多账户勾选)
+    5. **高级筛选入口**: `[高级筛选 ▾]` (预留金额区间、币种、标签等高级检索条件的弹窗入口)
 
 ---
 

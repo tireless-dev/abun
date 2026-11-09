@@ -57,5 +57,10 @@ data class HlcToken(
                 nodeId = parts[2],
             )
         }
+
+        fun parseOrNull(value: String?): HlcToken? {
+            if (value.isNullOrBlank()) return null
+            return runCatching { parse(value) }.getOrNull()
+        }
     }
 }

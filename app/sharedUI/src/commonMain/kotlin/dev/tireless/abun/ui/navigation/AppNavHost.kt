@@ -36,6 +36,7 @@ import androidx.savedstate.read
 import dev.tireless.abun.app.AppModule
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
+import dev.tireless.abun.app.FinanceDateRangePreset
 import dev.tireless.abun.app.FinanceLedgerFilter
 import dev.tireless.abun.app.FinanceSplitDraft
 import dev.tireless.abun.app.JournalEntryView
@@ -119,6 +120,11 @@ fun AppNavHost(
     onStopPomodoro: (String) -> Unit,
     onSelectFinanceFilter: (FinanceLedgerFilter, String?, String?) -> Unit = { _, _, _ -> },
     onToggleFinanceViewMode: () -> Unit = {},
+    onToggleFinanceSortOrder: () -> Unit = {},
+    onToggleFinanceIncludeFuture: () -> Unit = {},
+    onSelectFinanceDateRange: (FinanceDateRangePreset) -> Unit = {},
+    onSelectFinanceAccounts: (Set<String>) -> Unit = {},
+    onLoadMoreFinanceTransactions: () -> Unit = {},
     onCreateFinanceTransaction: (String, String, String?, TransactionStatus, List<FinanceSplitDraft>) -> Unit = { _, _, _, _, _ -> },
     onDeleteFinanceTransaction: (String) -> Unit = {},
     onAutoPadAccountBalance: (String, Long) -> Unit = { _, _ -> },
@@ -336,6 +342,11 @@ fun AppNavHost(
                 state = state,
                 onSelectFilter = onSelectFinanceFilter,
                 onToggleViewMode = onToggleFinanceViewMode,
+                onToggleSortOrder = onToggleFinanceSortOrder,
+                onToggleIncludeFuture = onToggleFinanceIncludeFuture,
+                onSelectDateRange = onSelectFinanceDateRange,
+                onSelectAccounts = onSelectFinanceAccounts,
+                onLoadMoreTransactions = onLoadMoreFinanceTransactions,
                 onOpenCreateTransaction = { navController.navigate(AppRoute.CreateFinanceTransaction.route) },
                 onOpenAccounts = { navController.navigate(AppRoute.FinanceAccounts.route) },
                 onOpenCockpit = { navController.navigate(AppRoute.FinanceCockpit.route) },

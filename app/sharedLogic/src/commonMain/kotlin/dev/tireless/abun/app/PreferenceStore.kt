@@ -106,7 +106,10 @@ class PreferenceStore(private val store: LocalStore) {
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+            remote.rejectedFields.orEmpty().forEach(stillDirty::remove)
+        }
         persistPreference(
             preference = merged.copy(
                 serverVersion = remote.serverVersion,

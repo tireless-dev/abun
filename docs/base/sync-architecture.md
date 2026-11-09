@@ -42,7 +42,7 @@ Expected behavior:
 
 Sync order must respect foreign-key and logical dependencies.
 
-The current implementation uses this pull order:
+The current implementation uses this topological pull order across all 14 sync scopes:
 
 1. preferences
 2. routines
@@ -50,8 +50,39 @@ The current implementation uses this pull order:
 4. alarms
 5. task events
 6. pomodoro sessions
+7. finance accounts
+8. finance exchange rates
+9. finance clearing groups
+10. finance transactions
+11. finance splits
+12. finance split clearing groups
+13. finance amortization plans
+14. finance budget rules
 
-The same order is used for push.
+The exact same topological order is used for push.
+
+## Chunked Batching & Breakpoint Resumption
+
+For initial imports, large ledger migrations, and routine sync:
+
+### Chunked Push (`pushPaged`)
+- Dirty records are queried in chunks (default 50 items per batch) to fit within HTTP payload and execution timeout limits.
+- After each batch is accepted by the server, the client immediately merges accepted field updates and clears dirty flags in local SQLite before fetching the next chunk.
+- If network drops or an error occurs on batch $N$, records in batches $1$ through $N-1$ remain marked clean in local SQLite. Retrying `syncNow()` resumes directly from batch $N$ without re-pushing already accepted items.
+- A progress guard detects if a batch produces zero net decrease in remaining dirty records, breaking the loop and logging an error to prevent infinite spinning.
+
+### Paged Pull (`pullPaged`)
+- Pull requests are paginated (default 500 items per page).
+- After each non-empty page is merged into SQLite, the local scope cursor is updated and committed immediately to `sync_state`.
+- If pull is interrupted on page $M$, retrying resumes directly from page $M$'s last saved cursor without re-fetching pages $1$ through $M-1$.
+
+### Server Batch Optimizations
+- All item writes within a batch are executed within a single database transaction (`withTransaction`).
+- Existing records are fetched in a single query via bulk lookup (`id = ANY($2)`), avoiding $O(N)$ individual select queries.
+- Sequential server version numbers are reserved upfront in a single roundtrip via `reserveServerVersions(db, count)`, eliminating per-item version generation roundtrips over Hyperdrive/Supabase connections.
+
+### Automatic Mutation Triggering
+All client-side mutative operations in `AbunAppController` (including tasks, routines, alarms, pomodoros, preferences, finance accounts, transactions, splits, clearing groups, amortization plans, and budget rules) invoke `requestSync()`. This debounces local modifications (default 750ms) before initiating a background sync loop, ensuring changes are promptly pushed to the cloud and propagated across clients without requiring manual sync triggers or app restarts.
 
 ## API Families
 
@@ -77,6 +108,14 @@ Current Kotlin clients call these routes through [SyncRemoteApi.kt](/Users/jerry
 - `GET|POST /api/sync/alarms`
 - `GET|POST /api/sync/task-events`
 - `GET|POST /api/sync/pomodoro-sessions`
+- `GET|POST /api/sync/finance-accounts`
+- `GET|POST /api/sync/finance-exchange-rates`
+- `GET|POST /api/sync/finance-clearing-groups`
+- `GET|POST /api/sync/finance-transactions`
+- `GET|POST /api/sync/finance-splits`
+- `GET|POST /api/sync/finance-split-clearing-groups`
+- `GET|POST /api/sync/finance-amortization-plans`
+- `GET|POST /api/sync/finance-budget-rules`
 
 Sync and direct business calls now have an auth precondition:
 

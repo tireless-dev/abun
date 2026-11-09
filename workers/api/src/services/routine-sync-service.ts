@@ -196,16 +196,19 @@ class DatabaseRoutineSyncService implements RoutineSyncServiceLike {
   }
 
   async push(userId: string, items: SyncRoutine[]): Promise<SyncRoutine[]> {
-    const results: SyncRoutine[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncRoutine[] = [];
+      for (const incoming of items) {
         const existing = await selectOneRoutine(tx, userId, incoming.id);
-        if (!existing) return insertNewRoutine(tx, userId, incoming);
-        return mergeExistingRoutine(tx, userId, existing, incoming);
-      });
-      results.push(result);
-    }
-    return results;
+        if (!existing) {
+          results.push(await insertNewRoutine(tx, userId, incoming));
+        } else {
+          results.push(await mergeExistingRoutine(tx, userId, existing, incoming));
+        }
+      }
+      return results;
+    });
   }
 }
 

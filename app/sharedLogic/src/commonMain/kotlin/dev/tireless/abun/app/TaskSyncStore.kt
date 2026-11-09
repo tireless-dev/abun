@@ -90,7 +90,10 @@ class TaskSyncStore(private val store: LocalStore) {
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+            remote.rejectedFields.orEmpty().forEach(stillDirty::remove)
+        }
         store.taskStore.persistTask(
             mergedTask.copy(serverVersion = remote.serverVersion),
             mergedHlc,
@@ -124,7 +127,10 @@ class TaskSyncStore(private val store: LocalStore) {
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+            remote.rejectedFields.orEmpty().forEach(stillDirty::remove)
+        }
         store.routineAlarmStore.persistRoutine(merged.copy(serverVersion = remote.serverVersion), mergedHlc, stillDirty.toList(), stillDirty.isNotEmpty())
     }
 
@@ -147,7 +153,10 @@ class TaskSyncStore(private val store: LocalStore) {
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+            remote.rejectedFields.orEmpty().forEach(stillDirty::remove)
+        }
         store.routineAlarmStore.persistAlarm(merged.copy(serverVersion = remote.serverVersion), mergedHlc, stillDirty.toList(), stillDirty.isNotEmpty())
     }
 
@@ -180,7 +189,10 @@ class TaskSyncStore(private val store: LocalStore) {
             }
             mergedHlc[field] = incomingHlc
         }
-        if (clearAccepted) remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields.orEmpty().forEach(stillDirty::remove)
+            remote.rejectedFields.orEmpty().forEach(stillDirty::remove)
+        }
         store.pomodoroStore.persistPomodoroSession(
             merged.copy(
                 serverVersion = remote.serverVersion,

@@ -15,6 +15,7 @@ import dev.tireless.abun.app.StableStringIdGenerator
 import dev.tireless.abun.app.ThemePreference
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 
@@ -27,6 +28,11 @@ actual fun rememberAbunAppController(): AbunAppController {
                 databaseDriverFactory = AndroidDatabaseDriverFactory(context),
                 httpClient = HttpClient(OkHttp) {
                     install(ContentNegotiation) { json(dev.tireless.abun.app.AppJson) }
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 60_000
+                        connectTimeoutMillis = 15_000
+                        socketTimeoutMillis = 60_000
+                    }
                 },
                 loginPreferenceStore = AndroidLoginPreferenceStore(context),
                 nodeIdProvider = AndroidNodeIdProvider(),

@@ -96,7 +96,8 @@ fun CombinedRepaymentSheetContent(
     }
 
     // Collect upcoming scheduled loan tranches
-    val scheduledLoanTxs = finance.transactions.filter {
+    val scheduledSource = finance.scheduledTransactions.ifEmpty { finance.transactions }
+    val scheduledLoanTxs = scheduledSource.filter {
         it.transaction.status == TransactionStatus.SCHEDULED && it.transaction.sourcePlanId != null
     }
 

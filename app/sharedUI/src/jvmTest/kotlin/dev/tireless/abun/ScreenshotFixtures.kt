@@ -219,7 +219,7 @@ internal fun populatedFinanceScreenshotState(
         transaction = tx1,
         splits = tx1Splits,
         primaryAmountFormatted = "-¥329.00",
-        primaryAccountsFormatted = "数码装备 <- 招商银行储蓄卡",
+        primaryAccountsFormatted = "招商银行储蓄卡 → 数码装备",
         beancountText = "2026-05-29 * \"Apple Store\" \"MagSafe 双项充电器\"\n  Assets:Bank:CMB  -329.00 CNY\n  Expenses:Electronics  329.00 CNY",
     )
 
@@ -248,7 +248,7 @@ internal fun populatedFinanceScreenshotState(
         transaction = tx2,
         splits = tx2Splits,
         primaryAmountFormatted = "-¥142.50",
-        primaryAccountsFormatted = "餐饮美食 <- 支付宝余额宝",
+        primaryAccountsFormatted = "支付宝余额宝 → 餐饮美食",
         beancountText = "2026-05-28 * \"盒马鲜生\" \"生鲜果蔬及半成品晚餐\"\n  Assets:Alipay:Balance  -142.50 CNY\n  Expenses:Food:Lunch  142.50 CNY",
     )
 
@@ -277,7 +277,7 @@ internal fun populatedFinanceScreenshotState(
         transaction = tx3,
         splits = tx3Splits,
         primaryAmountFormatted = "-¥48.00",
-        primaryAccountsFormatted = "餐饮美食 <- 招商银行储蓄卡",
+        primaryAccountsFormatted = "招商银行储蓄卡 → 餐饮美食",
         beancountText = "2026-05-27 * \"星巴克臻选\" \"冷萃浮乐朵\"\n  Assets:Bank:CMB  -48.00 CNY\n  Expenses:Food:Lunch  48.00 CNY",
     )
 
@@ -469,7 +469,7 @@ internal fun populatedFinanceScreenshotState(
         transaction = scheduledTrancheTx,
         splits = emptyList(),
         primaryAmountFormatted = "-¥1,036.00",
-        primaryAccountsFormatted = "招商银行储蓄卡 -> 招商银行信用卡",
+        primaryAccountsFormatted = "招商银行储蓄卡 → 招商银行信用卡",
         beancountText = "",
     )
 

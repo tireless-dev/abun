@@ -127,19 +127,22 @@ class DatabaseTaskEventSyncService implements TaskEventSyncServiceLike {
   }
 
   async push(userId: string, items: SyncTaskEvent[]): Promise<SyncTaskEvent[]> {
-    const results: SyncTaskEvent[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncTaskEvent[] = [];
+      for (const incoming of items) {
         if (!(await this.tasks.exists(userId, incoming.task_id))) {
           throw new Error("task_id does not belong to current user");
         }
         const existing = await selectOneTaskEvent(tx, userId, incoming.id);
-        if (existing) return { ...existing, accepted: false };
-        return insertNewTaskEvent(tx, userId, incoming);
-      });
-      results.push(result);
-    }
-    return results;
+        if (existing) {
+          results.push({ ...existing, accepted: false });
+        } else {
+          results.push(await insertNewTaskEvent(tx, userId, incoming));
+        }
+      }
+      return results;
+    });
   }
 }
 

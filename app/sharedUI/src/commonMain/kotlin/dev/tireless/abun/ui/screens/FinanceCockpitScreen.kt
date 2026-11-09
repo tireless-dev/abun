@@ -156,56 +156,6 @@ fun FinanceCockpitScreen(
             )
         }
 
-        // Pending Drafts Banner (when draftCount > 0)
-        val draftCount = finance.transactions.count { it.transaction.status == TransactionStatus.DRAFT }
-        if (draftCount > 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(ThemeTokens.colors.surfaceElevated)
-                    .clickable(onClick = onOpenLedger)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                    .testTag("pending-drafts-banner"),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(ThemeTokens.colors.notesAccent),
-                        )
-                        Text(
-                            text = "PENDING DRAFTS · 待确认交易 ($draftCount 笔)",
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ThemeTokens.colors.textPrimary,
-                            ),
-                        )
-                    }
-                    Text(
-                        text = "VIEW INBOX →",
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ThemeTokens.colors.textSecondary,
-                        ),
-                    )
-                }
-            }
-        }
-
         // 2. Guardrail Pacing Bento Card
         SwissBentoCard(
             modifier = Modifier.fillMaxWidth(),

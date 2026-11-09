@@ -9,14 +9,21 @@ import dev.tireless.abun.finance.ClearingGroupType
 import dev.tireless.abun.finance.FinanceCurrencies
 import dev.tireless.abun.finance.LiquidTier
 import dev.tireless.abun.finance.TransactionStatus
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.plus
 
 class FinanceViewDeriver(private val store: LocalStore) {
     fun deriveFinanceViewState(
         selectedFilter: FinanceLedgerFilter = FinanceLedgerFilter.ALL,
         filterAccountId: String? = null,
+        filterAccountIds: Set<String> = emptySet(),
+        dateRangePreset: FinanceDateRangePreset = FinanceDateRangePreset.ALL,
         filterClearingGroupId: String? = null,
         viewMode: FinanceLedgerViewMode = FinanceLedgerViewMode.STANDARD,
         runwayHorizonDays: Int = 90,
+        sortAscending: Boolean = false,
+        includeFuture: Boolean = false,
+        loadedPageCount: Int = 1,
     ): FinanceViewState {
         val accounts = store.queries.selectAllFinanceAccounts(store.financeAccountStore::mapFinanceAccountRow).executeAsList()
         val accountsById = accounts.associateBy { it.id }
@@ -94,8 +101,8 @@ class FinanceViewDeriver(private val store: LocalStore) {
             val fromPath = outflowSplit?.let { accountsById[it.accountId]?.name ?: accountsById[it.accountId]?.path }
             val toPath = inflowSplit?.let { accountsById[it.accountId]?.name ?: accountsById[it.accountId]?.path }
             val primaryAccountsFormatted = when {
-                splits.size > 2 -> "${fromPath ?: "Multiple"} -> (${splits.size} splits)"
-                fromPath != null && toPath != null -> "$toPath <- $fromPath"
+                splits.size > 2 -> "${fromPath ?: "多项账户"} → (${splits.size} 笔分录)"
+                fromPath != null && toPath != null -> "$fromPath → $toPath"
                 fromPath != null -> fromPath
                 toPath != null -> toPath
                 else -> "Empty"
@@ -133,23 +140,89 @@ class FinanceViewDeriver(private val store: LocalStore) {
             )
         }
 
-        val filteredTransactions = when (selectedFilter) {
-            FinanceLedgerFilter.ALL -> transactionViews
-            FinanceLedgerFilter.DRAFTS -> transactionViews.filter { it.transaction.status == TransactionStatus.DRAFT }
-            FinanceLedgerFilter.SCHEDULED -> transactionViews.filter { it.transaction.status == TransactionStatus.SCHEDULED }
-            FinanceLedgerFilter.BY_ACCOUNT -> {
-                if (filterAccountId == null) transactionViews
-                else transactionViews.filter { tx -> tx.splits.any { it.split.accountId == filterAccountId } }
+        val today = store.timeProvider.today()
+        val todayStr = today.toString()
+
+        val scheduledTxViews = transactionViews.filter { it.transaction.status == TransactionStatus.SCHEDULED }
+        val draftTxCount = transactionViews.count { it.transaction.status == TransactionStatus.DRAFT }
+
+        val baseFiltered = when {
+            filterAccountIds.isNotEmpty() -> {
+                transactionViews.filter { tx -> tx.splits.any { it.split.accountId in filterAccountIds } }
             }
-            FinanceLedgerFilter.BY_CLEARING_GROUP -> {
-                if (filterClearingGroupId == null) transactionViews
-                else transactionViews.filter { tx ->
+            selectedFilter == FinanceLedgerFilter.BY_ACCOUNT && filterAccountId != null -> {
+                transactionViews.filter { tx -> tx.splits.any { it.split.accountId == filterAccountId } }
+            }
+            selectedFilter == FinanceLedgerFilter.BY_CLEARING_GROUP && filterClearingGroupId != null -> {
+                transactionViews.filter { tx ->
                     tx.splits.any { splitView ->
                         splitView.clearingGroups.any { it.id == filterClearingGroupId }
                     }
                 }
             }
+            else -> transactionViews
         }
+
+        // Apply date range filter
+        val dateFiltered = when (dateRangePreset) {
+            FinanceDateRangePreset.ALL -> baseFiltered
+            FinanceDateRangePreset.THIS_MONTH -> {
+                val ym = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
+                baseFiltered.filter { it.transaction.txDate.startsWith(ym) }
+            }
+            FinanceDateRangePreset.LAST_MONTH -> {
+                val prev = today.plus(-1, DateTimeUnit.MONTH)
+                val ym = "${prev.year}-${prev.monthNumber.toString().padStart(2, '0')}"
+                baseFiltered.filter { it.transaction.txDate.startsWith(ym) }
+            }
+            FinanceDateRangePreset.LAST_30_DAYS -> {
+                val start = today.plus(-30, DateTimeUnit.DAY).toString()
+                baseFiltered.filter { it.transaction.txDate >= start }
+            }
+            FinanceDateRangePreset.LAST_90_DAYS -> {
+                val start = today.plus(-90, DateTimeUnit.DAY).toString()
+                baseFiltered.filter { it.transaction.txDate >= start }
+            }
+            FinanceDateRangePreset.THIS_YEAR -> {
+                val y = today.year.toString()
+                baseFiltered.filter { it.transaction.txDate.startsWith(y) }
+            }
+        }
+
+        val futureFiltered = if (!includeFuture) {
+            dateFiltered.filter { it.transaction.txDate <= todayStr }
+        } else {
+            dateFiltered
+        }
+
+        val sortedTransactions = if (sortAscending) {
+            futureFiltered.sortedWith(compareBy<FinanceTransactionViewItem> { it.transaction.txDate }.thenBy { it.transaction.txTime.orEmpty() }.thenBy { it.transaction.id })
+        } else {
+            futureFiltered.sortedWith(compareByDescending<FinanceTransactionViewItem> { it.transaction.txDate }.thenByDescending { it.transaction.txTime.orEmpty() }.thenByDescending { it.transaction.id })
+        }
+
+        val totalTxCount = sortedTransactions.size
+        val pageSize = 40
+        val maxItems = (loadedPageCount * pageSize).coerceAtLeast(pageSize)
+
+        val pagedTransactions = if (sortAscending) {
+            if (includeFuture) {
+                val past = sortedTransactions.filter { it.transaction.txDate <= todayStr }
+                val future = sortedTransactions.filter { it.transaction.txDate > todayStr }
+                past.takeLast(maxItems) + future.take(maxItems)
+            } else {
+                sortedTransactions.takeLast(maxItems)
+            }
+        } else {
+            if (includeFuture) {
+                val future = sortedTransactions.filter { it.transaction.txDate > todayStr }
+                val past = sortedTransactions.filter { it.transaction.txDate <= todayStr }
+                future.takeLast(maxItems) + past.take(maxItems)
+            } else {
+                sortedTransactions.take(maxItems)
+            }
+        }
+        val hasMore = pagedTransactions.size < totalTxCount
 
         val netWorth = accountViews.filter { it.account.includeInNetWorth && !it.account.isArchived && it.account.currency == "CNY" }.sumOf { it.balanceMinor }
         val liquidAssets = accountViews.filter {
@@ -205,8 +278,6 @@ class FinanceViewDeriver(private val store: LocalStore) {
         }
 
         val allBudgetRules = store.queries.selectAllFinanceBudgetRules(store.financeAccountStore::mapFinanceBudgetRuleRow).executeAsList()
-        val today = store.timeProvider.today()
-        val todayStr = today.toString()
         val txMap = allTxs.associateBy { it.id }
 
         val budgetEvaluations = allBudgetRules.map { rule ->
@@ -276,7 +347,7 @@ class FinanceViewDeriver(private val store: LocalStore) {
 
         return FinanceViewState(
             accounts = accountViews,
-            transactions = filteredTransactions,
+            transactions = pagedTransactions,
             clearingGroups = clearingGroupViews,
             amortizationPlans = amortizationPlanViews,
             budgetEvaluations = budgetEvaluations,
@@ -291,10 +362,19 @@ class FinanceViewDeriver(private val store: LocalStore) {
             formattedLiquidAssets = FinanceCurrencies.format(liquidAssets, "CNY"),
             selectedFilter = selectedFilter,
             filterAccountId = filterAccountId,
+            filterAccountIds = filterAccountIds,
+            dateRangePreset = dateRangePreset,
             filterClearingGroupId = filterClearingGroupId,
             viewMode = viewMode,
             canLoadPredefinedAccounts = canLoadPredefined,
             hasSubAccountsOrRecords = !canLoadPredefined,
+            sortAscending = sortAscending,
+            includeFuture = includeFuture,
+            loadedPageCount = loadedPageCount,
+            totalTransactionCount = totalTxCount,
+            hasMoreTransactions = hasMore,
+            scheduledTransactions = scheduledTxViews,
+            draftCount = draftTxCount,
         )
     }
 }

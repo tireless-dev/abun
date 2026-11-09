@@ -22,6 +22,7 @@ class AbunAppController(
 ) {
     private val timeProvider = dependencies.timeProvider
     private val loginPreferenceStore = dependencies.loginPreferenceStore
+    private val logger = dependencies.logger
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authRemoteApi = AuthRemoteApi(
         baseUrl = dependencies.serverBaseUrl,
@@ -64,6 +65,11 @@ class AbunAppController(
     private var scheduledSyncJob: Job? = null
     private var isSyncing = false
     private var syncRequestedWhileRunning = false
+    private var ledgerSortAscending = false
+    private var ledgerIncludeFuture = false
+    private var ledgerPageCount = 1
+    private var ledgerFilterAccountIds: Set<String> = emptySet()
+    private var ledgerDateRangePreset: FinanceDateRangePreset = FinanceDateRangePreset.ALL
 
     init {
         refresh()
@@ -580,6 +586,7 @@ class AbunAppController(
                 }.onSuccess {
                     refresh(lastSyncedAt = timeProvider.nowEpochMillis().let(::epochMillisToIsoString))
                 }.onFailure {
+                    logger.error("sync.failed", throwable = it)
                     if (it is AuthSessionExpiredException) {
                         transitionToGuest(showGuide = true, authError = it.message)
                     } else {
@@ -628,14 +635,43 @@ class AbunAppController(
             },
             preferences = preferences,
             syncState = _state.value.syncState.copy(isSyncing = false, lastSyncedAt = lastSyncedAt),
-            financeView = store.financeViewDeriver.deriveFinanceViewState(
-                selectedFilter = _state.value.financeView.selectedFilter,
-                filterAccountId = _state.value.financeView.filterAccountId,
-                filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
-                viewMode = _state.value.financeView.viewMode,
-                runwayHorizonDays = _state.value.financeView.runwayHorizonDays,
-            ),
+            financeView = deriveCurrentFinanceView(),
         )
+    }
+
+    private fun deriveCurrentFinanceView(
+        selectedFilter: FinanceLedgerFilter = _state.value.financeView.selectedFilter,
+        filterAccountId: String? = _state.value.financeView.filterAccountId,
+        filterAccountIds: Set<String> = ledgerFilterAccountIds,
+        dateRangePreset: FinanceDateRangePreset = ledgerDateRangePreset,
+        filterClearingGroupId: String? = _state.value.financeView.filterClearingGroupId,
+        viewMode: FinanceLedgerViewMode = _state.value.financeView.viewMode,
+        runwayHorizonDays: Int = _state.value.financeView.runwayHorizonDays,
+    ): FinanceViewState {
+        return store.financeViewDeriver.deriveFinanceViewState(
+            selectedFilter = selectedFilter,
+            filterAccountId = filterAccountId,
+            filterAccountIds = filterAccountIds,
+            dateRangePreset = dateRangePreset,
+            filterClearingGroupId = filterClearingGroupId,
+            viewMode = viewMode,
+            runwayHorizonDays = runwayHorizonDays,
+            sortAscending = ledgerSortAscending,
+            includeFuture = ledgerIncludeFuture,
+            loadedPageCount = ledgerPageCount,
+        )
+    }
+
+    fun setFinanceDateRangePreset(preset: FinanceDateRangePreset) {
+        ledgerDateRangePreset = preset
+        ledgerPageCount = 1
+        _state.value = _state.value.copy(financeView = deriveCurrentFinanceView())
+    }
+
+    fun setFinanceAccountFilter(accountIds: Set<String>) {
+        ledgerFilterAccountIds = accountIds
+        ledgerPageCount = 1
+        _state.value = _state.value.copy(financeView = deriveCurrentFinanceView())
     }
 
     fun selectFinanceFilter(
@@ -643,14 +679,37 @@ class AbunAppController(
         accountId: String? = null,
         clearingGroupId: String? = null,
     ) {
+        ledgerPageCount = 1
         _state.value = _state.value.copy(
-            financeView = store.financeViewDeriver.deriveFinanceViewState(
+            financeView = deriveCurrentFinanceView(
                 selectedFilter = filter,
                 filterAccountId = accountId,
                 filterClearingGroupId = clearingGroupId,
-                viewMode = _state.value.financeView.viewMode,
-                runwayHorizonDays = _state.value.financeView.runwayHorizonDays,
             ),
+        )
+    }
+
+    fun toggleFinanceSortOrder() {
+        ledgerSortAscending = !ledgerSortAscending
+        ledgerPageCount = 1
+        _state.value = _state.value.copy(
+            financeView = deriveCurrentFinanceView(),
+        )
+    }
+
+    fun toggleFinanceIncludeFuture() {
+        ledgerIncludeFuture = !ledgerIncludeFuture
+        ledgerPageCount = 1
+        _state.value = _state.value.copy(
+            financeView = deriveCurrentFinanceView(),
+        )
+    }
+
+    fun loadMoreFinanceTransactions() {
+        if (!_state.value.financeView.hasMoreTransactions) return
+        ledgerPageCount++
+        _state.value = _state.value.copy(
+            financeView = deriveCurrentFinanceView(),
         )
     }
 
@@ -682,11 +741,13 @@ class AbunAppController(
             splits = splits,
         )
         refresh()
+        requestSync()
     }
 
     fun deleteFinanceTransaction(id: String) {
         store.financeLedgerStore.deleteFinanceTransaction(id)
         refresh()
+        requestSync()
     }
 
     fun createFinanceAccount(
@@ -714,6 +775,7 @@ class AbunAppController(
             dueDay = dueDay,
         )
         refresh()
+        requestSync()
     }
 
     fun updateFinanceAccount(
@@ -745,11 +807,13 @@ class AbunAppController(
             isArchived = isArchived,
         )
         refresh()
+        requestSync()
     }
 
     fun deleteFinanceAccount(id: String) {
         store.financeAccountStore.deleteFinanceAccount(id)
         refresh()
+        requestSync()
     }
 
     fun loadPredefinedFinanceAccounts() {
@@ -775,6 +839,7 @@ class AbunAppController(
             adjustmentDate = adjustmentDate,
         )
         refresh()
+        requestSync()
     }
 
     fun createFinanceClearingGroup(
@@ -794,6 +859,7 @@ class AbunAppController(
             dueDate = dueDate,
         )
         refresh()
+        requestSync()
     }
 
     fun createFinanceAmortizationPlan(
@@ -829,12 +895,14 @@ class AbunAppController(
             existingDisbursementSplitId = existingDisbursementSplitId,
         )
         refresh()
+        requestSync()
         return planId
     }
 
     fun deleteFinanceAmortizationPlan(id: String) {
         store.financeLedgerStore.deleteFinanceAmortizationPlan(id)
         refresh()
+        requestSync()
     }
 
     fun repayCreditStatement(
@@ -872,6 +940,7 @@ class AbunAppController(
             ),
         )
         refresh()
+        requestSync()
     }
 
     fun executeLoanTrancheRepayment(transactionId: String) {
@@ -904,20 +973,18 @@ class AbunAppController(
             }
         }
         refresh()
+        requestSync()
     }
 
     fun reassignSplitClearingGroup(splitId: String, oldGroupId: String, newGroupId: String) {
         store.financeLedgerStore.reassignSplitClearingGroup(splitId, oldGroupId, newGroupId)
         refresh()
+        requestSync()
     }
 
     fun setFinanceRunwayHorizon(horizonDays: Int) {
         _state.value = _state.value.copy(
-            financeView = store.financeViewDeriver.deriveFinanceViewState(
-                selectedFilter = _state.value.financeView.selectedFilter,
-                filterAccountId = _state.value.financeView.filterAccountId,
-                filterClearingGroupId = _state.value.financeView.filterClearingGroupId,
-                viewMode = _state.value.financeView.viewMode,
+            financeView = deriveCurrentFinanceView(
                 runwayHorizonDays = horizonDays,
             ),
         )
@@ -942,11 +1009,13 @@ class AbunAppController(
             includeInRunway = includeInRunway,
         )
         refresh()
+        requestSync()
     }
 
     fun deleteBudgetRule(id: String) {
         store.financeAccountStore.deleteBudgetRule(id)
         refresh()
+        requestSync()
     }
 
     companion object {

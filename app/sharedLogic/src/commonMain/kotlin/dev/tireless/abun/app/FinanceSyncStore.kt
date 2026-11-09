@@ -248,7 +248,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceAccount(
@@ -323,7 +326,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceExchangeRate(
@@ -398,7 +404,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceClearingGroup(
@@ -474,7 +483,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceTransaction(
@@ -551,7 +563,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceSplit(
@@ -617,7 +632,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceSplitClearingGroup(
@@ -699,7 +717,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceAmortizationPlan(
@@ -780,7 +801,10 @@ class FinanceSyncStore(private val store: LocalStore) {
             mergedHlc[field] = incomingHlc
         }
 
-        if (clearAccepted) remote.acceptedFields?.forEach(stillDirty::remove)
+        if (clearAccepted) {
+            remote.acceptedFields?.forEach(stillDirty::remove)
+            remote.rejectedFields?.forEach(stillDirty::remove)
+        }
         val isDirty = stillDirty.isNotEmpty()
 
         store.queries.upsertFinanceBudgetRule(

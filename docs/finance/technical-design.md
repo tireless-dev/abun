@@ -364,3 +364,21 @@ To respect foreign-key dependencies during pull-then-push sync, extend [`SyncEng
   - Implemented pass-through account semantics across Kotlin `CashflowRunwayEngine` and TypeScript `cashflow-runway.ts`: transfers into pass-through accounts (`Assets:Current:ICBC`, `Assets:Current:MYBank`, `Assets:Current:PSBC`) are recognized as immediate consumption outflows while contributing zero inflow.
   - Excluded non-liquid assets (公积金 `Assets:Growth:HPF`, 医保个人账户 `Assets:Growth:MIPA`, 应收款 `Assets:Receivables:Wanon`) and non-commercial liabilities (父母借款 `Liabilities:Borrowing:Parents`, 个人借款 `Liabilities:Borrowing:Personal`) from Net Worth and Liquidity, accurately reflecting commercial net solvency (-¥205,949.14).
   - Resolved JD loan discrepancy in Beancount (`others/jd.bean`), bringing balance to ¥0.00 with verified zero errors across all 311 ledger assertions.
+
+- **Phase 8 Complete (Ledger Pagination, Chronological/Reverse Ordering, Future Filtering & Settings Padding Alignment)**:
+  - **Padding Alignment**: Removed redundant `.padding(ThemeTokens.spacing.lgDp)` from root `Column` in `FinanceSettingsScreen.kt`, aligning outer margin and padding with `FinanceLedgerScreen`, `FinanceCockpitScreen`, and `SettingsScreenContent` inside `EditorialScreen`.
+  - **Ledger Pagination (`LazyColumn`)**: Refactored `FinanceLedgerScreen.kt` from full-dataset `Column(verticalScroll)` to `LazyColumn` with page batching (`pageSize = 40`). Added `snapshotFlow` scroll listener to trigger seamless incremental loading (`onLoadMoreTransactions`) on swipe.
+  - **Future Record Filtering**: Transactions with `txDate > today` are now filtered out by default unless explicitly included via `[含未来 / 无未来]` toggle (`testTag="finance-include-future-toggle"`) or under the `SCHEDULED` filter. When future records are enabled, they are kept outside the initial visible viewport fold, requiring user swipe/pull to view.
+  - **Bi-Directional Chronological Ordering**: Added `[正序 ↑ / 倒序 ↓]` toggle (`testTag="finance-sort-order-toggle"`). In ASC (正序 ↑), the initial viewport scrolls to the latest past/today transactions at the bottom, and pulling down reveals earlier historical records. In DESC (倒序 ↓), the viewport lands on today's transactions, and scrolling down reveals earlier history.
+  - **ViewState & Deriver Alignment**: Added `sortAscending`, `includeFuture`, `loadedPageCount`, `totalTransactionCount`, `hasMoreTransactions`, `scheduledTransactions`, and `draftCount` to `FinanceViewState` and `FinanceViewDeriver.kt`, maintaining accurate metrics on Cockpit and Clearing Hub while keeping the ledger reactive and performant.
+
+- **Phase 9 Complete (Ledger Filter Bar Standardization, Removal of Beancount/Draft/Scheduled, Left-to-Right Arrows & DESC Today Alignment)**:
+  - **Filter Bar Re-Architecture**: Replaced scattered chips with a unified 5-component tool strip:
+    1. Sort toggle on far left with neutral styling (`finance-sort-order-toggle`).
+    2. Future toggle (`[包含未来 / 隐藏未来]`, `finance-include-future-toggle`).
+    3. Date range preset dropdown (`FinanceDateRangePreset`: 全部、本月、上月、最近30天、最近90天、本年度).
+    4. Account multi-select dialog (`AccountMultiSelectDialog` with search, select all, clear, and item checkboxes).
+    5. Advanced filter entry placeholder (`AdvancedFilterPlaceholderDialog`).
+  - **Beancount, Draft & Scheduled Cleanup**: Removed raw Beancount ledger panel and toggle from the ledger screen. Removed "科目管理" button from the ledger screen (consolidated into Settings). Eliminated "草稿" filter and cockpit draft banner, and eliminated redundant "计划中" status.
+  - **DESC Viewport Alignment on Today**: Sliced near-future entries with `future.takeLast(maxItems)` in DESC and set `rememberLazyListState(initialFirstVisibleItemIndex = todayIndex)`, ensuring that on initial render with future records included, today's transactions land directly in the visible viewport with future entries tucked above the fold.
+  - **Arrow Direction Normalization**: Formatted double-entry accounts as `Source → Target` (`$fromPath → $toPath`, e.g. `招商银行 → 工作午餐`) using Unicode arrow `→` (U+2192), correctly indicating outflow-to-inflow monetary movement.

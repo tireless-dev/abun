@@ -165,16 +165,19 @@ class DatabasePreferenceSyncService implements PreferenceSyncServiceLike {
   }
 
   async push(userId: string, items: SyncPreference[]): Promise<SyncPreference[]> {
-    const results: SyncPreference[] = [];
-    for (const incoming of items) {
-      const result = await withTransaction(this.db, async (tx) => {
+    if (items.length === 0) return [];
+    return await withTransaction(this.db, async (tx) => {
+      const results: SyncPreference[] = [];
+      for (const incoming of items) {
         const existing = await selectOnePreference(tx, userId, incoming.key);
-        if (!existing) return insertNewPreference(tx, userId, incoming);
-        return mergeExistingPreference(tx, userId, existing, incoming);
-      });
-      results.push(result);
-    }
-    return results;
+        if (!existing) {
+          results.push(await insertNewPreference(tx, userId, incoming));
+        } else {
+          results.push(await mergeExistingPreference(tx, userId, existing, incoming));
+        }
+      }
+      return results;
+    });
   }
 }
 
