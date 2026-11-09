@@ -261,7 +261,7 @@ def main():
             "is_deleted": 0,
             "hlc_map": "{}",
             "dirty_fields": "[]",
-            "is_dirty": 1,
+            "is_dirty": 0,
             "server_version": 0,
         }
 
@@ -307,7 +307,7 @@ def main():
             "is_deleted": 0,
             "hlc_map": "{}",
             "dirty_fields": "[]",
-            "is_dirty": 1,
+            "is_dirty": 0,
             "server_version": 0,
         }
 
@@ -338,7 +338,7 @@ def main():
                 "is_deleted": 0,
                 "hlc_map": "{}",
                 "dirty_fields": "[]",
-                "is_dirty": 1,
+                "is_dirty": 0,
                 "server_version": 0,
             }
 
@@ -416,7 +416,7 @@ def main():
             "is_deleted": 0,
             "hlc_map": "{}",
             "dirty_fields": "[]",
-            "is_dirty": 1,
+            "is_dirty": 0,
             "server_version": 0,
             "created_at": now_ts,
             "updated_at": now_ts,
@@ -466,7 +466,7 @@ def main():
                 "is_deleted": 0,
                 "hlc_map": "{}",
                 "dirty_fields": "[]",
-                "is_dirty": 1,
+                "is_dirty": 0,
                 "server_version": 0,
                 "created_at": now_ts,
                 "updated_at": now_ts,
@@ -519,7 +519,7 @@ def main():
                         "is_deleted": 0,
                         "hlc_map": "{}",
                         "dirty_fields": "[]",
-                        "is_dirty": 1,
+                        "is_dirty": 0,
                         "server_version": 0,
                         "created_at": now_ts,
                         "updated_at": now_ts,
@@ -533,7 +533,7 @@ def main():
                     "is_deleted": 0,
                     "hlc_map": "{}",
                     "dirty_fields": "[]",
-                    "is_dirty": 1,
+                    "is_dirty": 0,
                     "server_version": 0,
                     "created_at": now_ts,
                     "updated_at": now_ts,
