@@ -33,8 +33,8 @@ class ThemePreferenceSupportTest {
             )
         }
 
-        onNodeWithText("Appearance").fetchSemanticsNode()
-        onNodeWithText("Theme").fetchSemanticsNode()
+        onNodeWithText("Appearance", substring = true, ignoreCase = true).fetchSemanticsNode()
+        onNodeWithText("Theme", substring = true, ignoreCase = true).fetchSemanticsNode()
         onNodeWithTag("theme-option-system").fetchSemanticsNode()
         onNodeWithText("Light").fetchSemanticsNode()
         onNodeWithText("Dark").fetchSemanticsNode()

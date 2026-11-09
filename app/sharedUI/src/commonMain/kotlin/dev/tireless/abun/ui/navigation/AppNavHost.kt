@@ -93,6 +93,18 @@ fun AppNavHost(
     onRunRoutine: (RoutineListItemView) -> Unit,
     onUpdateThemePreference: (ThemePreference) -> Unit,
     onUpdateLanguagePreference: (LanguagePreference) -> Unit = {},
+    onUpdateTaskPreferences: (
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+    ) -> Unit = { _, _, _, _, _ -> },
+    onUpdateGeneralPreferences: (
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+        rolloverTime: String,
+    ) -> Unit = { _, _, _ -> },
     onUpdatePreferences: (
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,
@@ -199,6 +211,7 @@ fun AppNavHost(
                 onCreateRoutine = onCreateRoutine,
                 onOpenRoutine = onOpenRoutine,
                 onRunRoutine = onRunRoutine,
+                onUpdateTaskPreferences = onUpdateTaskPreferences,
             )
         }
         composable(AppRoute.Settings.route) {
@@ -211,6 +224,7 @@ fun AppNavHost(
                 onUpdateAutoUpdateEnabled = onUpdateAutoUpdateEnabled,
                 onUpdateThemePreference = onUpdateThemePreference,
                 onUpdateLanguagePreference = onUpdateLanguagePreference,
+                onUpdateGeneralPreferences = onUpdateGeneralPreferences,
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,
@@ -421,6 +435,8 @@ fun AppNavHost(
                 onCreateAccount = onCreateFinanceAccount,
                 onDeleteAccount = onDeleteFinanceAccount,
                 onAutoPad = onAutoPadAccountBalance,
+                onLoadPredefinedFinanceAccounts = onLoadPredefinedFinanceAccounts,
+                onResetFinanceToDefaultAccounts = onResetFinanceToDefaultAccounts,
             )
         }
         composable(AppRoute.CreateTask.route) {

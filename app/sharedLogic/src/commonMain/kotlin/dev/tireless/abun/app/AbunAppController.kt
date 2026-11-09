@@ -420,6 +420,48 @@ class AbunAppController(
         requestSync()
     }
 
+    fun updateTaskPreferences(
+        titlePrefix: String,
+        defaultAlarmLeadMinutes: Int,
+        focusMinutes: Int,
+        shortBreakMinutes: Int,
+        longBreakMinutes: Int,
+    ) {
+        val current = _state.value.preferences
+        updatePreferences(
+            titlePrefix = titlePrefix,
+            defaultAlarmLeadMinutes = defaultAlarmLeadMinutes,
+            focusMinutes = focusMinutes,
+            shortBreakMinutes = shortBreakMinutes,
+            longBreakMinutes = longBreakMinutes,
+            timezoneOverride = current.timezoneOverride,
+            dateFormat = current.dateFormat,
+            themePreference = current.themePreference,
+            rolloverTime = current.rolloverTime,
+            enabledModules = current.enabledModules,
+        )
+    }
+
+    fun updateGeneralPreferences(
+        timezoneOverride: String,
+        dateFormat: DateFormatPreference,
+        rolloverTime: String,
+    ) {
+        val current = _state.value.preferences
+        updatePreferences(
+            titlePrefix = current.titlePrefix,
+            defaultAlarmLeadMinutes = current.defaultAlarmLeadMinutes,
+            focusMinutes = current.focusMinutes,
+            shortBreakMinutes = current.shortBreakMinutes,
+            longBreakMinutes = current.longBreakMinutes,
+            timezoneOverride = timezoneOverride,
+            dateFormat = dateFormat,
+            themePreference = current.themePreference,
+            rolloverTime = rolloverTime,
+            enabledModules = current.enabledModules,
+        )
+    }
+
     fun updatePreferences(
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,

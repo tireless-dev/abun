@@ -61,7 +61,7 @@ class AppNavigationTest {
             }
         }
 
-        onNodeWithText("Appearance").fetchSemanticsNode()
+        onNodeWithTag("settings-panel-theme").fetchSemanticsNode()
     }
 
     @Test
@@ -377,11 +377,11 @@ class AppNavigationTest {
     }
 
     @Test
-    fun `settings screen renders finance presets card and triggers load and reset callbacks`() = runDesktopComposeUiTest {
+    fun `finance settings screen renders finance presets card and triggers load and reset callbacks`() = runDesktopComposeUiTest {
         var loadTriggered = false
         var resetTriggered = false
         var state by mutableStateOf(
-            screenshotState(selectedTab = AppTab.SETTINGS).copy(
+            screenshotState(selectedTab = AppTab.FINANCE).copy(
                 preferences = screenshotState().preferences.copy(
                     enabledModules = setOf(dev.tireless.abun.app.AppModule.TASKS, dev.tireless.abun.app.AppModule.FINANCE),
                 ),
@@ -393,8 +393,10 @@ class AppNavigationTest {
 
         setContent {
             AppTheme {
+                val navController = rememberNavController()
+                LaunchedEffect(Unit) { navController.navigate(AppRoute.FinanceSettings.route) }
                 AppNavHost(
-                    navController = rememberNavController(),
+                    navController = navController,
                     state = state,
                     liveNow = ScreenshotNow,
                     isPomodoroActive = false,

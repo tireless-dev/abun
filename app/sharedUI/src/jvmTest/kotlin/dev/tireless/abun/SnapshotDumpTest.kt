@@ -215,6 +215,20 @@ class SnapshotDumpTest {
     }
 
     @Test
+    fun dumpTaskSettings() {
+        if (System.getProperty("abun.dumpSnapshots") != "true") return
+        val state = screenshotState(selectedTab = AppTab.TASKS, selectedTaskSubTab = TaskSubTab.SETTINGS)
+        dumpSnapshot("task_settings") {
+            SnapshotScreenFrame(state = state) {
+                dev.tireless.abun.ui.screens.TaskSettingsScreen(
+                    state = state,
+                    onUpdateTaskPreferences = { _, _, _, _, _ -> },
+                )
+            }
+        }
+    }
+
+    @Test
     fun dumpSettings() {
         if (System.getProperty("abun.dumpSnapshots") != "true") return
         val state = screenshotState(selectedTab = AppTab.SETTINGS)
@@ -274,6 +288,7 @@ class SnapshotDumpTest {
                 TaskSubTab.TASKS -> "+ 新建任务"
                 TaskSubTab.ROUTINES -> "+ 新建例程"
                 TaskSubTab.POMODORO -> if (state.activePomodoroSession != null) "🍅 专注中" else "+ 开始专注"
+                TaskSubTab.SETTINGS -> "← 任务列表"
             }
             AppTab.FINANCE -> "+ 记一笔"
             AppTab.NOTES -> "+ 新建笔记"

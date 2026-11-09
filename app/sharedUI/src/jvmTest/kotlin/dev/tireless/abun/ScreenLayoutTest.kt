@@ -81,11 +81,28 @@ class ScreenLayoutTest {
             }
         }
 
+        val modulesTop = onNodeWithTag("settings-panel-modules").fetchSemanticsNode().boundsInRoot.top
         val cloudTop = onNodeWithTag("settings-panel-cloud").fetchSemanticsNode().boundsInRoot.top
-        val defaultsTaskTop = onNodeWithTag("settings-panel-task-defaults").fetchSemanticsNode().boundsInRoot.top
         val themeTop = onNodeWithTag("settings-panel-theme").fetchSemanticsNode().boundsInRoot.top
 
-        assertTrue(defaultsTaskTop > cloudTop, "Task defaults should be below sync status")
-        assertTrue(themeTop > defaultsTaskTop, "Theme should be below task defaults")
+        assertTrue(cloudTop > modulesTop, "Cloud should be below modules")
+        assertTrue(themeTop > cloudTop, "Theme should be below sync status")
+    }
+
+    @Test
+    fun `task settings screen stacks its panels vertically`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(themePreference = ThemePreference.LIGHT) {
+                dev.tireless.abun.ui.screens.TaskSettingsScreen(
+                    state = screenshotState(),
+                    onUpdateTaskPreferences = { _, _, _, _, _ -> },
+                )
+            }
+        }
+
+        val defaultsTaskTop = onNodeWithTag("settings-panel-task-defaults").fetchSemanticsNode().boundsInRoot.top
+        val focusDefaultsTop = onNodeWithTag("settings-panel-focus-defaults").fetchSemanticsNode().boundsInRoot.top
+
+        assertTrue(focusDefaultsTop > defaultsTaskTop, "Focus defaults should be below task defaults")
     }
 }

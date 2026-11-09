@@ -23,6 +23,7 @@ enum class TaskSubTab {
     TASKS,
     ROUTINES,
     POMODORO,
+    SETTINGS,
 }
 
 enum class TaskListFilter {

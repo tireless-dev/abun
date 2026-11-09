@@ -23,6 +23,7 @@ internal fun TasksScreen(
     onStartPomodoro: ((String?, PomodoroPhase) -> Unit)? = null,
     onCompletePomodoro: ((String, PomodoroTaskUpdate) -> Unit)? = null,
     onStopPomodoro: ((String) -> Unit)? = null,
+    onUpdateTaskPreferences: ((titlePrefix: String, defaultAlarmLeadMinutes: Int, focusMinutes: Int, shortBreakMinutes: Int, longBreakMinutes: Int) -> Unit)? = null,
 ) {
     when (state.selectedTaskSubTab) {
         TaskSubTab.TASKS -> TaskListScreen(
@@ -44,6 +45,10 @@ internal fun TasksScreen(
             onStartPomodoro = onStartPomodoro,
             onCompletePomodoro = onCompletePomodoro,
             onStopPomodoro = onStopPomodoro,
+        )
+        TaskSubTab.SETTINGS -> TaskSettingsScreen(
+            state = state,
+            onUpdateTaskPreferences = onUpdateTaskPreferences ?: { _, _, _, _, _ -> },
         )
     }
 }

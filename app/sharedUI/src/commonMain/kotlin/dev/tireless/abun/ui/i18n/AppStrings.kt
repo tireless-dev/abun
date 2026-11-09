@@ -37,6 +37,8 @@ interface NavStrings {
     val clearing: String
     val settings: String
     val tasks: String
+    val routines: String
+    val pomodoro: String
     val notes: String
     val things: String
     val finance: String
@@ -155,22 +157,42 @@ interface FinanceSettingsStrings {
     val liabilityNatureLabel: String
     val saveAccount: String
     val searchPlaceholder: String
+    val presetsCard: String
+    val financePresetsStatusDefault: String
+    val financePresetsStatusConfigured: String
+    val loadPredefinedAccounts: String
+    val resetToDefaultFiveAccounts: String
     fun categoryName(category: AccountCategory): String
     fun accountCount(count: Int): String
+}
+
+interface TaskSettingsStrings {
+    val title: String
+    val defaultsCard: String
+    val focusCard: String
+    val taskTitlePrefix: String
+    val defaultAlarmLeadMinutes: String
+    val focusMinutes: String
+    val shortBreakMinutes: String
+    val longBreakMinutes: String
+    val saveSettings: String
 }
 
 interface SettingsStrings {
     val title: String
     val appearanceCard: String
+    val theme: String
     val themeMode: String
     val themeSystem: String
     val themeLight: String
     val themeDark: String
+    val language: String
     val languageMode: String
     val langOptionSystem: String
     val langOptionEn: String
     val langOptionSc: String
     val langOptionTc: String
+    val dateFormat: String
     val cloudCard: String
     val syncStatus: String
     val syncing: String
@@ -240,6 +262,7 @@ interface AppStrings {
     val ledger: LedgerStrings
     val clearing: ClearingStrings
     val financeSettings: FinanceSettingsStrings
+    val taskSettings: TaskSettingsStrings
     val settings: SettingsStrings
     val actions: ActionStrings
 }
@@ -285,6 +308,8 @@ object EnStrings : AppStrings {
         override val clearing = "Clearing"
         override val settings = "Settings"
         override val tasks = "Tasks"
+        override val routines = "Routines"
+        override val pomodoro = "Pomodoro"
         override val notes = "Notes"
         override val things = "Things"
         override val finance = "Finance"
@@ -405,6 +430,11 @@ object EnStrings : AppStrings {
         override val liabilityNatureLabel = "Liability Nature"
         override val saveAccount = "Save Account"
         override val searchPlaceholder = "Search accounts..."
+        override val presetsCard = "ACCOUNT PRESETS"
+        override val financePresetsStatusDefault = "Only 5 root categories configured. Load presets for quick setup."
+        override val financePresetsStatusConfigured = "Custom accounts or entries exist. Reset restores the default 5 root categories."
+        override val loadPredefinedAccounts = "Load Preset Accounts"
+        override val resetToDefaultFiveAccounts = "Reset to 5 Root Accounts"
         override fun categoryName(category: AccountCategory) = when (category) {
             AccountCategory.ASSET -> "Assets"
             AccountCategory.LIABILITY -> "Liabilities"
@@ -415,18 +445,33 @@ object EnStrings : AppStrings {
         override fun accountCount(count: Int) = if (count == 1) "1 account" else "$count accounts"
     }
 
+    override val taskSettings = object : TaskSettingsStrings {
+        override val title = "TASK SETTINGS"
+        override val defaultsCard = "TASK DEFAULTS"
+        override val focusCard = "FOCUS & POMODORO"
+        override val taskTitlePrefix = "Default Title Prefix"
+        override val defaultAlarmLeadMinutes = "Default Alarm Lead (mins)"
+        override val focusMinutes = "Focus Duration (mins)"
+        override val shortBreakMinutes = "Short Break (mins)"
+        override val longBreakMinutes = "Long Break (mins)"
+        override val saveSettings = "Save Task Settings"
+    }
+
     override val settings = object : SettingsStrings {
         override val title = "SETTINGS"
         override val appearanceCard = "APPEARANCE & LANGUAGE"
+        override val theme = "Theme"
         override val themeMode = "Theme Mode"
         override val themeSystem = "System"
         override val themeLight = "Light"
         override val themeDark = "Dark"
+        override val language = "Language"
         override val languageMode = "Language"
         override val langOptionSystem = "System"
         override val langOptionEn = "En"
         override val langOptionSc = "SC"
         override val langOptionTc = "TC"
+        override val dateFormat = "Date Format"
         override val cloudCard = "CLOUD & SYNC"
         override val syncStatus = "Sync Status"
         override val syncing = "Syncing..."
@@ -530,6 +575,8 @@ object ScStrings : AppStrings {
         override val clearing = "待办"
         override val settings = "设置"
         override val tasks = "任务"
+        override val routines = "例程"
+        override val pomodoro = "番茄"
         override val notes = "笔记"
         override val things = "物品"
         override val finance = "财务"
@@ -650,6 +697,11 @@ object ScStrings : AppStrings {
         override val liabilityNatureLabel = "负债性质"
         override val saveAccount = "保存账户"
         override val searchPlaceholder = "搜索账户..."
+        override val presetsCard = "科目预置"
+        override val financePresetsStatusDefault = "当前仅包含 5 大基础科目。可导入标准科目体系快速开始。"
+        override val financePresetsStatusConfigured = "已存在自定义或扩展科目。重置将恢复为 5 大基础科目。"
+        override val loadPredefinedAccounts = "导入预置科目"
+        override val resetToDefaultFiveAccounts = "重置为 5 大科目"
         override fun categoryName(category: AccountCategory) = when (category) {
             AccountCategory.ASSET -> "资产"
             AccountCategory.LIABILITY -> "负债"
@@ -660,18 +712,33 @@ object ScStrings : AppStrings {
         override fun accountCount(count: Int) = "$count 个账户"
     }
 
+    override val taskSettings = object : TaskSettingsStrings {
+        override val title = "任务设置"
+        override val defaultsCard = "任务预设"
+        override val focusCard = "专注与番茄钟"
+        override val taskTitlePrefix = "默认任务前缀"
+        override val defaultAlarmLeadMinutes = "提醒提前分钟数"
+        override val focusMinutes = "专注时长 (分钟)"
+        override val shortBreakMinutes = "短休时长 (分钟)"
+        override val longBreakMinutes = "长休时长 (分钟)"
+        override val saveSettings = "保存任务设置"
+    }
+
     override val settings = object : SettingsStrings {
         override val title = "系统设置"
         override val appearanceCard = "外观与语言"
+        override val theme = "主题"
         override val themeMode = "主题模式"
         override val themeSystem = "系统"
         override val themeLight = "浅色"
         override val themeDark = "深色"
+        override val language = "界面语言"
         override val languageMode = "语言"
         override val langOptionSystem = "系统"
         override val langOptionEn = "英文"
         override val langOptionSc = "简中"
         override val langOptionTc = "繁中"
+        override val dateFormat = "日期格式"
         override val cloudCard = "云端与同步"
         override val syncStatus = "同步状态"
         override val syncing = "正在同步..."
@@ -775,6 +842,8 @@ object TcStrings : AppStrings {
         override val clearing = "待辦"
         override val settings = "設定"
         override val tasks = "任務"
+        override val routines = "例程"
+        override val pomodoro = "番茄"
         override val notes = "筆記"
         override val things = "物品"
         override val finance = "財務"
@@ -895,6 +964,11 @@ object TcStrings : AppStrings {
         override val liabilityNatureLabel = "負債性質"
         override val saveAccount = "儲存賬戶"
         override val searchPlaceholder = "搜尋賬戶..."
+        override val presetsCard = "科目預置"
+        override val financePresetsStatusDefault = "當前僅包含 5 大基礎科目。可導入標準科目體系快速開始。"
+        override val financePresetsStatusConfigured = "已存在自訂或擴展科目。重置將恢復為 5 大基礎科目。"
+        override val loadPredefinedAccounts = "導入預置科目"
+        override val resetToDefaultFiveAccounts = "重置為 5 大科目"
         override fun categoryName(category: AccountCategory) = when (category) {
             AccountCategory.ASSET -> "資產"
             AccountCategory.LIABILITY -> "負債"
@@ -905,18 +979,33 @@ object TcStrings : AppStrings {
         override fun accountCount(count: Int) = "$count 個賬戶"
     }
 
+    override val taskSettings = object : TaskSettingsStrings {
+        override val title = "任務設定"
+        override val defaultsCard = "任務預設"
+        override val focusCard = "專注與番茄鐘"
+        override val taskTitlePrefix = "預設任務前綴"
+        override val defaultAlarmLeadMinutes = "提醒提前分鐘數"
+        override val focusMinutes = "專注時長 (分鐘)"
+        override val shortBreakMinutes = "短休時長 (分鐘)"
+        override val longBreakMinutes = "長休時長 (分鐘)"
+        override val saveSettings = "儲存任務設定"
+    }
+
     override val settings = object : SettingsStrings {
         override val title = "系統設定"
         override val appearanceCard = "外觀與語言"
+        override val theme = "主題"
         override val themeMode = "主題模式"
         override val themeSystem = "系統"
         override val themeLight = "淺色"
         override val themeDark = "深色"
+        override val language = "介面語言"
         override val languageMode = "語言"
         override val langOptionSystem = "系統"
         override val langOptionEn = "英文"
         override val langOptionSc = "簡中"
         override val langOptionTc = "繁中"
+        override val dateFormat = "日期格式"
         override val cloudCard = "雲端與同步"
         override val syncStatus = "同步狀態"
         override val syncing = "正在同步..."

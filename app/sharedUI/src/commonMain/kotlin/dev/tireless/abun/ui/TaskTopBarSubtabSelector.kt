@@ -52,9 +52,10 @@ fun TaskTopBarSubtabSelector(
             val textColor = if (isSelected) ThemeTokens.colors.textPrimary else ThemeTokens.colors.textSecondary
             val fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             val label = when (subtab) {
-                TaskSubtab.TASKS -> "任务"
-                TaskSubtab.ROUTINES -> "例程"
-                TaskSubtab.POMODORO -> "番茄"
+                TaskSubtab.TASKS -> ThemeTokens.strings.nav.tasks
+                TaskSubtab.ROUTINES -> ThemeTokens.strings.nav.routines
+                TaskSubtab.POMODORO -> ThemeTokens.strings.nav.pomodoro
+                TaskSubtab.SETTINGS -> ThemeTokens.strings.nav.settings
             }
             Box(
                 modifier = Modifier

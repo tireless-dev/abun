@@ -546,6 +546,7 @@ fun App() {
                 TaskSubTab.TASKS -> "+ ${s.actions.quickCaptureTask}"
                 TaskSubTab.ROUTINES -> "+ Routine"
                 TaskSubTab.POMODORO -> if (state.activePomodoroSession != null) "🍅 Focus" else "+ Focus"
+                TaskSubTab.SETTINGS -> "← ${s.nav.tasks}"
             }
             AppTab.FINANCE -> s.ledger.addTransaction
             AppTab.NOTES -> "+ ${s.actions.quickCaptureNote}"
@@ -566,6 +567,7 @@ fun App() {
                             navController.navigate(AppRoute.StartPomodoro.route)
                         }
                     }
+                    TaskSubTab.SETTINGS -> controller.selectTaskSubTab(TaskSubTab.TASKS)
                 }
                 AppTab.FINANCE -> navController.navigate(AppRoute.CreateFinanceTransaction.route)
                 AppTab.NOTES -> controller.selectTab(AppTab.NOTES)
@@ -622,6 +624,8 @@ fun App() {
                         onRunRoutine = { controller.runRoutine(it.id) },
                         onUpdateThemePreference = controller::updateThemePreference,
                         onUpdateLanguagePreference = controller::updateLanguagePreference,
+                        onUpdateTaskPreferences = controller::updateTaskPreferences,
+                        onUpdateGeneralPreferences = controller::updateGeneralPreferences,
                         onUpdatePreferences = controller::updatePreferences,
                         onReopenLogin = controller::reopenLogin,
                         onLogout = controller::logout,
@@ -936,6 +940,7 @@ internal fun AppContent(
             TaskSubTab.TASKS -> "+ 新建任务"
             TaskSubTab.ROUTINES -> "+ 新建例程"
             TaskSubTab.POMODORO -> if (state.activePomodoroSession != null) "🍅 专注中" else "+ 开始专注"
+            TaskSubTab.SETTINGS -> "← 任务列表"
         }
         AppTab.FINANCE -> "+ 记一笔"
         AppTab.NOTES -> "+ 新建笔记"
@@ -956,6 +961,7 @@ internal fun AppContent(
                         navController.navigate(AppRoute.StartPomodoro.route)
                     }
                 }
+                TaskSubTab.SETTINGS -> onSelectTaskSubTab(TaskSubTab.TASKS)
             }
             AppTab.FINANCE -> navController.navigate(AppRoute.CreateFinanceTransaction.route)
             AppTab.NOTES -> onSelectTab(AppTab.NOTES)
@@ -1173,12 +1179,14 @@ private fun TaskSubTab.label(): String = when (this) {
     TaskSubTab.TASKS -> "Tasks"
     TaskSubTab.ROUTINES -> "Routines"
     TaskSubTab.POMODORO -> "Pomodoro"
+    TaskSubTab.SETTINGS -> "Settings"
 }
 
 private fun TaskSubTab.icon(): ImageVector = when (this) {
     TaskSubTab.TASKS -> Lucide.ListTodo
     TaskSubTab.ROUTINES -> Lucide.CalendarCheck
     TaskSubTab.POMODORO -> Lucide.Timer
+    TaskSubTab.SETTINGS -> Lucide.Settings
 }
 
 internal fun TaskListFilter.label(): String = when (this) {

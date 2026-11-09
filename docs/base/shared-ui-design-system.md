@@ -43,13 +43,37 @@ The application navigation eliminates traditional persistent bottom tab bars and
   - **Workspaces section**: 2-column bento grid for all enabled `AppModule`s showing live metrics (e.g. open tasks count, safe-to-spend balance).
   - **Footer**: Monospace link to `Settings & Preferences`.
 
-### Top-Bar Inline 3-Segment Sub-Navigation
+### Top-Bar Inline 4-Segment Sub-Navigation
 
-Sub-navigation within workspaces evolves from legacy top-app-bar dropdown selectors into inline, compact 3-segment pill selectors in the `TopAppBar`:
+Sub-navigation within workspaces evolves from legacy top-app-bar dropdown selectors into inline, compact 4-segment pill selectors in the `TopAppBar`:
 
-- **Tasks**: `任务` (Tasks) | `例程` (Routines) | `番茄` (Pomodoro) via `TaskTopBarSubtabSelector`.
-- **Finance**: `总览` (Cockpit) | `明细` (Ledger) | `清算` (Clearing Hub) via `TopBarSegmentedSubnav`.
+- **Tasks**: `Tasks` (`任务`) | `Routines` (`例程`) | `Pomodoro` (`番茄`) | `Settings` (`设置`) via `TaskTopBarSubtabSelector`.
+- **Finance**: `Cockpit` (`总览`) | `Ledger` (`明细`) | `Clearing` (`清算`) | `Settings` (`设置`) via `FinanceTopBarSubnav`.
 - Active segment highlights in crisp white surface with bold monospace typography; inactive segments remain subdued on track background (`ThemeTokens.colors.subnavTrack`).
+
+### Workspace-Scoped Settings Architecture
+
+To preserve clean functional boundaries, settings are partitioned into module-owned workspaces versus global system configuration:
+
+1. **Global Application Settings (`SettingsScreen`)**:
+   - Focuses strictly on cross-cutting application configuration.
+   - **Modules Bento**: Enable/disable optional app modules (`Tasks`, `Finance`, `Notes`, `Things`).
+   - **Cloud & Sync Bento**: Sync daemon status, manual sync triggers, and sync timeline.
+   - **Appearance & Language Bento**: Single-choice segmented controls for Theme (`System`, `Light`, `Dark`) and Language hot-switching (`System`, `En`, `SC`, `TC`).
+   - **General Preferences Bento**: Date format choice, timezone override, and day rollover boundary time.
+   - **Account & Session Bento**: Current authenticated identity, login actions, and logout button.
+   - **Software Updates Bento**: OTA distribution client version, release channel, auto-update toggle, and manual check button.
+   - **Typography & Precision**: Clean Swiss bento card architecture without redundant duplicate inner headers (removed oversized 24sp headers and redundant `SectionHeader`s), with standardized `12dp` to `14dp` vertical field spacing.
+
+2. **Task Workspace Settings (`TaskSettingsScreen`)**:
+   - Embedded directly as the 4th sub-surface of the Tasks workspace (`TaskSubTab.SETTINGS`).
+   - **Task Defaults Bento (`settings-panel-task-defaults`)**: Default title prefix and alarm lead minutes.
+   - **Focus Defaults Bento (`settings-panel-focus-defaults`)**: Focus work session, short break, and long break duration controls.
+
+3. **Finance Workspace Settings (`FinanceSettingsScreen`)**:
+   - Embedded directly as the 4th sub-surface of the Finance workspace (`FinanceTopBarSubnav` -> Settings).
+   - **Account Presets Bento (`settings-panel-finance-presets`)**: Load standard starter predefined accounts for pristine ledgers, or reset all ledger accounts back to Default 5 roots.
+   - **Full Account Hierarchy**: Tree-based inspection, business role configuration (Liquid Mainstay, Growth Asset, Pass-Through Bridge), commercial vs. personal debt classifications, and Auto-Pad reconciliation.
 
 ## Token Rules
 

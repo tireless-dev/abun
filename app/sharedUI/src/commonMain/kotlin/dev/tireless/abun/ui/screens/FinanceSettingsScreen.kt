@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,6 +100,8 @@ fun FinanceSettingsScreen(
     ) -> Unit,
     onDeleteAccount: (String) -> Unit,
     onAutoPad: (accountId: String, actualBalanceMinor: Long) -> Unit,
+    onLoadPredefinedFinanceAccounts: () -> Unit = {},
+    onResetFinanceToDefaultAccounts: () -> Unit = {},
 ) {
     val accounts = state.financeView.accounts
     var selectedCategoryFilter by remember { mutableStateOf<AccountCategory?>(null) }
@@ -193,7 +196,57 @@ fun FinanceSettingsScreen(
             )
         }
 
-        // 2. Inline Create Account Card
+        // 2. Account Presets Card
+        SwissBentoCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings-panel-finance-presets"),
+            contentPadding = PaddingValues(16.dp),
+        ) {
+            val s = ThemeTokens.strings.financeSettings
+            SwissCardHeader(
+                title = s.presetsCard,
+                accentDotColor = ThemeTokens.colors.financeAccent,
+                trailingText = if (state.financeView.canLoadPredefinedAccounts) "DEFAULT 5" else "CONFIGURED",
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            val statusText = if (state.financeView.canLoadPredefinedAccounts) {
+                s.financePresetsStatusDefault
+            } else {
+                s.financePresetsStatusConfigured
+            }
+            Text(
+                text = statusText,
+                style = ThemeTokens.type.body,
+                color = ThemeTokens.colors.textSecondary,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = onLoadPredefinedFinanceAccounts,
+                    enabled = state.financeView.canLoadPredefinedAccounts,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("finance-load-predefined-button"),
+                ) {
+                    Text(s.loadPredefinedAccounts)
+                }
+                OutlinedButton(
+                    onClick = onResetFinanceToDefaultAccounts,
+                    enabled = !state.financeView.canLoadPredefinedAccounts,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("finance-reset-default-five-button"),
+                ) {
+                    Text(s.resetToDefaultFiveAccounts)
+                }
+            }
+        }
+
+        // 3. Inline Create Account Card
         if (isCreatingAccount) {
             CreateAccountInlineCard(
                 onCreate = { path, name, category, currency, includeInNetWorth, isPassThrough, liquidTier ->
