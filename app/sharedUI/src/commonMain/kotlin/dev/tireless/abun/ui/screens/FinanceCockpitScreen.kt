@@ -85,7 +85,7 @@ fun FinanceCockpitScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "SAFE-TO-SPEND · 本月安全可支",
+                    text = ThemeTokens.strings.cockpit.safeToSpend,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
@@ -162,7 +162,7 @@ fun FinanceCockpitScreen(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "GUARDRAIL PACING · 预算护栏",
+                title = ThemeTokens.strings.cockpit.guardrailPacing,
                 accentDotColor = ThemeTokens.colors.financeAccent,
                 trailingContent = {
                     Row(
@@ -186,7 +186,7 @@ fun FinanceCockpitScreen(
                                 .testTag("cockpit-create-budget-btn"),
                         ) {
                             Text(
-                                text = "+ 护栏",
+                                text = ThemeTokens.strings.cockpit.addGuardrail,
                                 style = TextStyle(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp,
@@ -209,7 +209,7 @@ fun FinanceCockpitScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "暂无支出护栏，点击右上角「+ 护栏」添加月度限额",
+                        text = ThemeTokens.strings.cockpit.noGuardrails,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -237,7 +237,7 @@ fun FinanceCockpitScreen(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "CASHFLOW AGENDA · 未来现金流",
+                title = ThemeTokens.strings.cockpit.cashflowAgenda,
                 accentDotColor = ThemeTokens.colors.financeAccent,
                 trailingContent = {
                     Row(
@@ -303,7 +303,7 @@ fun FinanceCockpitScreen(
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         Text(
-                            text = if (isDeficit) "⚠️ 预测到资金赤字缺口" else "● 现金流跑道充足健康",
+                            text = if (isDeficit) ThemeTokens.strings.cockpit.deficitWarning else ThemeTokens.strings.cockpit.runwayHealthy,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
@@ -314,9 +314,9 @@ fun FinanceCockpitScreen(
                         )
                         Text(
                             text = if (isDeficit) {
-                                "预计将于 ${runway.deficitDate} 出现赤字 · 最低槽点 $minTroughFormatted (${runway.minimumTroughDate})"
+                                ThemeTokens.strings.cockpit.deficitPredicted(runway.deficitDate ?: "", minTroughFormatted, runway.minimumTroughDate)
                             } else {
-                                "未来 ${finance.runwayHorizonDays} 天内无断流风险 · 最低槽点 $minTroughFormatted (${runway.minimumTroughDate})"
+                                ThemeTokens.strings.cockpit.noDeficitRisk(finance.runwayHorizonDays, minTroughFormatted, runway.minimumTroughDate)
                             },
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
@@ -648,9 +648,9 @@ private fun GuardrailPacingRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val statusMsg = when {
-                eval.isOverBudget -> "⚠️ 本月已超支 ${item.formattedPacingDelta}"
-                eval.isAheadOfPacing -> "⚡️ 配速超前 ${item.formattedPacingDelta}"
-                else -> "✓ 配速健康，结余 ${item.formattedPacingDelta}"
+                eval.isOverBudget -> ThemeTokens.strings.cockpit.overBudget(item.formattedPacingDelta)
+                eval.isAheadOfPacing -> ThemeTokens.strings.cockpit.aheadOfPacing(item.formattedPacingDelta)
+                else -> ThemeTokens.strings.cockpit.pacingHealthy(item.formattedPacingDelta)
             }
 
             Text(
@@ -667,7 +667,7 @@ private fun GuardrailPacingRow(
             )
 
             Text(
-                text = "建议 ${item.formattedDailyAllowance}/天",
+                text = ThemeTokens.strings.cockpit.suggestedDaily(item.formattedDailyAllowance),
                 style = TextStyle(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,

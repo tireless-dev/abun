@@ -8,6 +8,7 @@ import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
 import dev.tireless.abun.app.IosDatabaseDriverFactory
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.IosNodeIdProvider
 import dev.tireless.abun.app.StableStringIdGenerator
@@ -59,6 +60,17 @@ private class IosLoginPreferenceStore : LoginPreferenceStore {
         }
     }
 
+    override fun languagePreference(): LanguagePreference =
+        (defaults.stringForKey(LANGUAGE_PREFERENCE_KEY)?.let(LanguagePreference::valueOf)) ?: LanguagePreference.SYSTEM
+
+    override fun setLanguagePreference(languagePreference: LanguagePreference) {
+        if (languagePreference == LanguagePreference.SYSTEM) {
+            defaults.removeObjectForKey(LANGUAGE_PREFERENCE_KEY)
+        } else {
+            defaults.setObject(languagePreference.name, forKey = LANGUAGE_PREFERENCE_KEY)
+        }
+    }
+
     override fun authSession(): AuthSession? {
         val userId = defaults.stringForKey(AUTH_USER_ID_KEY) ?: return null
         val accessToken = defaults.stringForKey(AUTH_ACCESS_TOKEN_KEY) ?: return null
@@ -97,6 +109,7 @@ private class IosLoginPreferenceStore : LoginPreferenceStore {
 
 private const val LOGIN_OMITTED_KEY = "app.auth.login_omitted"
 private const val THEME_PREFERENCE_KEY = "app.theme_preference"
+private const val LANGUAGE_PREFERENCE_KEY = "app.language_preference"
 private const val AUTH_USER_ID_KEY = "app.auth.user_id"
 private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"
 private const val AUTH_ACCESS_EXPIRES_AT_KEY = "app.auth.access_token_expires_at"

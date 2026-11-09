@@ -237,12 +237,12 @@ class AppNavigationTest {
         onNodeWithTag("finance-ledger-screen").assertIsDisplayed()
 
         // 3. Navigate to Settings tab (renders SettingsScreen with verticalScroll)
-        onNodeWithText("Settings").performClick()
+        onNodeWithTag("app-tab-settings").performClick()
         waitForIdle()
         onNodeWithTag("settings-panel-cloud").assertIsDisplayed()
 
         // 4. Navigate back to Dashboard tab
-        onNodeWithText("Dashboard").performClick()
+        onNodeWithTag("app-tab-today").performClick()
         waitForIdle()
         onNodeWithTag("day-panel-summary").assertIsDisplayed()
     }

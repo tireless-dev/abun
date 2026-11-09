@@ -155,11 +155,12 @@ private fun FinanceTopBarSubnav(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val nav = ThemeTokens.strings.nav
     val items = listOf(
-        Triple("总览", AppRoute.FinanceCockpit.route, "finance-subtab-cockpit"),
-        Triple("明细", AppRoute.Finance.route, "finance-subtab-ledger"),
-        Triple("清算", AppRoute.DebtClearingHub.route, "finance-subtab-clearing"),
-        Triple("设置", AppRoute.FinanceSettings.route, "finance-subtab-settings"),
+        Triple(nav.cockpit, AppRoute.FinanceCockpit.route, "finance-subtab-cockpit"),
+        Triple(nav.ledger, AppRoute.Finance.route, "finance-subtab-ledger"),
+        Triple(nav.clearing, AppRoute.DebtClearingHub.route, "finance-subtab-clearing"),
+        Triple(nav.settings, AppRoute.FinanceSettings.route, "finance-subtab-settings"),
     )
     val activeRoute = when (currentRoute) {
         AppRoute.Finance.route -> AppRoute.Finance.route
@@ -505,6 +506,7 @@ private fun FloatingCommandOverlay(
                     text = tab.tabLabel(),
                     modifier = Modifier
                         .weight(1f)
+                        .testTag("app-tab-${tab.name.lowercase()}")
                         .clickable { onSelectTab(tab) },
                 )
             }
@@ -580,7 +582,10 @@ fun App() {
         }
     }
 
-    AppTheme(themePreference = state.preferences.themePreference) {
+    AppTheme(
+        themePreference = state.preferences.themePreference,
+        languagePreference = state.preferences.languagePreference,
+    ) {
         if (state.auth.showGuide) {
             GuideScreenContent(
                 state = state,
@@ -593,17 +598,18 @@ fun App() {
             return@AppTheme
         }
 
+        val s = ThemeTokens.strings
         val primaryActionLabel = when (state.selectedTab) {
-            AppTab.TODAY -> "+ Capture"
+            AppTab.TODAY -> "+ ${s.actions.quickCaptureTask}"
             AppTab.TASKS -> when (state.selectedTaskSubTab) {
-                TaskSubTab.TASKS -> "+ 新建任务"
-                TaskSubTab.ROUTINES -> "+ 新建例程"
-                TaskSubTab.POMODORO -> if (state.activePomodoroSession != null) "🍅 专注中" else "+ 开始专注"
+                TaskSubTab.TASKS -> "+ ${s.actions.quickCaptureTask}"
+                TaskSubTab.ROUTINES -> "+ Routine"
+                TaskSubTab.POMODORO -> if (state.activePomodoroSession != null) "🍅 Focus" else "+ Focus"
             }
-            AppTab.FINANCE -> "+ 记一笔"
-            AppTab.NOTES -> "+ 新建笔记"
-            AppTab.THINGS -> "+ 新增物品"
-            AppTab.SETTINGS -> "← 返回主页"
+            AppTab.FINANCE -> s.ledger.addTransaction
+            AppTab.NOTES -> "+ ${s.actions.quickCaptureNote}"
+            AppTab.THINGS -> "+ ${s.actions.quickCaptureThing}"
+            AppTab.SETTINGS -> "← ${s.nav.dashboard}"
         }
 
         val onPrimaryActionClick = {
@@ -672,6 +678,7 @@ fun App() {
                         onOpenRoutine = { navController.navigate(AppRoute.RoutineDetail.create(it.id)) },
                         onRunRoutine = { controller.runRoutine(it.id) },
                         onUpdateThemePreference = controller::updateThemePreference,
+                        onUpdateLanguagePreference = controller::updateLanguagePreference,
                         onUpdatePreferences = controller::updatePreferences,
                         onReopenLogin = controller::reopenLogin,
                         onLogout = controller::logout,

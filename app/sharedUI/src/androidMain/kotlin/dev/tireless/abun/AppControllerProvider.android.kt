@@ -10,6 +10,7 @@ import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
 import dev.tireless.abun.app.DefaultTimeProvider
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.StableStringIdGenerator
 import dev.tireless.abun.app.ThemePreference
@@ -74,6 +75,21 @@ private class AndroidLoginPreferenceStore(context: android.content.Context) : Lo
         }.apply()
     }
 
+    override fun languagePreference(): LanguagePreference =
+        preferences.getString(LANGUAGE_PREFERENCE_KEY, LanguagePreference.SYSTEM.name)
+            ?.let { runCatching { LanguagePreference.valueOf(it) }.getOrNull() }
+            ?: LanguagePreference.SYSTEM
+
+    override fun setLanguagePreference(languagePreference: LanguagePreference) {
+        preferences.edit().apply {
+            if (languagePreference == LanguagePreference.SYSTEM) {
+                remove(LANGUAGE_PREFERENCE_KEY)
+            } else {
+                putString(LANGUAGE_PREFERENCE_KEY, languagePreference.name)
+            }
+        }.apply()
+    }
+
     override fun authSession(): AuthSession? {
         val userId = preferences.getString(AUTH_USER_ID_KEY, null) ?: return null
         val accessToken = preferences.getString(AUTH_ACCESS_TOKEN_KEY, null) ?: return null
@@ -125,6 +141,7 @@ private class AndroidLoginPreferenceStore(context: android.content.Context) : Lo
 private const val PREFERENCE_FILE = "abun.local.preferences"
 private const val LOGIN_OMITTED_KEY = "app.auth.login_omitted"
 private const val THEME_PREFERENCE_KEY = "app.theme_preference"
+private const val LANGUAGE_PREFERENCE_KEY = "app.language_preference"
 private const val AUTO_UPDATE_ENABLED_KEY = "app.ota.auto_update_enabled"
 private const val AUTH_USER_ID_KEY = "app.auth.user_id"
 private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"

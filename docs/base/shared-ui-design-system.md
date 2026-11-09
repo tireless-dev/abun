@@ -60,6 +60,21 @@ Sub-navigation within workspaces evolves from legacy top-app-bar dropdown select
 - `Light` and `Dark` force the shared color scheme across Desktop and Android
 - new settings or onboarding UI must refer to these exact modes rather than inventing one-off theme toggles
 
+### Internationalization (i18n) & Single-Language Content
+
+- **Strict Single-Language Rule**:
+  - Eliminate all bilingual compound labels (e.g. `English · 中文` or `English / 中文`).
+  - All UI strings throughout all screens must be sourced through `ThemeTokens.strings` (backed by `LocalAppStrings`).
+- **Supported Languages**:
+  - English (`AppLanguage.EN`)
+  - Simplified Chinese (`AppLanguage.SC` / 简体中文)
+  - Traditional Chinese (`AppLanguage.TC` / 繁體中文)
+- **Language Preference & Hot-Switching**:
+  - `LanguagePreference`: `SYSTEM`, `EN`, `SC`, `TC`.
+  - Stored in `LoginPreferenceStore` (`languagePreference()` / `setLanguagePreference(...)`) across Desktop (`Preferences`), Android (`SharedPreferences`), and iOS (`NSUserDefaults`).
+  - In Settings, exposed via an inline 4-segment choice: `System`, `En`, `SC`, `TC` (when active language is English) or `系统`, `英文`, `简中`, `繁中` (Simplified Chinese) or `系統`, `英文`, `簡中`, `繁中` (Traditional Chinese).
+  - Hot-switching immediately updates `LocalAppStrings` and `LocalAppLanguage` in `AppTheme`, reactively re-rendering the entire Compose hierarchy without application restart.
+
 ### Color
 
 - **WCAG 2.1 AA Contrast Standard**:

@@ -141,7 +141,7 @@ fun FinanceSettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "FINANCE SETTINGS · 财务设置",
+                        text = ThemeTokens.strings.financeSettings.title,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -150,7 +150,7 @@ fun FinanceSettingsScreen(
                         ),
                     )
                     Text(
-                        text = "五大类会计账户管理",
+                        text = ThemeTokens.strings.financeSettings.accountManagement,
                         style = ThemeTokens.type.title,
                     )
                 }
@@ -165,7 +165,10 @@ fun FinanceSettingsScreen(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp).padding(end = 4.dp),
                     )
-                    Text(if (isCreatingAccount) "取消新建" else "新建账户", style = ThemeTokens.type.label)
+                    Text(
+                        if (isCreatingAccount) ThemeTokens.strings.financeSettings.cancelCreate else ThemeTokens.strings.financeSettings.createAccount,
+                        style = ThemeTokens.type.label,
+                    )
                 }
             }
 
@@ -173,17 +176,17 @@ fun FinanceSettingsScreen(
                 metrics = listOf(
                     SwissMetricData(
                         label = "ACTIVE ACCOUNTS",
-                        value = "${activeAccounts.size} 个",
+                        value = ThemeTokens.strings.financeSettings.accountCount(activeAccounts.size),
                         valueColor = ThemeTokens.colors.textPrimary,
                     ),
                     SwissMetricData(
                         label = "LIQUID ASSETS",
-                        value = "${liquidAccounts.size} 账户 (${state.financeView.formattedLiquidAssets})",
+                        value = "${liquidAccounts.size} (${state.financeView.formattedLiquidAssets})",
                         valueColor = ThemeTokens.colors.financeAccent,
                     ),
                     SwissMetricData(
                         label = "NET WORTH SCOPE",
-                        value = "${netWorthAccounts.size} 账户 (${state.financeView.formattedNetWorth})",
+                        value = "${netWorthAccounts.size} (${state.financeView.formattedNetWorth})",
                         valueColor = ThemeTokens.colors.textPrimary,
                     ),
                 ),
@@ -213,21 +216,15 @@ fun FinanceSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 CategoryFilterChip(
-                    label = "全部 (${accounts.size})",
+                    label = "${ThemeTokens.strings.common.all} (${accounts.size})",
                     isSelected = selectedCategoryFilter == null,
                     onClick = { selectedCategoryFilter = null },
                 )
                 AccountCategory.entries.forEach { cat ->
                     val count = accounts.count { it.account.category == cat }
-                    val cnName = when (cat) {
-                        AccountCategory.ASSET -> "资产"
-                        AccountCategory.LIABILITY -> "负债"
-                        AccountCategory.INCOME -> "收入"
-                        AccountCategory.EXPENSE -> "支出"
-                        AccountCategory.EQUITY -> "权益"
-                    }
+                    val catName = ThemeTokens.strings.financeSettings.categoryName(cat)
                     CategoryFilterChip(
-                        label = "$cnName ($count)",
+                        label = "$catName ($count)",
                         isSelected = selectedCategoryFilter == cat,
                         onClick = { selectedCategoryFilter = cat },
                     )
@@ -237,7 +234,7 @@ fun FinanceSettingsScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("搜索账户...", style = ThemeTokens.type.label) },
+                placeholder = { Text(ThemeTokens.strings.financeSettings.searchPlaceholder, style = ThemeTokens.type.label) },
                 singleLine = true,
                 modifier = Modifier.width(180.dp).testTag("finance-settings-search-input"),
             )
@@ -253,13 +250,7 @@ fun FinanceSettingsScreen(
         activeCategories.forEach { category ->
             val categoryAccounts = filteredAccounts.filter { it.account.category == category }
             if (categoryAccounts.isNotEmpty()) {
-                val categoryName = when (category) {
-                    AccountCategory.ASSET -> "资产 (Assets)"
-                    AccountCategory.LIABILITY -> "负债 (Liabilities)"
-                    AccountCategory.INCOME -> "收入 (Income)"
-                    AccountCategory.EXPENSE -> "支出 (Expenses)"
-                    AccountCategory.EQUITY -> "权益 (Equity)"
-                }
+                val categoryName = ThemeTokens.strings.financeSettings.categoryName(category)
 
                 // Group by level-2 sub-path hierarchy (e.g. Current, Growth, Loans, CreditCard)
                 val subGroups = categoryAccounts.groupBy { item ->
@@ -273,7 +264,7 @@ fun FinanceSettingsScreen(
                 ) {
                     SwissCardHeader(
                         title = categoryName,
-                        trailingText = "${categoryAccounts.size} 账户",
+                        trailingText = ThemeTokens.strings.financeSettings.accountCount(categoryAccounts.size),
                     )
 
                     subGroups.forEach { (subGroupName, itemsInSubGroup) ->
@@ -305,7 +296,7 @@ fun FinanceSettingsScreen(
                                         ),
                                     )
                                     Text(
-                                        text = "· ${itemsInSubGroup.size} 项",
+                                        text = "· ${ThemeTokens.strings.common.itemsCount(itemsInSubGroup.size)}",
                                         style = ThemeTokens.type.bodyMuted,
                                         color = ThemeTokens.colors.textTertiary,
                                     )
@@ -411,7 +402,7 @@ private fun AccountHierarchyItemRow(
                                 .background(ThemeTokens.colors.surfaceMuted)
                                 .padding(horizontal = 4.dp, vertical = 2.dp),
                         ) {
-                            Text("已关闭/归档", style = TextStyle(fontSize = 10.sp, color = ThemeTokens.colors.textTertiary))
+                            Text(ThemeTokens.strings.financeSettings.archived, style = TextStyle(fontSize = 10.sp, color = ThemeTokens.colors.textTertiary))
                         }
                     }
                 }
@@ -450,7 +441,7 @@ private fun AccountHierarchyItemRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 1. Asset Account Role Segment: [🟢 流动主力] [🟡 沉淀资产] [⚡ 转出即消费]
+                // 1. Asset Account Role Segment
                 if (acc.category == AccountCategory.ASSET) {
                     val isOperating = !acc.isPassThrough && acc.liquidTier == LiquidTier.LIQUID
                     val isSediment = !acc.isPassThrough && acc.liquidTier != LiquidTier.LIQUID
@@ -464,7 +455,7 @@ private fun AccountHierarchyItemRow(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // 🟢 流动主力
+                        // Liquid Primary
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -480,7 +471,7 @@ private fun AccountHierarchyItemRow(
                                 .testTag("role-operating-${acc.id}"),
                         ) {
                             Text(
-                                text = "🟢 流动主力",
+                                text = ThemeTokens.strings.financeSettings.liquidPrimary,
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (isOperating) FontWeight.Bold else FontWeight.Normal,
@@ -489,7 +480,7 @@ private fun AccountHierarchyItemRow(
                             )
                         }
 
-                        // 🟡 沉淀资产
+                        // Sediment Asset
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -505,7 +496,7 @@ private fun AccountHierarchyItemRow(
                                 .testTag("role-sediment-${acc.id}"),
                         ) {
                             Text(
-                                text = "🟡 沉淀资产",
+                                text = ThemeTokens.strings.financeSettings.sedimentAsset,
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (isSediment) FontWeight.Bold else FontWeight.Normal,
@@ -514,7 +505,7 @@ private fun AccountHierarchyItemRow(
                             )
                         }
 
-                        // ⚡ 转出即消费
+                        // Pass-Through
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -530,7 +521,7 @@ private fun AccountHierarchyItemRow(
                                 .testTag("toggle-pass-through-${acc.id}"),
                         ) {
                             Text(
-                                text = "⚡ 转出即消费",
+                                text = ThemeTokens.strings.financeSettings.passThroughExpense,
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (isPass) FontWeight.Bold else FontWeight.Normal,
@@ -540,7 +531,7 @@ private fun AccountHierarchyItemRow(
                         }
                     }
 
-                    // Secondary Net Worth toggle ONLY for Sediment (沉淀资产)
+                    // Secondary Net Worth toggle ONLY for Sediment
                     if (isSediment) {
                         val incNetWorth = acc.includeInNetWorth && !acc.isArchived
                         val pillBg = if (incNetWorth) ThemeTokens.colors.surfaceElevated else ThemeTokens.colors.surfaceMuted
@@ -561,14 +552,14 @@ private fun AccountHierarchyItemRow(
                                 .testTag("toggle-net-worth-${acc.id}"),
                         ) {
                             Text(
-                                text = if (incNetWorth) "✓ 计入净资产" else "✕ 排除净资产",
+                                text = if (incNetWorth) ThemeTokens.strings.financeSettings.includeInNetWorth else ThemeTokens.strings.financeSettings.excludeFromNetWorth,
                                 style = TextStyle(fontSize = 11.sp, color = textCol),
                             )
                         }
                     }
                 }
 
-                // 2. Liability Account Role Segment: [🔴 商业负债] [⚪ 个人借款]
+                // 2. Liability Account Role Segment
                 if (acc.category == AccountCategory.LIABILITY) {
                     val isCommercial = acc.includeInNetWorth && !acc.isArchived
                     Row(
@@ -579,7 +570,7 @@ private fun AccountHierarchyItemRow(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // 🔴 商业负债
+                        // Commercial Liability
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -595,7 +586,7 @@ private fun AccountHierarchyItemRow(
                                 .testTag("role-commercial-${acc.id}"),
                         ) {
                             Text(
-                                text = "🔴 商业负债",
+                                text = ThemeTokens.strings.financeSettings.commercialLiability,
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (isCommercial) FontWeight.Bold else FontWeight.Normal,
@@ -604,7 +595,7 @@ private fun AccountHierarchyItemRow(
                             )
                         }
 
-                        // ⚪ 个人借款
+                        // Personal Loan
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -620,7 +611,7 @@ private fun AccountHierarchyItemRow(
                                 .testTag("role-informal-${acc.id}"),
                         ) {
                             Text(
-                                text = "⚪ 个人借款",
+                                text = ThemeTokens.strings.financeSettings.personalLoan,
                                 style = TextStyle(
                                     fontSize = 11.sp,
                                     fontWeight = if (!isCommercial) FontWeight.Bold else FontWeight.Normal,
@@ -632,7 +623,7 @@ private fun AccountHierarchyItemRow(
                 }
 
                 // 3. Archive Toggle
-                val archiveText = if (acc.isArchived) "已归档" else "正常"
+                val archiveText = if (acc.isArchived) ThemeTokens.strings.financeSettings.archived else ThemeTokens.strings.financeSettings.normal
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -661,7 +652,7 @@ private fun AccountHierarchyItemRow(
                     modifier = Modifier.testTag("finance-settings-pad-btn-${acc.id}"),
                 ) {
                     Icon(imageVector = Lucide.Scale, contentDescription = null, modifier = Modifier.size(13.dp).padding(end = 3.dp))
-                    Text("对账", style = TextStyle(fontSize = 11.sp))
+                    Text(ThemeTokens.strings.financeSettings.reconcileBalance, style = TextStyle(fontSize = 11.sp))
                 }
 
                 if (acc.id !in DEFAULT_FIVE_FINANCE_ACCOUNT_IDS) {
@@ -686,7 +677,7 @@ private fun AccountHierarchyItemRow(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "对账平账：输入银行/账单真实当前余额，系统将自动生成差额平账交易：",
+                    text = ThemeTokens.strings.financeSettings.reconcileBalanceDesc,
                     style = ThemeTokens.type.bodyMuted,
                     color = ThemeTokens.colors.textSecondary,
                 )
@@ -699,7 +690,7 @@ private fun AccountHierarchyItemRow(
                     OutlinedTextField(
                         value = actualBalanceInput,
                         onValueChange = { actualBalanceInput = it },
-                        label = { Text("真实余额 (${acc.currency})") },
+                        label = { Text("${ThemeTokens.strings.financeSettings.actualBalanceLabel} (${acc.currency})") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f).testTag("finance-pad-input-${acc.id}"),
                         singleLine = true,
@@ -719,7 +710,7 @@ private fun AccountHierarchyItemRow(
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.testTag("finance-pad-submit-${acc.id}"),
                     ) {
-                        Text("平账", style = ThemeTokens.type.label)
+                        Text(ThemeTokens.strings.financeSettings.autoPadButton, style = ThemeTokens.type.label)
                     }
                 }
             }
@@ -757,9 +748,9 @@ private fun CreateAccountInlineCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("新建会计账户", style = ThemeTokens.type.cardTitle)
+            Text(ThemeTokens.strings.financeSettings.newAccountTitle, style = ThemeTokens.type.cardTitle)
             OutlinedButton(onClick = onCancel, shape = RoundedCornerShape(6.dp)) {
-                Text("取消", style = ThemeTokens.type.label)
+                Text(ThemeTokens.strings.common.cancel, style = ThemeTokens.type.label)
             }
         }
 
@@ -770,7 +761,7 @@ private fun CreateAccountInlineCard(
             OutlinedTextField(
                 value = path,
                 onValueChange = { path = it },
-                label = { Text("账户路径 (如 Assets:Current:CMB)") },
+                label = { Text(ThemeTokens.strings.financeSettings.accountPathLabel) },
                 modifier = Modifier.weight(1.5f).testTag("settings-create-account-path"),
                 singleLine = true,
             )
@@ -778,7 +769,7 @@ private fun CreateAccountInlineCard(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("账户名称 (如 招商银行)") },
+                label = { Text(ThemeTokens.strings.financeSettings.accountNameLabel) },
                 modifier = Modifier.weight(1f).testTag("settings-create-account-name"),
                 singleLine = true,
             )
@@ -797,7 +788,7 @@ private fun CreateAccountInlineCard(
             OutlinedTextField(
                 value = currency,
                 onValueChange = { currency = it.uppercase() },
-                label = { Text("币种 (CNY, USD, USDT等)") },
+                label = { Text(ThemeTokens.strings.financeSettings.currencyLabel) },
                 modifier = Modifier.weight(1f).testTag("settings-create-account-currency"),
                 singleLine = true,
             )
@@ -806,7 +797,7 @@ private fun CreateAccountInlineCard(
         // Role-based configuration based on category
         if (category == AccountCategory.ASSET) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("资产定位", style = ThemeTokens.type.label)
+                Text(ThemeTokens.strings.financeSettings.assetRoleLabel, style = ThemeTokens.type.label)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -822,7 +813,7 @@ private fun CreateAccountInlineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "🟢 流动主力",
+                            ThemeTokens.strings.financeSettings.liquidPrimary,
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (assetRole == AssetRoleChoice.OPERATING) FontWeight.Bold else FontWeight.Normal,
@@ -839,7 +830,7 @@ private fun CreateAccountInlineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "🟡 沉淀资产",
+                            ThemeTokens.strings.financeSettings.sedimentAsset,
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (assetRole == AssetRoleChoice.SEDIMENT) FontWeight.Bold else FontWeight.Normal,
@@ -856,7 +847,7 @@ private fun CreateAccountInlineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "⚡ 转出即消费",
+                            ThemeTokens.strings.financeSettings.passThroughExpense,
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (assetRole == AssetRoleChoice.PASS_THROUGH) FontWeight.Bold else FontWeight.Normal,
@@ -873,7 +864,7 @@ private fun CreateAccountInlineCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("计入净资产统计 (Net Worth)", style = ThemeTokens.type.label)
+                    Text(ThemeTokens.strings.financeSettings.includeInNetWorth, style = ThemeTokens.type.label)
                     Switch(checked = sedimentIncludeNetWorth, onCheckedChange = { sedimentIncludeNetWorth = it })
                 }
             }
@@ -881,7 +872,7 @@ private fun CreateAccountInlineCard(
 
         if (category == AccountCategory.LIABILITY) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("负债性质", style = ThemeTokens.type.label)
+                Text(ThemeTokens.strings.financeSettings.liabilityNatureLabel, style = ThemeTokens.type.label)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -897,7 +888,7 @@ private fun CreateAccountInlineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "🔴 商业负债",
+                            ThemeTokens.strings.financeSettings.commercialLiability,
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (liabilityRole == LiabilityRoleChoice.COMMERCIAL) FontWeight.Bold else FontWeight.Normal,
@@ -914,7 +905,7 @@ private fun CreateAccountInlineCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "⚪ 个人借款",
+                            ThemeTokens.strings.financeSettings.personalLoan,
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = if (liabilityRole == LiabilityRoleChoice.INFORMAL) FontWeight.Bold else FontWeight.Normal,
@@ -952,7 +943,7 @@ private fun CreateAccountInlineCard(
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.testTag("settings-create-account-submit"),
             ) {
-                Text("保存账户")
+                Text(ThemeTokens.strings.financeSettings.saveAccount)
             }
         }
     }
@@ -968,16 +959,10 @@ private fun CategoryDropdown(
 
     Box(modifier = modifier) {
         OutlinedTextField(
-            value = when (selectedCategory) {
-                AccountCategory.ASSET -> "资产 (Asset)"
-                AccountCategory.LIABILITY -> "负债 (Liability)"
-                AccountCategory.INCOME -> "收入 (Income)"
-                AccountCategory.EXPENSE -> "支出 (Expense)"
-                AccountCategory.EQUITY -> "权益 (Equity)"
-            },
+            value = ThemeTokens.strings.financeSettings.categoryName(selectedCategory),
             onValueChange = {},
             readOnly = true,
-            label = { Text("分类") },
+            label = { Text(ThemeTokens.strings.ledger.accountFilter) },
             trailingIcon = {
                 Icon(
                     imageVector = Lucide.ChevronDown,
@@ -994,13 +979,7 @@ private fun CategoryDropdown(
             onDismissRequest = { expanded = false },
         ) {
             AccountCategory.entries.forEach { cat ->
-                val label = when (cat) {
-                    AccountCategory.ASSET -> "资产 (Asset)"
-                    AccountCategory.LIABILITY -> "负债 (Liability)"
-                    AccountCategory.INCOME -> "收入 (Income)"
-                    AccountCategory.EXPENSE -> "支出 (Expense)"
-                    AccountCategory.EQUITY -> "权益 (Equity)"
-                }
+                val label = ThemeTokens.strings.financeSettings.categoryName(cat)
                 DropdownMenuItem(
                     text = { Text(label) },
                     onClick = {

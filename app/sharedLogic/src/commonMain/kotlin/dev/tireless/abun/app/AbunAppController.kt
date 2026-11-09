@@ -535,6 +535,11 @@ class AbunAppController(
         refresh()
     }
 
+    fun updateLanguagePreference(languagePreference: LanguagePreference) {
+        loginPreferenceStore.setLanguagePreference(languagePreference)
+        refresh()
+    }
+
     fun syncNow() {
         if (_state.value.auth.mode != AuthMode.AUTHENTICATED) return
         requestSync(immediate = true)
@@ -604,7 +609,10 @@ class AbunAppController(
 
     fun refresh(lastSyncedAt: String? = _state.value.syncState.lastSyncedAt) {
         store.taskStore.autoMarkMissedTasks()
-        val preferences = store.preferenceStore.preferences().copy(themePreference = loginPreferenceStore.themePreference())
+        val preferences = store.preferenceStore.preferences().copy(
+            themePreference = loginPreferenceStore.themePreference(),
+            languagePreference = loginPreferenceStore.languagePreference(),
+        )
         val selectedTab = _state.value.selectedTab.takeIf { tab ->
             when (tab) {
                 AppTab.TODAY, AppTab.SETTINGS -> true

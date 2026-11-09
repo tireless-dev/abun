@@ -1,6 +1,7 @@
 package dev.tireless.abun
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import dev.tireless.abun.app.ThemePreference
@@ -25,6 +26,7 @@ class ThemePreferenceSupportTest {
             SettingsScreenContent(
                 state = screenshotState(),
                 onUpdateThemePreference = {},
+                onUpdateLanguagePreference = {},
                 onUpdatePreferences = { _, _, _, _, _, _, _, _, _ -> },
                 onReopenLogin = {},
                 onLogout = {},
@@ -33,7 +35,7 @@ class ThemePreferenceSupportTest {
 
         onNodeWithText("Appearance").fetchSemanticsNode()
         onNodeWithText("Theme").fetchSemanticsNode()
-        onNodeWithText("System").fetchSemanticsNode()
+        onNodeWithTag("theme-option-system").fetchSemanticsNode()
         onNodeWithText("Light").fetchSemanticsNode()
         onNodeWithText("Dark").fetchSemanticsNode()
     }

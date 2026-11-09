@@ -40,6 +40,7 @@ import dev.tireless.abun.app.FinanceDateRangePreset
 import dev.tireless.abun.app.FinanceLedgerFilter
 import dev.tireless.abun.app.FinanceSplitDraft
 import dev.tireless.abun.app.JournalEntryView
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroTaskUpdate
 import dev.tireless.abun.app.RoutineListItemView
@@ -91,6 +92,7 @@ fun AppNavHost(
     onOpenRoutine: (RoutineListItemView) -> Unit,
     onRunRoutine: (RoutineListItemView) -> Unit,
     onUpdateThemePreference: (ThemePreference) -> Unit,
+    onUpdateLanguagePreference: (LanguagePreference) -> Unit = {},
     onUpdatePreferences: (
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,
@@ -208,6 +210,7 @@ fun AppNavHost(
                 onTriggerOtaUpdate = onTriggerOtaUpdate,
                 onUpdateAutoUpdateEnabled = onUpdateAutoUpdateEnabled,
                 onUpdateThemePreference = onUpdateThemePreference,
+                onUpdateLanguagePreference = onUpdateLanguagePreference,
                 onUpdatePreferences = onUpdatePreferences,
                 onReopenLogin = onReopenLogin,
                 onLogout = onLogout,

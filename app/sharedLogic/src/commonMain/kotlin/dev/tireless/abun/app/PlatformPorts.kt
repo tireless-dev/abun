@@ -40,6 +40,8 @@ interface LoginPreferenceStore {
     fun setLoginOmitted(isOmitted: Boolean)
     fun themePreference(): ThemePreference
     fun setThemePreference(themePreference: ThemePreference)
+    fun languagePreference(): LanguagePreference = LanguagePreference.SYSTEM
+    fun setLanguagePreference(languagePreference: LanguagePreference) {}
     fun authSession(): AuthSession?
     fun setAuthSession(session: AuthSession)
     fun clearAuthSession()

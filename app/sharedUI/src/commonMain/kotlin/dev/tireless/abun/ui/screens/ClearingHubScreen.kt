@@ -92,7 +92,7 @@ fun ClearingHubScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "UNSETTLED OBLIGATIONS · 待清算总额",
+                    text = ThemeTokens.strings.clearing.unsettledObligations,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
@@ -148,7 +148,7 @@ fun ClearingHubScreen(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "CREDIT STATEMENTS · 信用卡账单",
+                title = ThemeTokens.strings.clearing.creditStatements,
                 accentDotColor = ThemeTokens.colors.financeAccent,
                 trailingContent = {
                     Row(
@@ -174,7 +174,7 @@ fun ClearingHubScreen(
                                 .testTag("clearing-hub-combined-repay-btn"),
                         ) {
                             Text(
-                                text = "合并还款",
+                                text = ThemeTokens.strings.clearing.combineRepayment,
                                 style = TextStyle(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp,
@@ -198,7 +198,7 @@ fun ClearingHubScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "暂无信用卡账单数据",
+                        text = ThemeTokens.strings.clearing.noCreditStatements,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -225,7 +225,7 @@ fun ClearingHubScreen(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "LOAN AMORTIZATION · 贷款分期",
+                title = ThemeTokens.strings.clearing.loanAmortization,
                 accentDotColor = ThemeTokens.colors.financeAccent,
                 trailingContent = {
                     Box(
@@ -238,7 +238,7 @@ fun ClearingHubScreen(
                             .testTag("clearing-hub-new-plan-btn"),
                     ) {
                         Text(
-                            text = "+ 新建分期",
+                            text = ThemeTokens.strings.clearing.newAmortization,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
@@ -261,7 +261,7 @@ fun ClearingHubScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "暂无贷款或分期计划",
+                        text = ThemeTokens.strings.clearing.noLoans,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -373,7 +373,7 @@ private fun StatementRow(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "一键还款",
+                        text = ThemeTokens.strings.clearing.oneClickRepay,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -568,7 +568,7 @@ private fun AmortizationPlanRow(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "记录本期还款",
+                            text = ThemeTokens.strings.clearing.recordRepayment,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,

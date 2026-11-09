@@ -15,6 +15,7 @@ import dev.tireless.abun.app.FinanceLedgerViewMode
 import dev.tireless.abun.app.FinanceSplitViewItem
 import dev.tireless.abun.app.FinanceTransactionViewItem
 import dev.tireless.abun.app.FinanceViewState
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.PomodoroPhase
 import dev.tireless.abun.app.PomodoroSessionState
 import dev.tireless.abun.app.PomodoroSessionView
@@ -80,6 +81,7 @@ internal fun screenshotState(
         timezoneOverride = "Asia/Shanghai",
         dateFormat = DateFormatPreference.WEEKDAY_MONTH_DAY,
         themePreference = ThemePreference.SYSTEM,
+        languagePreference = LanguagePreference.EN,
     ),
     syncState = SyncStateView(lastSyncedAt = "2026-05-30 14:20"),
     auth = auth,

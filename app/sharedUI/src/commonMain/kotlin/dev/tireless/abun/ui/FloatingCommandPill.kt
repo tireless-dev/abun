@@ -45,12 +45,12 @@ fun FloatingCommandPill(
     modifier: Modifier = Modifier,
 ) {
     val workspaceLabel = when (selectedTab) {
-        AppTab.TODAY -> "Dashboard"
-        AppTab.TASKS -> "Tasks"
-        AppTab.FINANCE -> "Finance"
-        AppTab.NOTES -> "Notes"
-        AppTab.THINGS -> "Things"
-        AppTab.SETTINGS -> "Settings"
+        AppTab.TODAY -> ThemeTokens.strings.nav.dashboard
+        AppTab.TASKS -> ThemeTokens.strings.nav.tasks
+        AppTab.FINANCE -> ThemeTokens.strings.nav.cockpit
+        AppTab.NOTES -> ThemeTokens.strings.nav.notes
+        AppTab.THINGS -> ThemeTokens.strings.nav.things
+        AppTab.SETTINGS -> ThemeTokens.strings.nav.settings
     }
 
     Surface(
@@ -176,7 +176,7 @@ fun FloatingCommandSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "QUICK CAPTURE · 全局快速捕获",
+                        text = ThemeTokens.strings.actions.quickCaptureHeader,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp,
@@ -234,7 +234,7 @@ fun FloatingCommandSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "WORKSPACES · 已启用模块",
+                        text = ThemeTokens.strings.actions.workspacesHeader,
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp,
@@ -290,7 +290,7 @@ fun FloatingCommandSheet(
                                     .background(ThemeTokens.colors.textPrimary),
                             )
                             Text(
-                                text = "Dashboard 总览",
+                                text = ThemeTokens.strings.nav.dashboard,
                                 style = TextStyle(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 12.sp,
@@ -371,7 +371,7 @@ fun FloatingCommandSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "⚙ SETTINGS · MODULES (${enabledModules.size}/4 ON)",
+                    text = "⚙ ${ThemeTokens.strings.settings.modulesCard} (${enabledModules.size}/4)",
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
@@ -379,7 +379,7 @@ fun FloatingCommandSheet(
                     ),
                 )
                 Text(
-                    text = "配置 →",
+                    text = ThemeTokens.strings.actions.configureModules,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
@@ -398,11 +398,12 @@ private fun QuickCaptureTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = ThemeTokens.strings
     val (label, symbol, accentColor, softBg, contentDesc) = when (module) {
-        AppModule.TASKS -> QuickCaptureInfo("任务", "+", ThemeTokens.colors.tasksAccent, ThemeTokens.colors.tasksSoft, "+ Task")
-        AppModule.FINANCE -> QuickCaptureInfo("记账", "¥", ThemeTokens.colors.financeAccent, ThemeTokens.colors.financeSoft, "+ Expense")
-        AppModule.NOTES -> QuickCaptureInfo("闪念", "✎", ThemeTokens.colors.notesAccent, ThemeTokens.colors.notesSoft, "+ Note")
-        AppModule.THINGS -> QuickCaptureInfo("物品", "◈", ThemeTokens.colors.thingsAccent, ThemeTokens.colors.thingsSoft, "+ Thing")
+        AppModule.TASKS -> QuickCaptureInfo(s.actions.quickCaptureTask, "+", ThemeTokens.colors.tasksAccent, ThemeTokens.colors.tasksSoft, "+ ${s.actions.quickCaptureTask}")
+        AppModule.FINANCE -> QuickCaptureInfo(s.actions.quickCaptureExpense, "¥", ThemeTokens.colors.financeAccent, ThemeTokens.colors.financeSoft, "+ ${s.actions.quickCaptureExpense}")
+        AppModule.NOTES -> QuickCaptureInfo(s.actions.quickCaptureNote, "✎", ThemeTokens.colors.notesAccent, ThemeTokens.colors.notesSoft, "+ ${s.actions.quickCaptureNote}")
+        AppModule.THINGS -> QuickCaptureInfo(s.actions.quickCaptureThing, "◈", ThemeTokens.colors.thingsAccent, ThemeTokens.colors.thingsSoft, "+ ${s.actions.quickCaptureThing}")
     }
 
     Surface(
@@ -469,11 +470,28 @@ private fun WorkspaceBentoItem(
     modifier: Modifier = Modifier,
 ) {
     val tag = "command-sheet-module-${module.name}"
+    val s = ThemeTokens.strings
     val (name, accentColor, description) = when (module) {
-        AppModule.TASKS -> Triple("Tasks", ThemeTokens.colors.tasksAccent, "多级任务与番茄钟")
-        AppModule.FINANCE -> Triple("Finance", ThemeTokens.colors.financeAccent, "复式记账与现金流")
-        AppModule.NOTES -> Triple("Notes", ThemeTokens.colors.notesAccent, "双链笔记与闪念")
-        AppModule.THINGS -> Triple("Things", ThemeTokens.colors.thingsAccent, "物品与数字资产")
+        AppModule.TASKS -> Triple(s.nav.tasks, ThemeTokens.colors.tasksAccent, when (ThemeTokens.language) {
+            dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Tasks & Pomodoro"
+            dev.tireless.abun.ui.i18n.AppLanguage.SC -> "多级任务与番茄钟"
+            dev.tireless.abun.ui.i18n.AppLanguage.TC -> "多級任務與番茄鐘"
+        })
+        AppModule.FINANCE -> Triple(s.nav.cockpit, ThemeTokens.colors.financeAccent, when (ThemeTokens.language) {
+            dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Ledger & Cash Flow"
+            dev.tireless.abun.ui.i18n.AppLanguage.SC -> "复式记账与现金流"
+            dev.tireless.abun.ui.i18n.AppLanguage.TC -> "複式記賬與現金流"
+        })
+        AppModule.NOTES -> Triple(s.nav.notes, ThemeTokens.colors.notesAccent, when (ThemeTokens.language) {
+            dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Notes & Journal"
+            dev.tireless.abun.ui.i18n.AppLanguage.SC -> "双链笔记与闪念"
+            dev.tireless.abun.ui.i18n.AppLanguage.TC -> "雙鏈筆記與閃念"
+        })
+        AppModule.THINGS -> Triple(s.nav.things, ThemeTokens.colors.thingsAccent, when (ThemeTokens.language) {
+            dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Items & Assets"
+            dev.tireless.abun.ui.i18n.AppLanguage.SC -> "物品与数字资产"
+            dev.tireless.abun.ui.i18n.AppLanguage.TC -> "物品與數位資產"
+        })
     }
 
     Surface(

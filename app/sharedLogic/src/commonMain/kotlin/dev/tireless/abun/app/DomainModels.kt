@@ -45,6 +45,13 @@ enum class ThemePreference {
     DARK,
 }
 
+enum class LanguagePreference {
+    SYSTEM,
+    EN,
+    SC,
+    TC,
+}
+
 enum class BlankTitlePolicy {
     REJECT_BLANK,
 }
@@ -165,6 +172,7 @@ data class PreferencesViewState(
     val timezoneOverride: String = "SYSTEM",
     val dateFormat: DateFormatPreference = DateFormatPreference.ISO,
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
+    val languagePreference: LanguagePreference = LanguagePreference.SYSTEM,
     val blankTitlePolicy: BlankTitlePolicy = BlankTitlePolicy.REJECT_BLANK,
     val rolloverTime: String = "02:00",
     val enabledModules: Set<AppModule> = AppModule.entries.toSet(),

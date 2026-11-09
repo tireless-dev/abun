@@ -39,6 +39,7 @@ import dev.tireless.abun.SyncStatusPanel
 import dev.tireless.abun.app.AppModule
 import dev.tireless.abun.app.AppUiState
 import dev.tireless.abun.app.DateFormatPreference
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.ThemePreference
 import dev.tireless.abun.core.ota.BuildInfo
 import dev.tireless.abun.dateFormatFromLabel
@@ -50,6 +51,7 @@ import dev.tireless.abun.ui.SwissBentoCard
 import dev.tireless.abun.ui.SwissCardHeader
 import dev.tireless.abun.ui.SwissHairlineDivider
 import dev.tireless.abun.ui.components.SectionHeader
+import dev.tireless.abun.ui.i18n.languageOptionLabel
 import dev.tireless.abun.ui.theme.ThemeTokens
 import dev.tireless.abun.ui.theme.withMaterialContentColor
 
@@ -61,7 +63,8 @@ internal fun SettingsScreen(
     onManualCheckUpdate: () -> Unit = {},
     onTriggerOtaUpdate: () -> Unit = {},
     onUpdateAutoUpdateEnabled: (Boolean) -> Unit = {},
-    onUpdateThemePreference: (ThemePreference) -> Unit,
+    onUpdateThemePreference: (ThemePreference) -> Unit = {},
+    onUpdateLanguagePreference: (LanguagePreference) -> Unit = {},
     onUpdatePreferences: (
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,
@@ -87,6 +90,7 @@ internal fun SettingsScreen(
         onTriggerOtaUpdate = onTriggerOtaUpdate,
         onUpdateAutoUpdateEnabled = onUpdateAutoUpdateEnabled,
         onUpdateThemePreference = onUpdateThemePreference,
+        onUpdateLanguagePreference = onUpdateLanguagePreference,
         onUpdatePreferences = onUpdatePreferences,
         onReopenLogin = onReopenLogin,
         onLogout = onLogout,
@@ -104,7 +108,8 @@ internal fun SettingsScreenContent(
     onManualCheckUpdate: () -> Unit = {},
     onTriggerOtaUpdate: () -> Unit = {},
     onUpdateAutoUpdateEnabled: (Boolean) -> Unit = {},
-    onUpdateThemePreference: (ThemePreference) -> Unit,
+    onUpdateThemePreference: (ThemePreference) -> Unit = {},
+    onUpdateLanguagePreference: (LanguagePreference) -> Unit = {},
     onUpdatePreferences: (
         titlePrefix: String,
         defaultAlarmLeadMinutes: Int,
@@ -122,6 +127,7 @@ internal fun SettingsScreenContent(
     onLoadPredefinedFinanceAccounts: () -> Unit = {},
     onResetFinanceToDefaultAccounts: () -> Unit = {},
 ) {
+    val s = ThemeTokens.strings
     var titlePrefix by remember(state.preferences) { mutableStateOf(state.preferences.titlePrefix) }
     var focusMinutes by remember(state.preferences) { mutableStateOf(state.preferences.focusMinutes.toString()) }
     var shortBreakMinutes by remember(state.preferences) { mutableStateOf(state.preferences.shortBreakMinutes.toString()) }
@@ -145,8 +151,8 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "MODULES · 功能模块开关",
-                trailingText = "${state.preferences.enabledModules.size} OF 4 ENABLED",
+                title = s.settings.modulesCard,
+                trailingText = s.settings.modulesEnabledCount(state.preferences.enabledModules.size, 4),
             )
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -154,26 +160,42 @@ internal fun SettingsScreenContent(
                 ModuleRowConfig(
                     module = AppModule.TASKS,
                     dotColor = ThemeTokens.colors.tasksAccent,
-                    title = "Tasks · 任务与番茄",
-                    subtitle = "Multi-level tasks, Routines & Timeblocks",
+                    title = s.nav.tasks,
+                    subtitle = when (ThemeTokens.language) {
+                        dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Multi-level tasks, Routines & Timeblocks"
+                        dev.tireless.abun.ui.i18n.AppLanguage.SC -> "多级任务、例程与时间块"
+                        dev.tireless.abun.ui.i18n.AppLanguage.TC -> "多級任務、例程與時間塊"
+                    },
                 ),
                 ModuleRowConfig(
                     module = AppModule.FINANCE,
                     dotColor = ThemeTokens.colors.financeAccent,
-                    title = "Finance · 复式记账",
-                    subtitle = "Beancount ledger, Guardrails & Clearing",
+                    title = s.nav.cockpit,
+                    subtitle = when (ThemeTokens.language) {
+                        dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Beancount ledger, Guardrails & Clearing"
+                        dev.tireless.abun.ui.i18n.AppLanguage.SC -> "复式记账、预算护栏与结算"
+                        dev.tireless.abun.ui.i18n.AppLanguage.TC -> "複式記賬、預算護欄與結算"
+                    },
                 ),
                 ModuleRowConfig(
                     module = AppModule.NOTES,
                     dotColor = ThemeTokens.colors.notesAccent,
-                    title = "Notes · 双链笔记",
-                    subtitle = "Daily journal, Markdown & [[Backlinks]]",
+                    title = s.nav.notes,
+                    subtitle = when (ThemeTokens.language) {
+                        dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Daily journal, Markdown & [[Backlinks]]"
+                        dev.tireless.abun.ui.i18n.AppLanguage.SC -> "每日闪念、Markdown 与双链笔记"
+                        dev.tireless.abun.ui.i18n.AppLanguage.TC -> "每日閃念、Markdown 與雙鏈筆記"
+                    },
                 ),
                 ModuleRowConfig(
                     module = AppModule.THINGS,
                     dotColor = ThemeTokens.colors.thingsAccent,
-                    title = "Things · 物品与数字资产",
-                    subtitle = "Physical inventory & Digital subscriptions",
+                    title = s.nav.things,
+                    subtitle = when (ThemeTokens.language) {
+                        dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Physical inventory & Digital subscriptions"
+                        dev.tireless.abun.ui.i18n.AppLanguage.SC -> "实体物品清单与数字资产管理"
+                        dev.tireless.abun.ui.i18n.AppLanguage.TC -> "實體物品清單與數位資產管理"
+                    },
                 ),
             )
 
@@ -222,7 +244,7 @@ internal fun SettingsScreenContent(
             }
         }
 
-        // Section 3: ACCOUNT & SYNC Bento Card
+        // Section 2: CLOUD & SYNC Bento Card
         SwissBentoCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -230,15 +252,15 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "CLOUD & SYNC · 账户与同步",
+                title = s.settings.cloudCard,
                 accentDotColor = ThemeTokens.colors.primary,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("Cloud", "Sync status")
+            SectionHeader(s.settings.cloudCard, s.settings.syncStatus)
             SyncStatusPanel(state)
         }
 
-        // Section 2: TASK & FOCUS DEFAULTS Bento Card
+        // Section 3: TASK & FOCUS DEFAULTS Bento Card
         SwissBentoCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -246,15 +268,15 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(14.dp),
         ) {
             SwissCardHeader(
-                title = "TASK & FOCUS DEFAULTS · 任务与专注设置",
+                title = s.settings.tasksCard,
                 accentDotColor = ThemeTokens.colors.tasksAccent,
             )
             Spacer(modifier = Modifier.height(6.dp))
-            SectionHeader("Defaults", "Task")
+            SectionHeader(s.settings.tasksCard, s.nav.tasks)
             OutlinedTextField(
                 value = titlePrefix,
                 onValueChange = { titlePrefix = it },
-                label = { Text("Task title prefix", style = ThemeTokens.type.label) },
+                label = { Text(s.settings.taskTitlePrefix, style = ThemeTokens.type.label) },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
@@ -267,7 +289,7 @@ internal fun SettingsScreenContent(
                 OutlinedTextField(
                     value = focusMinutes,
                     onValueChange = { focusMinutes = it },
-                    label = { Text("Focus minutes", style = ThemeTokens.type.label) },
+                    label = { Text(s.settings.focusMinutes, style = ThemeTokens.type.label) },
                     modifier = Modifier.weight(1f),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
@@ -275,7 +297,7 @@ internal fun SettingsScreenContent(
                 OutlinedTextField(
                     value = shortBreakMinutes,
                     onValueChange = { shortBreakMinutes = it },
-                    label = { Text("Short break", style = ThemeTokens.type.label) },
+                    label = { Text(s.settings.shortBreakMinutes, style = ThemeTokens.type.label) },
                     modifier = Modifier.weight(1f),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
@@ -283,7 +305,7 @@ internal fun SettingsScreenContent(
                 OutlinedTextField(
                     value = longBreakMinutes,
                     onValueChange = { longBreakMinutes = it },
-                    label = { Text("Long break", style = ThemeTokens.type.label) },
+                    label = { Text(s.settings.longBreakMinutes, style = ThemeTokens.type.label) },
                     modifier = Modifier.weight(1f),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
@@ -291,7 +313,7 @@ internal fun SettingsScreenContent(
             }
         }
 
-        // Section 2c: APPEARANCE Bento Card
+        // Section 4: APPEARANCE & LANGUAGE Bento Card
         SwissBentoCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -299,22 +321,37 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "APPEARANCE · 外观主题",
+                title = s.settings.appearanceCard,
                 accentDotColor = ThemeTokens.colors.primary,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("Appearance", "Theme")
+            SectionHeader(
+                eyebrow = when (ThemeTokens.language) {
+                    dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Appearance"
+                    dev.tireless.abun.ui.i18n.AppLanguage.SC -> "外观"
+                    dev.tireless.abun.ui.i18n.AppLanguage.TC -> "外觀"
+                },
+                title = when (ThemeTokens.language) {
+                    dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Theme"
+                    dev.tireless.abun.ui.i18n.AppLanguage.SC -> "主题"
+                    dev.tireless.abun.ui.i18n.AppLanguage.TC -> "主題"
+                },
+            )
             SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 ThemePreference.entries.forEachIndexed { index, themePreference ->
-                    val option = themePreference.label()
+                    val option = when (themePreference) {
+                        ThemePreference.SYSTEM -> s.settings.themeSystem
+                        ThemePreference.LIGHT -> s.settings.themeLight
+                        ThemePreference.DARK -> s.settings.themeDark
+                    }
                     SegmentedButton(
                         modifier = Modifier.testTag("theme-option-${themePreference.name.lowercase()}"),
-                        selected = option == selectedThemePreference.label(),
+                        selected = themePreference == selectedThemePreference,
                         onClick = {
-                            selectedThemePreference = themePreferenceFromLabel(option)
-                            onUpdateThemePreference(selectedThemePreference)
+                            selectedThemePreference = themePreference
+                            onUpdateThemePreference(themePreference)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
                     ) {
@@ -322,9 +359,42 @@ internal fun SettingsScreenContent(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            SectionHeader(
+                eyebrow = when (ThemeTokens.language) {
+                    dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Language"
+                    dev.tireless.abun.ui.i18n.AppLanguage.SC -> "界面语言"
+                    dev.tireless.abun.ui.i18n.AppLanguage.TC -> "界面語言"
+                },
+                title = when (ThemeTokens.language) {
+                    dev.tireless.abun.ui.i18n.AppLanguage.EN -> "Display"
+                    dev.tireless.abun.ui.i18n.AppLanguage.SC -> "显示模式"
+                    dev.tireless.abun.ui.i18n.AppLanguage.TC -> "顯示模式"
+                },
+            )
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-language-selector"),
+            ) {
+                LanguagePreference.entries.forEachIndexed { index, langPref ->
+                    val optionLabel = languageOptionLabel(langPref, ThemeTokens.language)
+                    SegmentedButton(
+                        modifier = Modifier.testTag("language-option-${langPref.name.lowercase()}"),
+                        selected = langPref == state.preferences.languagePreference,
+                        onClick = {
+                            onUpdateLanguagePreference(langPref)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = LanguagePreference.entries.size),
+                    ) {
+                        Text(optionLabel, style = ThemeTokens.type.body.withMaterialContentColor())
+                    }
+                }
+            }
         }
 
-        // Section 2d: APP PREFERENCES Bento Card
+        // Section 5: APP PREFERENCES Bento Card
         SwissBentoCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -332,15 +402,15 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "APP PREFERENCES · 全局偏好",
+                title = s.settings.title,
                 accentDotColor = ThemeTokens.colors.primary,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("App", "Preferences")
+            SectionHeader(s.settings.title, s.settings.dayRolloverTime)
             OutlinedTextField(
                 value = timezoneOverride,
                 onValueChange = { timezoneOverride = it },
-                label = { Text("Timezone override", style = ThemeTokens.type.label) },
+                label = { Text(s.settings.timezoneOverride, style = ThemeTokens.type.label) },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
@@ -348,7 +418,7 @@ internal fun SettingsScreenContent(
             OutlinedTextField(
                 value = rolloverTime,
                 onValueChange = { rolloverTime = it },
-                label = { Text("Day rollover time", style = ThemeTokens.type.label) },
+                label = { Text(s.settings.dayRolloverTime, style = ThemeTokens.type.label) },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
@@ -384,11 +454,11 @@ internal fun SettingsScreenContent(
                     )
                 },
             ) {
-                Text("Save settings", style = ThemeTokens.type.body.withMaterialContentColor())
+                Text(s.settings.saveSettings, style = ThemeTokens.type.body.withMaterialContentColor())
             }
         }
 
-        // Section Finance Account Presets
+        // Section 6: Finance Account Presets
         if (AppModule.FINANCE in state.preferences.enabledModules) {
             SwissBentoCard(
                 modifier = Modifier
@@ -397,15 +467,15 @@ internal fun SettingsScreenContent(
                 contentPadding = PaddingValues(16.dp),
             ) {
                 SwissCardHeader(
-                    title = "FINANCE PRESETS · 财务账户预设",
+                    title = s.settings.financeCard,
                     accentDotColor = ThemeTokens.colors.financeAccent,
                     trailingText = if (state.financeView.canLoadPredefinedAccounts) "DEFAULT 5" else "CONFIGURED",
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 val statusText = if (state.financeView.canLoadPredefinedAccounts) {
-                    "当前仅有基础五类根账户，可加载预设子账户以快速上手记账。"
+                    s.settings.financePresetsStatusDefault
                 } else {
-                    "已配置子账户或已有记账记录。如需重置，可清除子账户与记录并恢复为基础五类根账户。"
+                    s.settings.financePresetsStatusConfigured
                 }
                 Text(
                     text = statusText,
@@ -424,7 +494,7 @@ internal fun SettingsScreenContent(
                             .weight(1f)
                             .testTag("finance-load-predefined-button"),
                     ) {
-                        Text("加载预设子账户")
+                        Text(s.settings.loadPredefinedAccounts)
                     }
                     OutlinedButton(
                         onClick = onResetFinanceToDefaultAccounts,
@@ -433,13 +503,13 @@ internal fun SettingsScreenContent(
                             .weight(1f)
                             .testTag("finance-reset-default-five-button"),
                     ) {
-                        Text("重置为基础五类账户")
+                        Text(s.settings.resetToDefaultFiveAccounts)
                     }
                 }
             }
         }
 
-        // Section Account Session/Login
+        // Section 7: Account Session/Login
         if (state.auth.mode == dev.tireless.abun.app.AuthMode.GUEST) {
             SwissBentoCard(
                 modifier = Modifier
@@ -448,17 +518,17 @@ internal fun SettingsScreenContent(
                 contentPadding = PaddingValues(16.dp),
             ) {
                 SwissCardHeader(
-                    title = "ACCOUNT · 访客与登录",
+                    title = s.settings.accountInfo,
                     accentDotColor = ThemeTokens.colors.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                SectionHeader("Account", "Login")
+                SectionHeader(s.settings.accountInfo, s.settings.accountLogin)
                 Text(
-                    state.auth.errorMessage ?: "Login anytime to enable cloud sync on this device.",
+                    state.auth.errorMessage ?: s.settings.guestAccountDesc,
                     style = ThemeTokens.type.bodyMuted,
                 )
                 Button(onClick = onReopenLogin) {
-                    Text("Open login", style = ThemeTokens.type.body.withMaterialContentColor())
+                    Text(s.settings.signIn, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         } else {
@@ -469,22 +539,22 @@ internal fun SettingsScreenContent(
                 contentPadding = PaddingValues(16.dp),
             ) {
                 SwissCardHeader(
-                    title = "ACCOUNT · 会话状态",
+                    title = s.settings.accountInfo,
                     accentDotColor = ThemeTokens.colors.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                SectionHeader("Account", "Session")
+                SectionHeader(s.settings.accountInfo, s.settings.signedInAs)
                 Text(
-                    "This device is signed in and can sync with your server account.",
+                    s.settings.signedInAccountDesc,
                     style = ThemeTokens.type.bodyMuted,
                 )
                 OutlinedButton(onClick = onLogout) {
-                    Text("Log out", style = ThemeTokens.type.body.withMaterialContentColor())
+                    Text(s.settings.signOut, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
         }
 
-        // Section Software Updates
+        // Section 8: Software Updates
         SwissBentoCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -492,18 +562,18 @@ internal fun SettingsScreenContent(
             contentPadding = PaddingValues(16.dp),
         ) {
             SwissCardHeader(
-                title = "SOFTWARE · 软件更新",
+                title = s.settings.softwareUpdatesCard,
                 accentDotColor = ThemeTokens.colors.primary,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("Software", "Updates")
+            SectionHeader(s.settings.softwareUpdatesCard, s.settings.version)
             Text(
-                text = "Current Build: ${BuildInfo.BUILD_IDENTIFIER}",
+                text = "${s.settings.currentBuild}: ${BuildInfo.BUILD_IDENTIFIER}",
                 style = ThemeTokens.type.bodyMuted,
             )
             state.apiVersion?.let { apiVersion ->
                 Text(
-                    text = "API Version: v$apiVersion",
+                    text = "${s.settings.apiVersion}: v$apiVersion",
                     style = ThemeTokens.type.bodyMuted,
                 )
             }
@@ -515,7 +585,7 @@ internal fun SettingsScreenContent(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp)) {
                             Text(
-                                text = "New update available: v${status.info.versionName} (${status.info.versionCode}-${status.info.commit})",
+                                text = "${s.actions.updateAvailable}: v${status.info.versionName} (${status.info.versionCode}-${status.info.commit})",
                                 style = ThemeTokens.type.body.copy(fontWeight = FontWeight.Bold),
                             )
                             if (status.info.changelog.isNotBlank()) {
@@ -528,7 +598,7 @@ internal fun SettingsScreenContent(
                                 onClick = onTriggerOtaUpdate,
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text("Update now", style = ThemeTokens.type.body.withMaterialContentColor())
+                                Text(s.actions.updateNow, style = ThemeTokens.type.body.withMaterialContentColor())
                             }
                         }
                     }
@@ -536,7 +606,7 @@ internal fun SettingsScreenContent(
                 is OtaStatus.Downloading -> {
                     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
                         Text(
-                            text = "Downloading update: ${(status.progress * 100).toInt()}%",
+                            text = "${s.actions.installingUpdate} ${(status.progress * 100).toInt()}%",
                             style = ThemeTokens.type.body,
                         )
                         LinearProgressIndicator(
@@ -549,7 +619,7 @@ internal fun SettingsScreenContent(
                 is OtaStatus.Installing -> {
                     Column(verticalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.xsDp)) {
                         Text(
-                            text = "Installing update...",
+                            text = s.actions.installingUpdate,
                             style = ThemeTokens.type.body,
                         )
                         LinearProgressIndicator(
@@ -560,13 +630,13 @@ internal fun SettingsScreenContent(
                 }
                 is OtaStatus.Checking -> {
                     Text(
-                        text = "Checking for updates...",
+                        text = s.common.loading,
                         style = ThemeTokens.type.bodyMuted,
                     )
                 }
                 is OtaStatus.UpToDate -> {
                     Text(
-                        text = "Your app is up to date.",
+                        text = s.common.success,
                         style = ThemeTokens.type.bodyMuted,
                     )
                 }
@@ -589,14 +659,14 @@ internal fun SettingsScreenContent(
                     onClick = onManualCheckUpdate,
                     enabled = !isActionDisabled,
                 ) {
-                    Text("Check for updates", style = ThemeTokens.type.body.withMaterialContentColor())
+                    Text(s.settings.checkForUpdates, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(ThemeTokens.spacing.smDp),
                 ) {
-                    Text("Auto check", style = ThemeTokens.type.label)
+                    Text(s.settings.autoCheckUpdates, style = ThemeTokens.type.label)
                     Switch(
                         checked = isAutoUpdateEnabled,
                         onCheckedChange = onUpdateAutoUpdateEnabled,

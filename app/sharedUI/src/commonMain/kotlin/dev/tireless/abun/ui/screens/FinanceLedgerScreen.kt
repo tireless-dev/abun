@@ -232,6 +232,9 @@ fun FinanceLedgerScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val s = ThemeTokens.strings
+            val lang = ThemeTokens.language
+
             // 1. 排序按钮 (最左侧，两种状态保持相同中性样式)
             Box(
                 modifier = Modifier
@@ -243,7 +246,7 @@ fun FinanceLedgerScreen(
                     .testTag("finance-sort-order-toggle"),
             ) {
                 Text(
-                    text = if (finance.sortAscending) "正序 ↑" else "倒序 ↓",
+                    text = if (finance.sortAscending) "${s.ledger.oldestFirst} ↑" else "${s.ledger.newestFirst} ↓",
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
@@ -268,7 +271,7 @@ fun FinanceLedgerScreen(
                     .testTag("finance-include-future-toggle"),
             ) {
                 Text(
-                    text = if (finance.includeFuture) "包含未来" else "隐藏未来",
+                    text = if (finance.includeFuture) s.ledger.futureIncluded else s.ledger.excludeFuture,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
@@ -295,7 +298,7 @@ fun FinanceLedgerScreen(
                         .testTag("finance-date-range-filter-btn"),
                 ) {
                     Text(
-                        text = "日期: ${finance.dateRangePreset.label} ▾",
+                        text = "${s.ledger.dateRange}: ${dateRangePresetLabel(finance.dateRangePreset, lang)} ▾",
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -311,7 +314,7 @@ fun FinanceLedgerScreen(
                 ) {
                     FinanceDateRangePreset.entries.forEach { preset ->
                         DropdownMenuItem(
-                            text = { Text(preset.label) },
+                            text = { Text(dateRangePresetLabel(preset, lang)) },
                             onClick = {
                                 onSelectDateRange(preset)
                                 dateMenuExpanded = false
@@ -335,8 +338,13 @@ fun FinanceLedgerScreen(
                     .padding(horizontal = 10.dp, vertical = 6.dp)
                     .testTag("finance-account-filter-btn"),
             ) {
+                val accountText = if (finance.filterAccountIds.isEmpty()) {
+                    "${s.ledger.accountFilter}: ${s.common.all} ▾"
+                } else {
+                    "${s.ledger.accountFilter}: ${s.ledger.selectedAccounts(finance.filterAccountIds.size)} ▾"
+                }
                 Text(
-                    text = if (finance.filterAccountIds.isEmpty()) "账户: 全部 ▾" else "账户: 已选 (${finance.filterAccountIds.size}) ▾",
+                    text = accountText,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
@@ -357,7 +365,7 @@ fun FinanceLedgerScreen(
                     .testTag("finance-advanced-filter-btn"),
             ) {
                 Text(
-                    text = "高级筛选 ▾",
+                    text = s.ledger.advancedFilter,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
@@ -402,7 +410,7 @@ fun FinanceLedgerScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            text = "NO TRANSACTIONS · 暂无交易记录",
+                            text = ThemeTokens.strings.ledger.noTransactions,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp,
@@ -411,7 +419,7 @@ fun FinanceLedgerScreen(
                             ),
                         )
                         Text(
-                            text = "使用底部快捷指令栏「+ 记一笔」记录收支或转账",
+                            text = ThemeTokens.strings.ledger.noTransactionsDesc,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
@@ -435,7 +443,7 @@ fun FinanceLedgerScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
-                                        text = "↑ 下拉或点击加载更早记录 (${finance.transactions.size}/${finance.totalTransactionCount})",
+                                        text = ThemeTokens.strings.ledger.pullDownLoadEarlier(finance.transactions.size, finance.totalTransactionCount),
                                         style = TextStyle(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
@@ -472,7 +480,7 @@ fun FinanceLedgerScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
-                                        text = "↓ 滑动或点击加载更早记录 (${finance.transactions.size}/${finance.totalTransactionCount})",
+                                        text = ThemeTokens.strings.ledger.scrollUpLoadEarlier(finance.transactions.size, finance.totalTransactionCount),
                                         style = TextStyle(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
@@ -778,7 +786,7 @@ private fun AccountMultiSelectDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("选择账户", style = ThemeTokens.type.cardTitle)
+            Text(ThemeTokens.strings.ledger.selectAccountsTitle, style = ThemeTokens.type.cardTitle)
         },
         text = {
             Column(
@@ -790,7 +798,7 @@ private fun AccountMultiSelectDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("搜索账户...", style = ThemeTokens.type.label) },
+                    placeholder = { Text(ThemeTokens.strings.ledger.searchAccountsPlaceholder, style = ThemeTokens.type.label) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -804,14 +812,14 @@ private fun AccountMultiSelectDialog(
                             currentSelection = currentSelection + filteredAccounts.map { it.account.id }.toSet()
                         },
                     ) {
-                        Text("全选", style = ThemeTokens.type.label)
+                        Text(ThemeTokens.strings.ledger.selectAll, style = ThemeTokens.type.label)
                     }
                     TextButton(
                         onClick = {
                             currentSelection = emptySet()
                         },
                     ) {
-                        Text("清空", style = ThemeTokens.type.label)
+                        Text(ThemeTokens.strings.ledger.clearSelection, style = ThemeTokens.type.label)
                     }
                 }
 
@@ -874,12 +882,12 @@ private fun AccountMultiSelectDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", style = ThemeTokens.type.body)
+                Text(ThemeTokens.strings.common.cancel, style = ThemeTokens.type.body)
             }
         },
         confirmButton = {
             TextButton(onClick = { onApply(currentSelection) }) {
-                Text("应用", style = ThemeTokens.type.body, fontWeight = FontWeight.Bold)
+                Text(ThemeTokens.strings.common.apply, style = ThemeTokens.type.body, fontWeight = FontWeight.Bold)
             }
         },
     )
@@ -891,21 +899,44 @@ private fun AdvancedFilterPlaceholderDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("高级筛选", style = ThemeTokens.type.cardTitle) },
+        title = { Text(ThemeTokens.strings.ledger.advancedFilterTitle, style = ThemeTokens.type.cardTitle) },
         text = {
             Text(
-                "高级筛选功能正在规划中，后续将支持：\n" +
-                    "• 自定义金额区间\n" +
-                    "• 多币种过滤\n" +
-                    "• 标签与关键字复合检索\n" +
-                    "• 交易对手方 (Payee) 精确筛选",
+                ThemeTokens.strings.ledger.advancedFilterNotice,
                 style = ThemeTokens.type.body,
             )
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("知道了", style = ThemeTokens.type.body, fontWeight = FontWeight.Bold)
+                Text(ThemeTokens.strings.ledger.acknowledged, style = ThemeTokens.type.body, fontWeight = FontWeight.Bold)
             }
         },
     )
+}
+
+private fun dateRangePresetLabel(preset: FinanceDateRangePreset, language: dev.tireless.abun.ui.i18n.AppLanguage): String = when (language) {
+    dev.tireless.abun.ui.i18n.AppLanguage.EN -> when (preset) {
+        FinanceDateRangePreset.ALL -> "All Dates"
+        FinanceDateRangePreset.THIS_MONTH -> "This Month"
+        FinanceDateRangePreset.LAST_MONTH -> "Last Month"
+        FinanceDateRangePreset.LAST_30_DAYS -> "Last 30 Days"
+        FinanceDateRangePreset.LAST_90_DAYS -> "Last 90 Days"
+        FinanceDateRangePreset.THIS_YEAR -> "This Year"
+    }
+    dev.tireless.abun.ui.i18n.AppLanguage.SC -> when (preset) {
+        FinanceDateRangePreset.ALL -> "全部日期"
+        FinanceDateRangePreset.THIS_MONTH -> "本月"
+        FinanceDateRangePreset.LAST_MONTH -> "上月"
+        FinanceDateRangePreset.LAST_30_DAYS -> "近30天"
+        FinanceDateRangePreset.LAST_90_DAYS -> "近90天"
+        FinanceDateRangePreset.THIS_YEAR -> "本年"
+    }
+    dev.tireless.abun.ui.i18n.AppLanguage.TC -> when (preset) {
+        FinanceDateRangePreset.ALL -> "全部日期"
+        FinanceDateRangePreset.THIS_MONTH -> "本月"
+        FinanceDateRangePreset.LAST_MONTH -> "上月"
+        FinanceDateRangePreset.LAST_30_DAYS -> "近30天"
+        FinanceDateRangePreset.LAST_90_DAYS -> "近90天"
+        FinanceDateRangePreset.THIS_YEAR -> "本年"
+    }
 }

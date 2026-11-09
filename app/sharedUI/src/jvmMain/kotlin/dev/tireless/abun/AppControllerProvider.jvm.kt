@@ -7,6 +7,7 @@ import dev.tireless.abun.app.AuthSession
 import dev.tireless.abun.app.AppDependencies
 import dev.tireless.abun.app.DefaultTimeProvider
 import dev.tireless.abun.app.JvmDatabaseDriverFactory
+import dev.tireless.abun.app.LanguagePreference
 import dev.tireless.abun.app.LoginPreferenceStore
 import dev.tireless.abun.app.JvmNodeIdProvider
 import dev.tireless.abun.app.DEFAULT_SERVER_BASE_URL
@@ -93,6 +94,19 @@ private class JvmLoginPreferenceStore : LoginPreferenceStore {
         }
     }
 
+    override fun languagePreference(): LanguagePreference =
+        preferences.get(LANGUAGE_PREFERENCE_KEY, LanguagePreference.SYSTEM.name)
+            ?.let { runCatching { LanguagePreference.valueOf(it) }.getOrNull() }
+            ?: LanguagePreference.SYSTEM
+
+    override fun setLanguagePreference(languagePreference: LanguagePreference) {
+        if (languagePreference == LanguagePreference.SYSTEM) {
+            preferences.remove(LANGUAGE_PREFERENCE_KEY)
+        } else {
+            preferences.put(LANGUAGE_PREFERENCE_KEY, languagePreference.name)
+        }
+    }
+
     override fun authSession(): AuthSession? {
         val userId = preferences.get(AUTH_USER_ID_KEY, null) ?: return null
         val accessToken = preferences.get(AUTH_ACCESS_TOKEN_KEY, null) ?: return null
@@ -131,6 +145,7 @@ private class JvmLoginPreferenceStore : LoginPreferenceStore {
 
 private const val LOGIN_OMITTED_KEY = "app.auth.login_omitted"
 private const val THEME_PREFERENCE_KEY = "app.theme_preference"
+private const val LANGUAGE_PREFERENCE_KEY = "app.language_preference"
 private const val AUTH_USER_ID_KEY = "app.auth.user_id"
 private const val AUTH_ACCESS_TOKEN_KEY = "app.auth.access_token"
 private const val AUTH_ACCESS_EXPIRES_AT_KEY = "app.auth.access_token_expires_at"

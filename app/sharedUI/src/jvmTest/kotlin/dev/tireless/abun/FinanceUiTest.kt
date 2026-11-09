@@ -138,7 +138,7 @@ class FinanceUiTest {
         var includeFuture by mutableStateOf(false)
 
         setContent {
-            AppTheme {
+            AppTheme(languagePreference = dev.tireless.abun.app.LanguagePreference.SC) {
                 FinanceLedgerScreen(
                     state = testFinanceState(
                         transactions = listOf(txItem),
