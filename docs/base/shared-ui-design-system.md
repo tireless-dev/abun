@@ -117,8 +117,16 @@ Sub-navigation within workspaces evolves from legacy top-app-bar dropdown select
 
 ### Bottom Action Pill Overlay & Toast Clearance
 
-- The centered `FloatingCommandPill` sits at `Alignment.BottomCenter` with `padding(bottom = 12.dp)` and a height footprint of ~48dp (top edge at ~60dp from screen bottom).
-- Any floating banner, toast, or action prompt (such as `OtaToastCard` or `FloatingCommandSheet`) anchored at `BottomCenter` must apply `.padding(bottom = 76.dp)` (or higher) to sit cleanly above the pill and guarantee zero visual overlap.
+- The centered `FloatingCommandPill` sits at `Alignment.BottomCenter` with `.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))` and `padding(bottom = 24.dp)` to guarantee ample clearance above the mobile system gesture navigation bar (home indicator) as well as the bottom window edge on desktop.
+- Any floating banner, toast, or action prompt (such as `OtaToastCard` or `FloatingCommandSheet`) anchored at `BottomCenter` applies `.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))` and `.padding(bottom = 88.dp)` (or higher) to sit cleanly above the pill with zero visual overlap.
+
+### Screen Top Bar Conventions
+
+- **Today / Dashboard**:
+  - Deliberately omits the `TopAppBar`. Redundant top chrome (duplicate date, `DASHBOARD` label, `LOCAL-FIRST` tag, and redundant settings icon) is removed.
+  - The page body begins cleanly with the daily quote and an enlarged, prominent date header (`20sp` monospace bold) paired with localized date-stepping buttons (`Previous` / `Today` / `Next`).
+- **Feature Workspaces (Tasks, Finance, Settings)**:
+  - Retain focused `TopAppBar` hosting inline segmented sub-navigation or back navigation.
 
 ### Typography
 

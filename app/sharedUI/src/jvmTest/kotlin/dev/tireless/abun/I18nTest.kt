@@ -60,6 +60,16 @@ class I18nTest {
         assertEquals("Cockpit", en.nav.cockpit)
         assertEquals("总览", sc.nav.cockpit)
         assertEquals("總覽", tc.nav.cockpit)
+
+        assertEquals("Previous", en.common.previous)
+        assertEquals("前一天", sc.common.previous)
+        assertEquals("前一天", tc.common.previous)
+        assertEquals("Today", en.common.today)
+        assertEquals("今天", sc.common.today)
+        assertEquals("今天", tc.common.today)
+        assertEquals("Next", en.common.next)
+        assertEquals("后一天", sc.common.next)
+        assertEquals("後一天", tc.common.next)
     }
 
     @Test

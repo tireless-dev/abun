@@ -24,6 +24,9 @@ interface CommonStrings {
     val clear: String
     val all: String
     val apply: String
+    val previous: String
+    val today: String
+    val next: String
     fun itemsCount(count: Int): String
 }
 
@@ -269,6 +272,9 @@ object EnStrings : AppStrings {
         override val clear = "Clear"
         override val all = "All"
         override val apply = "Apply"
+        override val previous = "Previous"
+        override val today = "Today"
+        override val next = "Next"
         override fun itemsCount(count: Int) = if (count == 1) "1 item" else "$count items"
     }
 
@@ -511,6 +517,9 @@ object ScStrings : AppStrings {
         override val clear = "清除"
         override val all = "全部"
         override val apply = "应用"
+        override val previous = "前一天"
+        override val today = "今天"
+        override val next = "后一天"
         override fun itemsCount(count: Int) = "$count 项"
     }
 
@@ -753,6 +762,9 @@ object TcStrings : AppStrings {
         override val clear = "清除"
         override val all = "全部"
         override val apply = "套用"
+        override val previous = "前一天"
+        override val today = "今天"
+        override val next = "後一天"
         override fun itemsCount(count: Int) = "$count 項"
     }
 

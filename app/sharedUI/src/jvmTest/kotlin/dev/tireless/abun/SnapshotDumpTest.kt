@@ -290,12 +290,14 @@ class SnapshotDumpTest {
             Scaffold(
                 containerColor = if (state.selectedTab == AppTab.TODAY) ThemeTokens.colors.canvas else MaterialTheme.colorScheme.background,
                 topBar = {
-                    AbunTopAppBar(
-                        selectedTab = state.selectedTab,
-                        selectedTaskSubTab = state.selectedTaskSubTab,
-                        selectedDate = state.selectedDate,
-                        currentRoute = currentRoute,
-                    )
+                    if (state.selectedTab != AppTab.TODAY) {
+                        AbunTopAppBar(
+                            selectedTab = state.selectedTab,
+                            selectedTaskSubTab = state.selectedTaskSubTab,
+                            selectedDate = state.selectedDate,
+                            currentRoute = currentRoute,
+                        )
+                    }
                 },
             ) { padding: PaddingValues ->
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -303,9 +305,9 @@ class SnapshotDumpTest {
                         modifier = Modifier.padding(padding),
                         contentPadding = PaddingValues(
                             start = ThemeTokens.spacing.mdDp,
-                            top = ThemeTokens.spacing.mdDp,
+                            top = if (state.selectedTab == AppTab.TODAY) 20.dp else ThemeTokens.spacing.mdDp,
                             end = ThemeTokens.spacing.mdDp,
-                            bottom = 80.dp,
+                            bottom = 96.dp,
                         ),
                         verticalSpacing = if (state.selectedTab == AppTab.TODAY) ThemeTokens.spacing.mdDp else ThemeTokens.spacing.lgDp,
                     ) {
@@ -323,7 +325,7 @@ class SnapshotDumpTest {
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 76.dp),
+                            .padding(bottom = 88.dp),
                     ) {
                         FloatingCommandSheet(
                             enabledModules = state.preferences.enabledModules,
@@ -343,7 +345,7 @@ class SnapshotDumpTest {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 24.dp),
             ) {
                 FloatingCommandPill(
                     selectedTab = state.selectedTab,

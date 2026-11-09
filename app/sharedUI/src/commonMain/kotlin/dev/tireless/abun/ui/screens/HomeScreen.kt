@@ -169,7 +169,7 @@ internal fun HomeScreen(
                     text = state.selectedDate,
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = ThemeTokens.colors.textPrimary,
                     ),
@@ -178,6 +178,7 @@ internal fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val s = ThemeTokens.strings.common
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -185,7 +186,7 @@ internal fun HomeScreen(
                         color = ThemeTokens.colors.subnavTrack,
                     ) {
                         Text(
-                            text = "Previous",
+                            text = s.previous,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
@@ -201,7 +202,7 @@ internal fun HomeScreen(
                         color = ThemeTokens.colors.subnavTrack,
                     ) {
                         Text(
-                            text = "Today",
+                            text = s.today,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
@@ -217,7 +218,7 @@ internal fun HomeScreen(
                         color = ThemeTokens.colors.subnavTrack,
                     ) {
                         Text(
-                            text = "Next",
+                            text = s.next,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,

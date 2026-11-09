@@ -217,76 +217,15 @@ internal fun AbunTopAppBar(
     onSelectTaskSubTab: (TaskSubTab) -> Unit = {},
     onNavigateRoute: (String) -> Unit = {},
 ) {
+    if (selectedTab == AppTab.TODAY) return
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = if (selectedTab == AppTab.TODAY) ThemeTokens.colors.canvas else ThemeTokens.colors.background,
+            containerColor = ThemeTokens.colors.background,
             titleContentColor = ThemeTokens.colors.textPrimary,
         ),
         title = {
             when (selectedTab) {
-                AppTab.TODAY -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "$selectedDate · DASHBOARD",
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = ThemeTokens.colors.textSecondary,
-                            ),
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = ThemeTokens.colors.financeSoft,
-                                modifier = Modifier.padding(end = 4.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(ThemeTokens.colors.financeAccent),
-                                    )
-                                    Text(
-                                        text = "LOCAL-FIRST",
-                                        style = TextStyle(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = ThemeTokens.colors.financeAccent,
-                                        ),
-                                    )
-                                }
-                            }
-                            IconButton(
-                                onClick = { onSelectTab(AppTab.SETTINGS) },
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .testTag("topbar-settings-button"),
-                            ) {
-                                Icon(
-                                    imageVector = Lucide.Settings,
-                                    contentDescription = "Settings",
-                                    tint = ThemeTokens.colors.textSecondary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    }
-                }
+                AppTab.TODAY -> Unit
                 AppTab.TASKS -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -447,7 +386,8 @@ private fun FloatingCommandOverlay(
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(bottom = 76.dp)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                        .padding(bottom = 88.dp)
                         .clickable(enabled = false) {},
                 ) {
                     FloatingCommandSheet(
@@ -484,7 +424,8 @@ private fun FloatingCommandOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .padding(bottom = 24.dp),
         ) {
             FloatingCommandPill(
                 selectedTab = state.selectedTab,
@@ -637,20 +578,22 @@ fun App() {
             MaterialScaffold(
             containerColor = if (state.selectedTab == AppTab.TODAY) ThemeTokens.colors.canvas else MaterialTheme.colorScheme.background,
             topBar = {
-                AbunTopAppBar(
-                    selectedTab = state.selectedTab,
-                    selectedTaskSubTab = state.selectedTaskSubTab,
-                    selectedDate = state.selectedDate,
-                    currentRoute = currentRoute,
-                    onSelectTab = controller::selectTab,
-                    onSelectTaskSubTab = controller::selectTaskSubTab,
-                    onNavigateRoute = { route ->
-                        navController.navigate(route) {
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
+                if (state.selectedTab != AppTab.TODAY) {
+                    AbunTopAppBar(
+                        selectedTab = state.selectedTab,
+                        selectedTaskSubTab = state.selectedTaskSubTab,
+                        selectedDate = state.selectedDate,
+                        currentRoute = currentRoute,
+                        onSelectTab = controller::selectTab,
+                        onSelectTaskSubTab = controller::selectTaskSubTab,
+                        onNavigateRoute = { route ->
+                            navController.navigate(route) {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    )
+                }
             },
         ) { padding: PaddingValues ->
             Box(modifier = Modifier.fillMaxSize()) {
@@ -658,9 +601,9 @@ fun App() {
                     modifier = Modifier.padding(padding),
                     contentPadding = PaddingValues(
                         start = ThemeTokens.spacing.mdDp,
-                        top = ThemeTokens.spacing.mdDp,
+                        top = if (state.selectedTab == AppTab.TODAY) 20.dp else ThemeTokens.spacing.mdDp,
                         end = ThemeTokens.spacing.mdDp,
-                        bottom = 80.dp,
+                        bottom = 96.dp,
                     ),
                     verticalSpacing = if (state.selectedTab == AppTab.TODAY) ThemeTokens.spacing.mdDp else ThemeTokens.spacing.lgDp,
                 ) {
@@ -800,7 +743,8 @@ fun App() {
                         .align(Alignment.BottomCenter)
                         .padding(padding)
                         .padding(horizontal = ThemeTokens.spacing.mdDp)
-                        .padding(bottom = 76.dp),
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                        .padding(bottom = 88.dp),
                 ) {
                     val updateInfo = (otaStatus as? OtaStatus.UpdateAvailable)?.info
                     if (updateInfo != null) {
@@ -881,11 +825,11 @@ private fun OtaToastCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(ThemeTokens.colors.primary),
+                    Icon(
+                        imageVector = Lucide.Diamond,
+                        contentDescription = null,
+                        tint = ThemeTokens.colors.primary,
+                        modifier = Modifier.size(12.dp),
                     )
                     Text(
                         text = "New update available",
