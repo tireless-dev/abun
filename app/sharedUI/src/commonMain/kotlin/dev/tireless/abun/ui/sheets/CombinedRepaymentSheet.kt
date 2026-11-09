@@ -235,7 +235,7 @@ fun CombinedRepaymentSheetContent(
                                 }
                             }
                         }
-                        Text(text = debtAmt, style = ThemeTokens.type.cardTitle, fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                        Text(text = debtAmt, style = ThemeTokens.type.cardTitle, fontWeight = FontWeight.Bold, color = ThemeTokens.colors.error)
                     }
                 }
             }

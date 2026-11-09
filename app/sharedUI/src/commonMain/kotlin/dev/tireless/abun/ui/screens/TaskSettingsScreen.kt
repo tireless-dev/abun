@@ -70,6 +70,7 @@ internal fun TaskSettingsScreen(
                 modifier = Modifier.fillMaxWidth().testTag("task-settings-title-prefix-field"),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedTextField(
@@ -79,6 +80,7 @@ internal fun TaskSettingsScreen(
                 modifier = Modifier.fillMaxWidth().testTag("task-settings-alarm-lead-field"),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
         }
 
@@ -105,6 +107,7 @@ internal fun TaskSettingsScreen(
                     modifier = Modifier.weight(1f).testTag("task-settings-focus-minutes-field"),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
+                    colors = ThemeTokens.outlinedTextFieldColors(),
                 )
                 OutlinedTextField(
                     value = shortBreakMinutes,
@@ -113,6 +116,7 @@ internal fun TaskSettingsScreen(
                     modifier = Modifier.weight(1f).testTag("task-settings-short-break-field"),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
+                    colors = ThemeTokens.outlinedTextFieldColors(),
                 )
                 OutlinedTextField(
                     value = longBreakMinutes,
@@ -121,6 +125,7 @@ internal fun TaskSettingsScreen(
                     modifier = Modifier.weight(1f).testTag("task-settings-long-break-field"),
                     textStyle = ThemeTokens.type.body,
                     singleLine = true,
+                    colors = ThemeTokens.outlinedTextFieldColors(),
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -135,6 +140,7 @@ internal fun TaskSettingsScreen(
                     )
                 },
                 modifier = Modifier.testTag("task-settings-save-button"),
+                colors = ThemeTokens.buttonColors(),
             ) {
                 Text(s.taskSettings.saveSettings, style = ThemeTokens.type.body.withMaterialContentColor())
             }

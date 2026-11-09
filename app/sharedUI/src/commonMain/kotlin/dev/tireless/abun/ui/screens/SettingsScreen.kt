@@ -241,6 +241,7 @@ internal fun SettingsScreenContent(
                     Switch(
                         checked = config.module in state.preferences.enabledModules,
                         onCheckedChange = { onToggleModule(config.module, it) },
+                        colors = ThemeTokens.switchColors(),
                         modifier = Modifier.testTag("module-toggle-${config.module.name.lowercase()}"),
                     )
                 }
@@ -297,6 +298,7 @@ internal fun SettingsScreenContent(
                             onUpdateThemePreference(themePreference)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
+                        colors = ThemeTokens.segmentedButtonColors(),
                     ) {
                         Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
                     }
@@ -327,6 +329,7 @@ internal fun SettingsScreenContent(
                             onUpdateLanguagePreference(langPref)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = LanguagePreference.entries.size),
+                        colors = ThemeTokens.segmentedButtonColors(),
                     ) {
                         Text(optionLabel, style = ThemeTokens.type.body.withMaterialContentColor())
                     }
@@ -353,6 +356,7 @@ internal fun SettingsScreenContent(
                 modifier = Modifier.fillMaxWidth().testTag("settings-timezone-field"),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedTextField(
@@ -362,6 +366,7 @@ internal fun SettingsScreenContent(
                 modifier = Modifier.fillMaxWidth().testTag("settings-rollover-field"),
                 textStyle = ThemeTokens.type.body,
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -381,6 +386,7 @@ internal fun SettingsScreenContent(
                         selected = option == selectedDateFormat.label(),
                         onClick = { selectedDateFormat = dateFormatFromLabel(option) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = DateFormatPreference.entries.size),
+                        colors = ThemeTokens.segmentedButtonColors(),
                     ) {
                         Text(option, style = ThemeTokens.type.body.withMaterialContentColor())
                     }
@@ -407,6 +413,7 @@ internal fun SettingsScreenContent(
                     )
                 },
                 modifier = Modifier.testTag("settings-save-button"),
+                colors = ThemeTokens.buttonColors(),
             ) {
                 Text(s.settings.saveSettings, style = ThemeTokens.type.body.withMaterialContentColor())
             }
@@ -452,7 +459,10 @@ internal fun SettingsScreenContent(
                     style = ThemeTokens.type.bodyMuted,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = onLogout) {
+                OutlinedButton(
+                    onClick = onLogout,
+                    colors = ThemeTokens.outlinedButtonColors(),
+                ) {
                     Text(s.settings.signOut, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
             }
@@ -570,6 +580,7 @@ internal fun SettingsScreenContent(
                 OutlinedButton(
                     onClick = onManualCheckUpdate,
                     enabled = !isActionDisabled,
+                    colors = ThemeTokens.outlinedButtonColors(),
                 ) {
                     Text(s.settings.checkForUpdates, style = ThemeTokens.type.body.withMaterialContentColor())
                 }
@@ -582,6 +593,8 @@ internal fun SettingsScreenContent(
                     Switch(
                         checked = isAutoUpdateEnabled,
                         onCheckedChange = onUpdateAutoUpdateEnabled,
+                        colors = ThemeTokens.switchColors(),
+                        modifier = Modifier.testTag("ota-auto-update-switch"),
                     )
                 }
             }

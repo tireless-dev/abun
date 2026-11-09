@@ -231,6 +231,7 @@ fun FinanceSettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .testTag("finance-load-predefined-button"),
+                    colors = ThemeTokens.buttonColors(),
                 ) {
                     Text(s.loadPredefinedAccounts)
                 }
@@ -240,6 +241,7 @@ fun FinanceSettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .testTag("finance-reset-default-five-button"),
+                    colors = ThemeTokens.outlinedButtonColors(),
                 ) {
                     Text(s.resetToDefaultFiveAccounts)
                 }
@@ -290,6 +292,7 @@ fun FinanceSettingsScreen(
                 placeholder = { Text(ThemeTokens.strings.financeSettings.searchPlaceholder, style = ThemeTokens.type.label) },
                 singleLine = true,
                 modifier = Modifier.width(180.dp).testTag("finance-settings-search-input"),
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
         }
 
@@ -817,6 +820,7 @@ private fun CreateAccountInlineCard(
                 label = { Text(ThemeTokens.strings.financeSettings.accountPathLabel) },
                 modifier = Modifier.weight(1.5f).testTag("settings-create-account-path"),
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
 
             OutlinedTextField(
@@ -825,6 +829,7 @@ private fun CreateAccountInlineCard(
                 label = { Text(ThemeTokens.strings.financeSettings.accountNameLabel) },
                 modifier = Modifier.weight(1f).testTag("settings-create-account-name"),
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
         }
 
@@ -844,6 +849,7 @@ private fun CreateAccountInlineCard(
                 label = { Text(ThemeTokens.strings.financeSettings.currencyLabel) },
                 modifier = Modifier.weight(1f).testTag("settings-create-account-currency"),
                 singleLine = true,
+                colors = ThemeTokens.outlinedTextFieldColors(),
             )
         }
 
@@ -918,7 +924,11 @@ private fun CreateAccountInlineCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(ThemeTokens.strings.financeSettings.includeInNetWorth, style = ThemeTokens.type.label)
-                    Switch(checked = sedimentIncludeNetWorth, onCheckedChange = { sedimentIncludeNetWorth = it })
+                    Switch(
+                        checked = sedimentIncludeNetWorth,
+                        onCheckedChange = { sedimentIncludeNetWorth = it },
+                        colors = ThemeTokens.switchColors(),
+                    )
                 }
             }
         }
@@ -995,6 +1005,7 @@ private fun CreateAccountInlineCard(
                 enabled = path.isNotBlank() && name.isNotBlank(),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.testTag("settings-create-account-submit"),
+                colors = ThemeTokens.buttonColors(),
             ) {
                 Text(ThemeTokens.strings.financeSettings.saveAccount)
             }
@@ -1025,6 +1036,7 @@ private fun CategoryDropdown(
             },
             modifier = Modifier.fillMaxWidth().clickable { expanded = true },
             singleLine = true,
+            colors = ThemeTokens.outlinedTextFieldColors(),
         )
 
         DropdownMenu(

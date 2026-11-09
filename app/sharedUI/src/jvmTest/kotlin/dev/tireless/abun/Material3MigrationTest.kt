@@ -31,9 +31,9 @@ class Material3MigrationTest {
         }
 
         waitForIdle()
-        assertEquals(Color(0xFF3F4EAE), primary)
+        assertEquals(Color(0xFF0F172A), primary)
         assertEquals(Color(0xFFFFFFFF), surface)
-        assertEquals(Color(0xFFFAFAF7), background)
+        assertEquals(Color(0xFFF7F7F4), background)
     }
 
     @Test

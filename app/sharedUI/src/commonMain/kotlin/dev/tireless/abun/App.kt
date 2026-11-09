@@ -220,7 +220,7 @@ internal fun AbunTopAppBar(
     if (selectedTab == AppTab.TODAY) return
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = ThemeTokens.colors.background,
+            containerColor = ThemeTokens.colors.canvas,
             titleContentColor = ThemeTokens.colors.textPrimary,
         ),
         title = {
@@ -578,7 +578,7 @@ fun App() {
 
         Box(modifier = Modifier.fillMaxSize()) {
             MaterialScaffold(
-            containerColor = if (state.selectedTab == AppTab.TODAY) ThemeTokens.colors.canvas else MaterialTheme.colorScheme.background,
+            containerColor = ThemeTokens.colors.canvas,
             topBar = {
                 if (state.selectedTab != AppTab.TODAY) {
                     AbunTopAppBar(
@@ -997,7 +997,7 @@ internal fun AppContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         MaterialScaffold(
-            containerColor = if (state.selectedTab == AppTab.TODAY) ThemeTokens.colors.canvas else MaterialTheme.colorScheme.background,
+            containerColor = ThemeTokens.colors.canvas,
             topBar = {
                 AbunTopAppBar(
                     selectedTab = state.selectedTab,

@@ -99,6 +99,20 @@ To preserve clean functional boundaries, settings are partitioned into module-ow
   - In Settings, exposed via an inline 4-segment choice: `System`, `En`, `SC`, `TC` (when active language is English) or `系统`, `英文`, `简中`, `繁中` (Simplified Chinese) or `系統`, `英文`, `簡中`, `繁中` (Traditional Chinese).
   - Hot-switching immediately updates `LocalAppStrings` and `LocalAppLanguage` in `AppTheme`, reactively re-rendering the entire Compose hierarchy without application restart.
 
+### Control Token Rules (Elimination of Material 3 Default Palette Leakage)
+
+To maintain absolute aesthetic consistency with Swiss Precision (B1), default Google Material 3 color palette defaults (such as default Indigo/Purple `0xFF3F4EAE` and Teal/Sage `0xFFDCEDE9`) are eliminated:
+
+- **MaterialTheme Palette Realignment**:
+  - `MaterialTheme.colorScheme.primary` is aligned to high-contrast monochrome (`#0F172A` in Light, `#F8FAFC` in Dark).
+  - `MaterialTheme.colorScheme.secondaryContainer` is aligned to subtle stone (`#EAE9E3` in Light, `#1E2227` in Dark).
+  - `MaterialTheme.colorScheme.background` is aligned to canvas (`#F7F7F4` in Light, `#111315` in Dark).
+- **Control Styling Primitives (`ThemeTokens`)**:
+  - `switchColors()`: High-contrast thumb and track (`textPrimary` / `surface` when checked; `subnavTrack` / `textTertiary` when unchecked). No purple glow.
+  - `segmentedButtonColors()`: Active segment uses `surface` background, `textPrimary` bold label, and `borderStrong` border; inactive segments remain transparent with `textSecondary`. No sage green tint.
+  - `outlinedTextFieldColors()`: Focused borders, labels, and cursors strictly track `textPrimary` with `surface` container; unfocused borders track `border`. No purple focus indicator.
+  - `buttonColors()` & `outlinedButtonColors()`: High-contrast Swiss styling (`textPrimary` container with `surface` content for filled buttons; `textPrimary` content with transparent container for outlined buttons).
+
 ### Color
 
 - **WCAG 2.1 AA Contrast Standard**:
